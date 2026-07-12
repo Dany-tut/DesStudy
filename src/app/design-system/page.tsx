@@ -9,6 +9,9 @@ import { Slider } from '@/components/ui/Slider';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Switch } from '@/components/ui/Switch';
 import { ChoiceCard } from '@/components/ui/ChoiceCard';
+import { TilePicker } from '@/components/ui/TilePicker';
+import { SwatchPicker } from '@/components/ui/SwatchPicker';
+import { AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 
 /**
  * Design System showcase — Chapter 3 (UX/UI Bible) made visible.
@@ -21,6 +24,9 @@ export default function DesignSystemPage() {
   const [density, setDensity] = useState<'compact' | 'cozy' | 'roomy'>('cozy');
   const [notifications, setNotifications] = useState(true);
   const [choice, setChoice] = useState<string | null>('flex');
+  const [padding, setPadding] = useState(16);
+  const [align, setAlign] = useState<'left' | 'center' | 'right'>('center');
+  const [sample, setSample] = useState<'a' | 'b' | 'c' | 'd'>('c');
 
   const toggle = () => {
     const next = !dark;
@@ -153,8 +159,11 @@ export default function DesignSystemPage() {
       </Section>
 
       <Section title="Степпер — точная настройка на 8pt-сетке">
-        <div className="max-w-[280px]">
-          <Stepper label="Отступ между блоками" value={gap} min={0} max={64} step={4} onChange={setGap} />
+        <div className="flex flex-wrap items-start gap-10">
+          <div className="max-w-[280px]">
+            <Stepper label="Отступ между блоками" value={gap} min={0} max={64} step={4} onChange={setGap} />
+          </div>
+          <Stepper label="Внутренние поля" value={padding} min={0} max={48} step={4} variant="dots" onChange={setPadding} />
         </div>
       </Section>
 
@@ -191,6 +200,36 @@ export default function DesignSystemPage() {
             onClick={() => setChoice('absolute')}
           />
           <ChoiceCard label="float: left" selected={false} disabled onClick={() => setChoice('float')} />
+        </div>
+      </Section>
+
+      <Section title="Пикеры — иконки-плитки и сэмплы">
+        <div className="flex flex-col gap-8">
+          <div>
+            <p className="mb-3 text-footnote text-secondary">Выравнивание блока</p>
+            <TilePicker
+              value={align}
+              onChange={setAlign}
+              options={[
+                { value: 'left', label: 'Слева', icon: AlignLeft },
+                { value: 'center', label: 'Центр', icon: AlignCenter },
+                { value: 'right', label: 'Справа', icon: AlignRight },
+              ]}
+            />
+          </div>
+          <div>
+            <p className="mb-3 text-footnote text-secondary">Какой пример верный?</p>
+            <SwatchPicker
+              value={sample}
+              onChange={setSample}
+              options={[
+                { value: 'a', label: 'A' },
+                { value: 'b', label: 'B' },
+                { value: 'c', label: 'C', swatch: 'var(--brand)' },
+                { value: 'd', label: 'D' },
+              ]}
+            />
+          </div>
         </div>
       </Section>
     </main>

@@ -24,7 +24,7 @@ export function ChoiceCard({
       disabled={disabled}
       onClick={onClick}
       className={[
-        'flex items-center justify-between gap-2 rounded-lg border px-4 py-3 text-left text-callout transition-fast',
+        'flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left text-callout transition-fast',
         correct
           ? 'border-success bg-success/10 text-primary'
           : selected
@@ -33,9 +33,18 @@ export function ChoiceCard({
       ].join(' ')}
     >
       {label}
-      {(correct || (selected && !disabled)) && (
-        <Check size={16} className={correct ? 'text-success' : 'text-brand'} />
-      )}
+      <span
+        className={[
+          'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-fast',
+          correct
+            ? 'border-success bg-success text-on-brand'
+            : selected
+              ? 'border-brand bg-brand text-on-brand'
+              : 'border-border-strong bg-transparent',
+        ].join(' ')}
+      >
+        {(correct || selected) && <Check size={11} strokeWidth={3} />}
+      </span>
     </motion.button>
   );
 }
