@@ -4,7 +4,7 @@ import { use, useMemo, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { Clock, Target, Trophy, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { lessons } from '@/content/lessons/spacing-8pt';
+import { lessons } from '@/content/lessons';
 import { ExampleVisual } from '@/components/examples/ExampleVisual';
 import { ExercisePlayer } from '@/components/exercises/ExercisePlayer';
 

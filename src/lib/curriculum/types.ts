@@ -78,7 +78,30 @@ export interface BuildAnswer {
   padding: number;
 }
 
-export type Exercise = ChooseExercise | TuneExercise | BuildExercise;
+/**
+ * L1: drag-to-reorder on the canvas. The learner drags items into the correct
+ * visual order (e.g. fixing typographic hierarchy). Validated deterministically
+ * by comparing the arranged order to the target.
+ */
+export interface OrderExercise {
+  id: string;
+  type: 'order';
+  prompt: string;
+  /** Items in their initial (shuffled) presentation order. */
+  items: OrderItem[];
+  /** Correct order, top → bottom, as item ids. */
+  correctOrder: string[];
+  explanation: string;
+}
+
+export interface OrderItem {
+  id: string;
+  label: string;
+  /** Rendered size hint so the card visually reads like the element it is. */
+  size?: 'display' | 'title' | 'body' | 'caption' | 'button';
+}
+
+export type Exercise = ChooseExercise | TuneExercise | BuildExercise | OrderExercise;
 
 // ─────────────────────────────────────────────────────────────
 // LESSON — follows PRD Chapter 5 lesson structure.

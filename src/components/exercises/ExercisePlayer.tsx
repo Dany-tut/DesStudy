@@ -7,8 +7,12 @@ import type { Exercise, ValidationOutcome, BuildAnswer } from '@/lib/curriculum/
 import { validate } from '@/lib/curriculum/validate';
 import type { MentorReply } from '@/lib/ai/mentor';
 import { AutoLayoutCanvas } from './AutoLayoutCanvas';
+import { OrderCanvas } from './OrderCanvas';
+import { Button } from '@/components/ui/Button';
+import { Slider } from '@/components/ui/Slider';
+import { ChoiceCard } from '@/components/ui/ChoiceCard';
 
-type Answer = string | number | BuildAnswer | null;
+type Answer = string | number | BuildAnswer | string[] | null;
 
 /**
  * Plays a single exercise: capture answer → validate deterministically →
@@ -31,7 +35,11 @@ export function ExercisePlayer({
   onSolved?: (attempts: number) => void;
 }) {
   const initialChoice: Answer =
-    exercise.type === 'build' ? { gap: exercise.min, padding: exercise.min } : null;
+    exercise.type === 'build'
+      ? { gap: exercise.min, padding: exercise.min }
+      : exercise.type === 'order'
+        ? exercise.items.map((i) => i.id)
+        : null;
   const [choice, setChoice] = useState<Answer>(initialChoice);
   const [outcome, setOutcome] = useState<ValidationOutcome | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -47,6 +55,11 @@ export function ExercisePlayer({
     if (exercise.type === 'build') {
       const v = value as BuildAnswer;
       return `отступ ${v.gap}px, поля ${v.padding}px`;
+    }
+    if (exercise.type === 'order') {
+      const ids = value as string[];
+      const byId = new Map(exercise.items.map((i) => [i.id, i.label]));
+      return ids.map((id) => byId.get(id) ?? id).join(' → ');
     }
     return `${value}${exercise.unitLabel}`;
   }
@@ -124,21 +137,14 @@ export function ExercisePlayer({
             const isChosen = choice === opt.id;
             const isCorrect = solved && opt.id === exercise.correctOptionId;
             return (
-              <button
+              <ChoiceCard
                 key={opt.id}
+                label={opt.label}
+                selected={isChosen}
+                correct={isCorrect}
                 disabled={solved}
                 onClick={() => setChoice(opt.id)}
-                className={[
-                  'rounded-lg border px-4 py-3 text-left text-callout transition-fast',
-                  isCorrect
-                    ? 'border-success bg-success/10 text-primary'
-                    : isChosen
-                      ? 'border-brand bg-brand/10 text-primary'
-                      : 'border-border bg-canvas text-secondary hover:border-border-strong',
-                ].join(' ')}
-              >
-                {opt.label}
-              </button>
+              />
             );
           })}
         </div>
@@ -149,7 +155,7 @@ export function ExercisePlayer({
           disabled={solved}
           onChange={setChoice}
         />
-      ) : (
+      ) : exercise.type === 'build' ? (
         <AutoLayoutCanvas
           exercise={exercise}
           value={(choice as BuildAnswer) ?? { gap: exercise.min, padding: exercise.min }}
@@ -159,6 +165,13 @@ export function ExercisePlayer({
               update((prev as BuildAnswer) ?? { gap: exercise.min, padding: exercise.min }),
             )
           }
+        />
+      ) : (
+        <OrderCanvas
+          exercise={exercise}
+          value={(choice as string[]) ?? exercise.items.map((i) => i.id)}
+          disabled={solved}
+          onChange={(order) => setChoice(order)}
         />
       )}
 
@@ -230,11 +243,7 @@ export function ExercisePlayer({
       {/* Actions */}
       <div className="mt-5 flex items-center gap-3">
         {!solved ? (
-          <button
-            onClick={outcome ? retry : submit}
-            disabled={!outcome && choice === null}
-            className="flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-callout font-medium text-on-brand transition-base hover:bg-brand-hover disabled:cursor-not-allowed disabled:bg-muted disabled:text-tertiary"
-          >
+          <Button onClick={outcome ? retry : submit} disabled={!outcome && choice === null}>
             {outcome ? (
               <>
                 <RotateCcw size={16} /> Ещё попытка
@@ -242,7 +251,7 @@ export function ExercisePlayer({
             ) : (
               'Проверить'
             )}
-          </button>
+          </Button>
         ) : (
           <span className="flex items-center gap-2 text-footnote text-secondary">
             <Check size={14} className="text-success" />
@@ -267,29 +276,14 @@ function TuneControl({
 }) {
   return (
     <div>
-      <div className="mb-3 flex items-baseline justify-between">
-        <span className="text-footnote text-tertiary">
-          {exercise.min}
-          {exercise.unitLabel}
-        </span>
-        <span className="text-title2 font-semibold text-primary tabular-nums">
-          {value}
-          {exercise.unitLabel}
-        </span>
-        <span className="text-footnote text-tertiary">
-          {exercise.max}
-          {exercise.unitLabel}
-        </span>
-      </div>
-      <input
-        type="range"
+      <Slider
+        value={value}
         min={exercise.min}
         max={exercise.max}
         step={exercise.step}
-        value={value}
+        unit={exercise.unitLabel}
         disabled={disabled}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-brand"
+        onChange={onChange}
       />
       {/* Live preview of the gap being tuned */}
       <div className="mt-5 rounded-lg border border-border bg-canvas p-5">

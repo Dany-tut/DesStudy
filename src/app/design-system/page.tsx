@@ -1,8 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Sun, Moon, Check, Sparkles, ArrowRight } from 'lucide-react';
+import { Sun, Moon, Check, Sparkles, ArrowRight, Lock } from 'lucide-react';
 import { space, radius, semanticColors } from '@/design/tokens';
+import { Button } from '@/components/ui/Button';
+import { Stepper } from '@/components/ui/Stepper';
+import { Slider } from '@/components/ui/Slider';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { Switch } from '@/components/ui/Switch';
+import { ChoiceCard } from '@/components/ui/ChoiceCard';
 
 /**
  * Design System showcase — Chapter 3 (UX/UI Bible) made visible.
@@ -10,6 +16,11 @@ import { space, radius, semanticColors } from '@/design/tokens';
  */
 export default function DesignSystemPage() {
   const [dark, setDark] = useState(false);
+  const [gap, setGap] = useState(16);
+  const [tune, setTune] = useState(24);
+  const [density, setDensity] = useState<'compact' | 'cozy' | 'roomy'>('cozy');
+  const [notifications, setNotifications] = useState(true);
+  const [choice, setChoice] = useState<string | null>('flex');
 
   const toggle = () => {
     const next = !dark;
@@ -107,23 +118,79 @@ export default function DesignSystemPage() {
         </div>
       </Section>
 
-      <Section title="Components — button states">
+      <Section title="Кнопки">
         <div className="flex flex-wrap items-center gap-4">
-          <button className="flex items-center gap-2 rounded-lg bg-brand px-5 py-3 text-callout font-medium text-on-brand transition-base hover:bg-brand-hover">
+          <Button variant="primary" size="lg">
             Начать урок <ArrowRight size={16} />
-          </button>
-          <button className="rounded-lg border border-border bg-surface px-5 py-3 text-callout font-medium text-primary transition-base hover:bg-muted">
+          </Button>
+          <Button variant="secondary" size="lg">
             Вторичная
-          </button>
-          <button className="flex items-center gap-2 rounded-lg bg-success/10 px-5 py-3 text-callout font-medium text-success">
+          </Button>
+          <Button variant="success" size="lg">
             <Check size={16} /> Пройдено
-          </button>
-          <button
-            disabled
-            className="cursor-not-allowed rounded-lg bg-muted px-5 py-3 text-callout font-medium text-tertiary"
-          >
-            Заблокировано
-          </button>
+          </Button>
+          <Button variant="danger" size="lg">
+            Сбросить
+          </Button>
+          <Button variant="ghost" size="lg">
+            Пропустить
+          </Button>
+          <Button variant="primary" size="lg" disabled>
+            <Lock size={16} /> Заблокировано
+          </Button>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button variant="primary" size="sm">
+            sm
+          </Button>
+          <Button variant="primary" size="md">
+            md
+          </Button>
+          <Button variant="primary" size="lg">
+            lg
+          </Button>
+        </div>
+      </Section>
+
+      <Section title="Степпер — точная настройка на 8pt-сетке">
+        <div className="max-w-[280px]">
+          <Stepper label="Отступ между блоками" value={gap} min={0} max={64} step={4} onChange={setGap} />
+        </div>
+      </Section>
+
+      <Section title="Ползунок — плавная настройка в диапазоне">
+        <div className="max-w-[420px]">
+          <Slider value={tune} min={0} max={64} step={2} unit="px" onChange={setTune} />
+        </div>
+      </Section>
+
+      <Section title="Сегментированный переключатель">
+        <SegmentedControl
+          value={density}
+          onChange={setDensity}
+          options={[
+            { value: 'compact', label: 'Компактно' },
+            { value: 'cozy', label: 'Уютно' },
+            { value: 'roomy', label: 'Просторно' },
+          ]}
+        />
+      </Section>
+
+      <Section title="Свитч">
+        <Switch checked={notifications} onChange={setNotifications} label="Уведомления о прогрессе" />
+      </Section>
+
+      <Section title="Карточки выбора">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <ChoiceCard label="flex-direction: column" selected={choice === 'flex'} onClick={() => setChoice('flex')} />
+          <ChoiceCard label="display: grid" selected={choice === 'grid'} onClick={() => setChoice('grid')} />
+          <ChoiceCard
+            label="position: absolute"
+            selected={choice === 'absolute'}
+            correct
+            onClick={() => setChoice('absolute')}
+          />
+          <ChoiceCard label="float: left" selected={false} disabled onClick={() => setChoice('float')} />
         </div>
       </Section>
     </main>

@@ -1,4 +1,4 @@
-import { spacing8pt } from './lessons/spacing-8pt';
+import { spacing8pt, radiusScale, typeHierarchy } from './lessons';
 import type { Lesson } from '@/lib/curriculum/types';
 
 export type Level = 'beginner' | 'medium' | 'advanced';
@@ -56,8 +56,8 @@ export const PATHS: LearningPath[] = [
     emoji: '📐',
     lessons: [
       entry(spacing8pt, { emoji: '📏', popular: true }),
-      { slug: 'radius-scale', title: 'Скругления и шкала радиусов', minutes: 7, tasks: 8, level: 'beginner', emoji: '⬜', status: 'soon' },
-      { slug: 'type-hierarchy', title: 'Типографическая иерархия', minutes: 10, tasks: 12, level: 'beginner', emoji: '🔤', status: 'soon' },
+      entry(radiusScale, { emoji: '⬜' }),
+      entry(typeHierarchy, { emoji: '🔤', popular: true }),
       { slug: 'color-contrast', title: 'Цвет и контраст (WCAG)', minutes: 9, tasks: 10, level: 'medium', emoji: '🎨', status: 'soon' },
     ],
   },

@@ -63,5 +63,18 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
       }
       return { correct, explanation: exercise.explanation, hint };
     }
+    case 'order': {
+      const order = Array.isArray(answer) ? (answer as string[]) : [];
+      const correct =
+        order.length === exercise.correctOrder.length &&
+        order.every((id, i) => id === exercise.correctOrder[i]);
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : 'Порядок пока неверный — что должно привлекать внимание первым, а что последним?',
+      };
+    }
   }
 }

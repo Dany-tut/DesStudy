@@ -1,7 +1,7 @@
 'use client';
 
-import { Minus, Plus } from 'lucide-react';
 import type { BuildAnswer, BuildExercise } from '@/lib/curriculum/types';
+import { Stepper } from '@/components/ui/Stepper';
 
 /**
  * Interactive Canvas — auto-layout build surface.
@@ -56,61 +56,24 @@ export function AutoLayoutCanvas({
         <Stepper
           label="Отступ между блоками"
           value={value.gap}
+          min={min}
+          max={max}
+          step={step}
           disabled={disabled}
-          onDec={() => nudgeGap(-step)}
-          onInc={() => nudgeGap(step)}
+          onChange={(v) => nudgeGap(v - value.gap)}
         />
         <Stepper
           label="Внутренние поля"
           value={value.padding}
+          min={min}
+          max={max}
+          step={step}
           disabled={disabled}
-          onDec={() => nudgePad(-step)}
-          onInc={() => nudgePad(step)}
+          onChange={(v) => nudgePad(v - value.padding)}
         />
         <p className="text-caption text-tertiary">
           Шаг {step}px — держись 8pt-сетки.
         </p>
-      </div>
-    </div>
-  );
-}
-
-function Stepper({
-  label,
-  value,
-  disabled,
-  onDec,
-  onInc,
-}: {
-  label: string;
-  value: number;
-  disabled: boolean;
-  onDec: () => void;
-  onInc: () => void;
-}) {
-  return (
-    <div>
-      <p className="mb-1.5 text-footnote text-secondary">{label}</p>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onDec}
-          disabled={disabled}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-primary transition-fast hover:bg-muted disabled:opacity-40"
-          aria-label={`${label}: уменьшить`}
-        >
-          <Minus size={16} />
-        </button>
-        <div className="flex-1 rounded-lg bg-muted py-2 text-center text-callout font-semibold tabular-nums text-primary">
-          {value}px
-        </div>
-        <button
-          onClick={onInc}
-          disabled={disabled}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-primary transition-fast hover:bg-muted disabled:opacity-40"
-          aria-label={`${label}: увеличить`}
-        >
-          <Plus size={16} />
-        </button>
       </div>
     </div>
   );
