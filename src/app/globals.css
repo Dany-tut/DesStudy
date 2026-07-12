@@ -72,6 +72,13 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* 8pt dotted grid background for the Interactive Canvas. */
+.canvas-grid {
+  background-image: radial-gradient(var(--border-strong) 1px, transparent 1px);
+  background-size: 8px 8px;
+  background-position: -1px -1px;
+}
+
 /* Glassmorphism utility (floating navigation, elevated panels). */
 .glass {
   background: var(--glass-bg);

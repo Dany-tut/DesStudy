@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import { Check, X, RotateCcw, Lightbulb, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Exercise, ValidationOutcome } from '@/lib/curriculum/types';
+import type { Exercise, ValidationOutcome, BuildAnswer } from '@/lib/curriculum/types';
 import { validate } from '@/lib/curriculum/validate';
 import type { MentorReply } from '@/lib/ai/mentor';
+import { AutoLayoutCanvas } from './AutoLayoutCanvas';
+
+type Answer = string | number | BuildAnswer | null;
 
 /**
  * Plays a single exercise: capture answer → validate deterministically →
@@ -27,7 +30,9 @@ export function ExercisePlayer({
   lessonTotal?: number;
   onSolved?: (attempts: number) => void;
 }) {
-  const [choice, setChoice] = useState<string | number | null>(null);
+  const initialChoice: Answer =
+    exercise.type === 'build' ? { gap: exercise.min, padding: exercise.min } : null;
+  const [choice, setChoice] = useState<Answer>(initialChoice);
   const [outcome, setOutcome] = useState<ValidationOutcome | null>(null);
   const [attempts, setAttempts] = useState(0);
   const [mentor, setMentor] = useState<MentorReply | null>(null);
@@ -35,14 +40,18 @@ export function ExercisePlayer({
 
   const solved = outcome?.correct ?? false;
 
-  function answerLabel(value: string | number): string {
+  function answerLabel(value: Answer): string {
     if (exercise.type === 'choose') {
       return exercise.options.find((o) => o.id === value)?.label ?? String(value);
+    }
+    if (exercise.type === 'build') {
+      const v = value as BuildAnswer;
+      return `отступ ${v.gap}px, поля ${v.padding}px`;
     }
     return `${value}${exercise.unitLabel}`;
   }
 
-  async function askMentor(result: ValidationOutcome, nextAttempts: number, value: string | number) {
+  async function askMentor(result: ValidationOutcome, nextAttempts: number, value: Answer) {
     setMentorLoading(true);
     setMentor(null);
     try {
@@ -101,7 +110,7 @@ export function ExercisePlayer({
 
   function retry() {
     setOutcome(null);
-    setChoice(null);
+    setChoice(initialChoice);
     setMentor(null);
   }
 
@@ -133,12 +142,23 @@ export function ExercisePlayer({
             );
           })}
         </div>
-      ) : (
+      ) : exercise.type === 'tune' ? (
         <TuneControl
           exercise={exercise}
           value={typeof choice === 'number' ? choice : exercise.min}
           disabled={solved}
           onChange={setChoice}
+        />
+      ) : (
+        <AutoLayoutCanvas
+          exercise={exercise}
+          value={(choice as BuildAnswer) ?? { gap: exercise.min, padding: exercise.min }}
+          disabled={solved}
+          onChange={(update) =>
+            setChoice((prev) =>
+              update((prev as BuildAnswer) ?? { gap: exercise.min, padding: exercise.min }),
+            )
+          }
         />
       )}
 

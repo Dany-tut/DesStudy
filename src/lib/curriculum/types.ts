@@ -52,7 +52,33 @@ export interface TuneExercise {
   explanation: string;
 }
 
-export type Exercise = ChooseExercise | TuneExercise;
+/**
+ * L1: build on the Interactive Canvas. The learner constructs an auto-layout
+ * card (gap + padding) and the Geometry Engine validates it against a target,
+ * deterministically, on our own data — no Figma, no vision model needed.
+ */
+export interface BuildExercise {
+  id: string;
+  type: 'build';
+  prompt: string;
+  /** Number of stacked blocks in the card preview. */
+  blocks: number;
+  /** Grid step the controls snap to (e.g. 4 for the 8pt half-step). */
+  step: number;
+  min: number;
+  max: number;
+  /** Target auto-layout the learner must reproduce. */
+  target: BuildAnswer;
+  explanation: string;
+}
+
+/** The learner's canvas state for a build exercise. */
+export interface BuildAnswer {
+  gap: number;
+  padding: number;
+}
+
+export type Exercise = ChooseExercise | TuneExercise | BuildExercise;
 
 // ─────────────────────────────────────────────────────────────
 // LESSON — follows PRD Chapter 5 lesson structure.
