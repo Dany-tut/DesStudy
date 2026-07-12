@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
 import type { OrderExercise, OrderItem } from '@/lib/curriculum/types';
 
+type DropTarget = { id: string; pos: 'before' | 'after' };
+
 /**
- * Drag-and-drop canvas: the learner arranges cards into the correct order
- * (e.g. typographic hierarchy). HTML5 drag is the primary interaction; ↑/↓
- * buttons provide an accessible, keyboard-friendly alternative. State is the
- * ordered list of item ids, validated deterministically upstream.
+ * Drag-and-drop canvas: the learner arranges cards into the correct order.
+ * HTML5 drag is primary; ↑/↓ buttons are the accessible alternative. While
+ * dragging, a brand insertion line shows exactly where the card will land
+ * (before/after the hovered card, based on cursor position).
  */
 export function OrderCanvas({
   exercise,
@@ -22,6 +24,7 @@ export function OrderCanvas({
   onChange: (order: string[]) => void;
 }) {
   const [dragId, setDragId] = useState<string | null>(null);
+  const [over, setOver] = useState<DropTarget | null>(null);
 
   const byId = new Map(exercise.items.map((i) => [i.id, i]));
 
@@ -33,10 +36,30 @@ export function OrderCanvas({
     onChange(next);
   }
 
-  function onDrop(targetId: string) {
-    if (dragId === null || dragId === targetId) return;
-    move(value.indexOf(dragId), value.indexOf(targetId));
+  /** Insert dragId relative to a target, honoring before/after. */
+  function reorder(target: DropTarget) {
+    if (dragId === null) return;
+    const next = value.filter((x) => x !== dragId);
+    let idx = next.indexOf(target.id);
+    if (target.pos === 'after') idx += 1;
+    next.splice(idx, 0, dragId);
+    onChange(next);
+  }
+
+  function onDragOver(e: React.DragEvent, id: string) {
+    e.preventDefault();
+    if (dragId === null || id === dragId) {
+      setOver(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pos = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+    setOver((prev) => (prev?.id === id && prev.pos === pos ? prev : { id, pos }));
+  }
+
+  function endDrag() {
     setDragId(null);
+    setOver(null);
   }
 
   return (
@@ -45,45 +68,53 @@ export function OrderCanvas({
         {value.map((id, index) => {
           const item = byId.get(id);
           if (!item) return null;
+          const showBefore = over?.id === id && over.pos === 'before';
+          const showAfter = over?.id === id && over.pos === 'after';
           return (
-            <li
-              key={id}
-              draggable={!disabled}
-              onDragStart={() => setDragId(id)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => onDrop(id)}
-              onDragEnd={() => setDragId(null)}
-              className={[
-                'flex items-center gap-3 rounded-lg border bg-surface px-3 py-2.5 transition-fast',
-                dragId === id ? 'border-brand opacity-60' : 'border-border',
-                disabled ? '' : 'cursor-grab active:cursor-grabbing hover:border-border-strong',
-              ].join(' ')}
-            >
-              <GripVertical size={16} className="shrink-0 text-tertiary" />
-              <span className="flex-1 truncate">
-                <ItemLabel item={item} />
-              </span>
-              {!disabled && (
-                <span className="flex shrink-0 flex-col">
-                  <button
-                    onClick={() => move(index, index - 1)}
-                    disabled={index === 0}
-                    aria-label={`${item.label}: вверх`}
-                    className="flex h-5 w-6 items-center justify-center rounded text-tertiary transition-fast hover:text-primary disabled:opacity-30"
-                  >
-                    <ChevronUp size={14} />
-                  </button>
-                  <button
-                    onClick={() => move(index, index + 1)}
-                    disabled={index === value.length - 1}
-                    aria-label={`${item.label}: вниз`}
-                    className="flex h-5 w-6 items-center justify-center rounded text-tertiary transition-fast hover:text-primary disabled:opacity-30"
-                  >
-                    <ChevronDown size={14} />
-                  </button>
+            <Fragment key={id}>
+              {showBefore && <InsertLine />}
+              <li
+                draggable={!disabled}
+                onDragStart={() => setDragId(id)}
+                onDragOver={(e) => onDragOver(e, id)}
+                onDrop={() => {
+                  if (over) reorder(over);
+                  endDrag();
+                }}
+                onDragEnd={endDrag}
+                className={[
+                  'flex items-center gap-3 rounded-lg border bg-surface px-3 py-2.5 transition-fast',
+                  dragId === id ? 'border-brand opacity-50' : 'border-border',
+                  disabled ? '' : 'cursor-grab active:cursor-grabbing hover:border-border-strong',
+                ].join(' ')}
+              >
+                <GripVertical size={16} className="shrink-0 text-tertiary" />
+                <span className="flex-1 truncate">
+                  <ItemLabel item={item} />
                 </span>
-              )}
-            </li>
+                {!disabled && (
+                  <span className="flex shrink-0 flex-col">
+                    <button
+                      onClick={() => move(index, index - 1)}
+                      disabled={index === 0}
+                      aria-label={`${item.label}: вверх`}
+                      className="flex h-5 w-6 items-center justify-center rounded text-tertiary transition-fast hover:text-primary disabled:opacity-30"
+                    >
+                      <ChevronUp size={14} />
+                    </button>
+                    <button
+                      onClick={() => move(index, index + 1)}
+                      disabled={index === value.length - 1}
+                      aria-label={`${item.label}: вниз`}
+                      className="flex h-5 w-6 items-center justify-center rounded text-tertiary transition-fast hover:text-primary disabled:opacity-30"
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+                  </span>
+                )}
+              </li>
+              {showAfter && <InsertLine />}
+            </Fragment>
           );
         })}
       </ul>
@@ -91,6 +122,16 @@ export function OrderCanvas({
         Перетащи карточки (или используй ↑/↓), чтобы задать правильный порядок.
       </p>
     </div>
+  );
+}
+
+/** The insertion indicator — a brand line marking where the card will land. */
+function InsertLine() {
+  return (
+    <li className="pointer-events-none -my-1 flex items-center gap-2" aria-hidden>
+      <span className="h-2 w-2 shrink-0 rounded-full bg-brand" />
+      <span className="h-0.5 flex-1 rounded-full bg-brand" />
+    </li>
   );
 }
 
