@@ -129,6 +129,9 @@ export const semanticColors = {
     'text-on-brand': palette.white,
     brand: palette.brand500,
     'brand-hover': palette.brand600,
+    // Interaction-state overlays — layered on any surface, not tied to bg-muted.
+    'bg-hover': 'rgba(17, 20, 24, 0.035)',
+    'bg-pressed': 'rgba(17, 20, 24, 0.06)',
     success: palette.success,
     warning: palette.warning,
     danger: palette.danger,
@@ -147,6 +150,8 @@ export const semanticColors = {
     'text-on-brand': palette.white,
     brand: palette.brand400,
     'brand-hover': palette.brand500,
+    'bg-hover': 'rgba(255, 255, 255, 0.045)',
+    'bg-pressed': 'rgba(255, 255, 255, 0.08)',
     success: palette.success,
     warning: palette.warning,
     danger: palette.danger,

@@ -1,4 +1,4 @@
-import { spacing8pt, radiusScale, typeHierarchy } from './lessons';
+import { spacing8pt, radiusScale, typeHierarchy, colorContrast, uxHeuristics } from './lessons';
 import type { Lesson } from '@/lib/curriculum/types';
 
 export type Level = 'beginner' | 'medium' | 'advanced';
@@ -58,7 +58,7 @@ export const PATHS: LearningPath[] = [
       entry(spacing8pt, { emoji: '📏', popular: true }),
       entry(radiusScale, { emoji: '⬜' }),
       entry(typeHierarchy, { emoji: '🔤', popular: true }),
-      { slug: 'color-contrast', title: 'Цвет и контраст (WCAG)', minutes: 9, tasks: 10, level: 'medium', emoji: '🎨', status: 'soon' },
+      entry(colorContrast, { emoji: '🎨' }),
     ],
   },
   {
@@ -67,7 +67,7 @@ export const PATHS: LearningPath[] = [
     description: 'Пользовательские потоки, эвристики, продуктовое мышление.',
     emoji: '🧭',
     lessons: [
-      { slug: 'ux-heuristics', title: 'Эвристики Нильсена', minutes: 12, tasks: 15, level: 'beginner', emoji: '🔍', popular: true, status: 'soon' },
+      entry(uxHeuristics, { emoji: '🔍', popular: true }),
       { slug: 'user-flows', title: 'Пользовательские потоки', minutes: 11, tasks: 9, level: 'medium', emoji: '🧭', status: 'soon' },
     ],
   },

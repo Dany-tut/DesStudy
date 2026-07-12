@@ -92,7 +92,7 @@ export default async function HomePage() {
                       {l.status === 'available' ? (
                         <Link
                           href={`/learn/${l.slug}`}
-                          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-footnote text-secondary transition-fast hover:bg-muted hover:text-primary"
+                          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-footnote text-secondary transition-fast hover:bg-hover hover:text-primary active:bg-pressed"
                         >
                           {completed ? (
                             <Check size={14} className="text-success" />

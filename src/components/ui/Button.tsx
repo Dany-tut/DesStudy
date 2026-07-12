@@ -7,10 +7,10 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary: 'bg-brand text-on-brand shadow-sm hover:bg-brand-hover',
-  secondary: 'border border-border bg-surface text-primary hover:bg-muted',
+  secondary: 'border border-border bg-surface text-primary hover:bg-hover active:bg-pressed',
   success: 'bg-success/10 text-success hover:bg-success/15',
   danger: 'bg-danger/10 text-danger hover:bg-danger/15',
-  ghost: 'text-secondary hover:bg-muted hover:text-primary',
+  ghost: 'text-secondary hover:bg-hover hover:text-primary active:bg-pressed',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

@@ -68,6 +68,49 @@ export function ExampleVisual({ visual }: { visual: string }) {
       </Card>
     );
   }
+
+  // System status — no feedback vs visible loading state.
+  if (visual === 'status-bad') {
+    return (
+      <Card>
+        <span className="inline-block rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand">
+          Сохранить
+        </span>
+        <p className="mt-3 text-caption text-tertiary">…нажали, и ничего не происходит</p>
+      </Card>
+    );
+  }
+  if (visual === 'status-good') {
+    return (
+      <Card>
+        <span className="inline-flex items-center gap-2 rounded-lg bg-brand/70 px-4 py-2 text-footnote font-medium text-on-brand">
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+          Сохранение…
+        </span>
+        <p className="mt-3 text-caption text-tertiary">статус виден сразу</p>
+      </Card>
+    );
+  }
+
+  // Contrast — failing vs passing WCAG AA text.
+  if (visual === 'contrast-bad') {
+    return (
+      <div className="rounded-lg border border-border bg-white p-6">
+        <p className="text-callout" style={{ color: '#c9cdd8' }}>
+          Этот текст почти сливается с фоном
+        </p>
+      </div>
+    );
+  }
+  if (visual === 'contrast-good') {
+    return (
+      <div className="rounded-lg border border-border bg-white p-6">
+        <p className="text-callout" style={{ color: '#14171c' }}>
+          Этот текст читается легко и чётко
+        </p>
+      </div>
+    );
+  }
   return null;
 }
 

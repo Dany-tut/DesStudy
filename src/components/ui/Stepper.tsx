@@ -70,7 +70,7 @@ function StepperButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="flex h-9 w-9 items-center justify-center rounded-lg text-primary transition-fast hover:bg-muted active:bg-border disabled:cursor-not-allowed disabled:text-tertiary disabled:hover:bg-transparent"
+      className="flex h-9 w-9 items-center justify-center rounded-lg text-primary transition-fast hover:bg-hover active:bg-pressed disabled:cursor-not-allowed disabled:text-tertiary disabled:hover:bg-transparent"
     >
       <Icon size={16} />
     </motion.button>

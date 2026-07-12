@@ -46,6 +46,8 @@ const config: Config = {
         muted: 'var(--bg-muted)',
         border: 'var(--border)',
         'border-strong': 'var(--border-strong)',
+        hover: 'var(--bg-hover)',
+        pressed: 'var(--bg-pressed)',
         primary: 'var(--text-primary)',
         secondary: 'var(--text-secondary)',
         tertiary: 'var(--text-tertiary)',

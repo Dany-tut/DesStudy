@@ -12,11 +12,13 @@ import {
   Palette,
   Trophy,
   Settings,
-  Menu,
+  MoreHorizontal,
   X,
 } from 'lucide-react';
 
-const NAV: { href: string; label: string; icon: typeof Home; soon?: boolean }[] = [
+type NavItem = { href: string; label: string; icon: typeof Home; soon?: boolean };
+
+const NAV: NavItem[] = [
   { href: '/', label: 'Главная', icon: Home },
   { href: '/learn', label: 'Обучение', icon: GraduationCap },
   { href: '/dashboard', label: 'Дашборд', icon: LayoutDashboard },
@@ -26,97 +28,162 @@ const NAV: { href: string; label: string; icon: typeof Home; soon?: boolean }[] 
   { href: '/design-system', label: 'Дизайн-система', icon: Palette },
 ];
 
-export function Sidebar() {
-  const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+/** Primary destinations for the mobile bottom bar; the rest live under "Ещё". */
+const PRIMARY = ['/', '/learn', '/dashboard', '/design-system'];
 
-  const isActive = (href: string) =>
-    href === '/' ? pathname === '/' : pathname.startsWith(href);
+function useIsActive() {
+  const pathname = usePathname();
+  return (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+}
+
+export function Sidebar() {
+  const isActive = useIsActive();
 
   return (
     <>
-      {/* Mobile top bar */}
-      <div className="glass sticky top-0 z-sticky flex items-center justify-between px-4 py-3 md:hidden">
-        <Brand />
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-primary"
-          aria-label="Меню"
-        >
-          {open ? <X size={20} /> : <Menu size={20} />}
-        </button>
-      </div>
-
-      {/* Mobile drawer */}
-      {open && (
-        <div className="fixed inset-0 z-overlay md:hidden" onClick={() => setOpen(false)}>
-          <div className="absolute inset-0 bg-black/40" />
-          <nav
-            className="glass absolute left-0 top-0 h-full w-64 p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-6 px-2">
-              <Brand />
-            </div>
-            <NavList isActive={isActive} onNavigate={() => setOpen(false)} />
-          </nav>
-        </div>
-      )}
-
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface p-4 md:flex">
         <div className="mb-8 px-2 pt-2">
           <Brand />
         </div>
-        <NavList isActive={isActive} />
+        <nav className="flex flex-col gap-1">
+          {NAV.map((item) => (
+            <SidebarLink key={item.href} item={item} active={isActive(item.href)} />
+          ))}
+        </nav>
         <div className="mt-auto">
-          <Link
-            href="/settings"
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-body text-secondary transition-fast hover:bg-muted hover:text-primary"
-          >
-            <Settings size={18} />
-            Настройки
-          </Link>
+          <SidebarLink
+            item={{ href: '/settings', label: 'Настройки', icon: Settings }}
+            active={isActive('/settings')}
+          />
         </div>
       </aside>
+
+      {/* Mobile bottom floating bar */}
+      <BottomBar isActive={isActive} />
     </>
   );
 }
 
-function NavList({
-  isActive,
-  onNavigate,
+function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
+  const { href, label, icon: Icon, soon } = item;
+  return (
+    <Link
+      href={href}
+      className={[
+        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-body transition-fast',
+        active
+          ? 'bg-brand/10 font-medium text-brand'
+          : 'text-secondary hover:bg-hover hover:text-primary active:bg-pressed',
+      ].join(' ')}
+    >
+      <Icon size={18} className={active ? 'text-brand' : ''} />
+      <span className="flex-1">{label}</span>
+      {soon && (
+        <span className="rounded-full bg-muted px-1.5 py-0.5 text-caption text-tertiary">
+          скоро
+        </span>
+      )}
+    </Link>
+  );
+}
+
+function BottomBar({ isActive }: { isActive: (href: string) => boolean }) {
+  const [sheet, setSheet] = useState(false);
+  const primary = NAV.filter((i) => PRIMARY.includes(i.href));
+  const rest = NAV.filter((i) => !PRIMARY.includes(i.href)).concat({
+    href: '/settings',
+    label: 'Настройки',
+    icon: Settings,
+  });
+  const moreActive = rest.some((i) => isActive(i.href));
+
+  return (
+    <>
+      {/* "Ещё" sheet */}
+      {sheet && (
+        <div className="fixed inset-0 z-modal md:hidden" onClick={() => setSheet(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="glass absolute inset-x-3 bottom-3 rounded-2xl p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-1 flex items-center justify-between px-3 pt-2">
+              <span className="text-footnote font-medium text-secondary">Разделы</span>
+              <button
+                onClick={() => setSheet(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-tertiary transition-fast hover:bg-hover"
+                aria-label="Закрыть"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            {rest.map(({ href, label, icon: Icon, soon }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setSheet(false)}
+                className={[
+                  'flex items-center gap-3 rounded-xl px-3 py-3 text-body transition-fast',
+                  isActive(href)
+                    ? 'bg-brand/10 font-medium text-brand'
+                    : 'text-primary hover:bg-hover active:bg-pressed',
+                ].join(' ')}
+              >
+                <Icon size={18} className={isActive(href) ? 'text-brand' : 'text-secondary'} />
+                <span className="flex-1">{label}</span>
+                {soon && <span className="text-caption text-tertiary">скоро</span>}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Floating tab bar */}
+      <nav
+        className="glass fixed inset-x-0 bottom-0 z-sticky mx-auto mb-[max(12px,env(safe-area-inset-bottom))] flex w-[calc(100%-24px)] max-w-md items-stretch justify-around rounded-2xl p-1.5 shadow-lg md:hidden"
+        style={{ left: 12, right: 12 }}
+      >
+        {primary.map(({ href, label, icon: Icon }) => (
+          <Tab key={href} href={href} label={label} Icon={Icon} active={isActive(href)} />
+        ))}
+        <button
+          onClick={() => setSheet(true)}
+          className={[
+            'flex flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 transition-fast active:bg-pressed',
+            moreActive ? 'text-brand' : 'text-tertiary',
+          ].join(' ')}
+        >
+          <MoreHorizontal size={20} />
+          <span className="text-caption font-medium">Ещё</span>
+        </button>
+      </nav>
+    </>
+  );
+}
+
+function Tab({
+  href,
+  label,
+  Icon,
+  active,
 }: {
-  isActive: (href: string) => boolean;
-  onNavigate?: () => void;
+  href: string;
+  label: string;
+  Icon: typeof Home;
+  active: boolean;
 }) {
   return (
-    <nav className="flex flex-col gap-1">
-      {NAV.map(({ href, label, icon: Icon, soon }) => {
-        const active = isActive(href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNavigate}
-            className={[
-              'group flex items-center gap-3 rounded-lg px-3 py-2.5 text-body transition-fast',
-              active
-                ? 'bg-brand/10 font-medium text-brand'
-                : 'text-secondary hover:bg-muted hover:text-primary',
-            ].join(' ')}
-          >
-            <Icon size={18} className={active ? 'text-brand' : ''} />
-            <span className="flex-1">{label}</span>
-            {soon && (
-              <span className="rounded-full bg-muted px-1.5 py-0.5 text-caption text-tertiary">
-                скоро
-              </span>
-            )}
-          </Link>
-        );
-      })}
-    </nav>
+    <Link
+      href={href}
+      className={[
+        'flex flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 transition-fast active:bg-pressed',
+        active ? 'text-brand' : 'text-tertiary',
+      ].join(' ')}
+    >
+      <Icon size={20} />
+      <span className="text-caption font-medium">{label}</span>
+    </Link>
   );
 }
 
