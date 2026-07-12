@@ -1,0 +1,66 @@
+// DesStudy — data model (PRD Ch.5 / §7 Progress Tracking).
+// SQLite for zero-ops local dev; the schema ports to Postgres with only the
+// datasource provider changed. Mirrors src/lib/curriculum/types.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+/// An anonymous or (later) authenticated learner. Identified by a cookie for now.
+model Learner {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Gamification / retention (PRD §8, §13)
+  xp           Int      @default(0)
+  streak       Int      @default(0)
+  lastActiveOn String? // ISO date (YYYY-MM-DD) for streak calculation
+
+  attempts Attempt[]
+  progress LessonProgress[]
+  skills   SkillStat[]
+}
+
+/// One recorded attempt at one exercise (PRD §7: Attempts, Average Score).
+model Attempt {
+  id         String   @id @default(cuid())
+  learner    Learner  @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  learnerId  String
+  lessonSlug String
+  exerciseId String
+  skill      String // e.g. "spacing" — powers weak-skill analytics
+  correct    Boolean
+  tries      Int // attempts taken before solving this exercise
+  createdAt  DateTime @default(now())
+
+  @@index([learnerId, skill])
+}
+
+/// Per-lesson completion state (PRD §7: Lessons, Modules, Courses).
+model LessonProgress {
+  learner       Learner  @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  learnerId     String
+  lessonSlug    String
+  completed     Boolean  @default(false)
+  solvedCount   Int      @default(0)
+  totalCount    Int
+  updatedAt     DateTime @updatedAt
+
+  @@id([learnerId, lessonSlug])
+}
+
+/// Rolling per-skill accuracy → drives weak/strong skills + adaptive difficulty (PRD §4, §7).
+model SkillStat {
+  learner      Learner @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  learnerId    String
+  skill        String
+  solved       Int     @default(0)
+  totalTries   Int     @default(0)
+
+  @@id([learnerId, skill])
+}

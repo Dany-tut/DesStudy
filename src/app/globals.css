@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Semantic color variables — values mirror src/design/tokens.ts
+ * (semanticColors.light / .dark). Keep in sync with that file.
+ * Theme is toggled via [data-theme] on <html>; falls back to system.
+ */
+:root {
+  --bg-canvas: #f7f8fa;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-muted: #eef0f4;
+  --border: #e1e4eb;
+  --border-strong: #c9cdd8;
+  --text-primary: #14171c;
+  --text-secondary: #4b5563;
+  --text-tertiary: #9aa0ae;
+  --text-on-brand: #ffffff;
+  --brand: #5b6ef5;
+  --brand-hover: #4557e0;
+  --success: #2fb57c;
+  --warning: #e5a13a;
+  --danger: #e5484d;
+  --info: #3e8ff0;
+
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg-canvas: #0b0d11;
+    --bg-surface: #14171c;
+    --bg-elevated: #20242c;
+    --bg-muted: #20242c;
+    --border: #20242c;
+    --border-strong: #343a46;
+    --text-primary: #f7f8fa;
+    --text-secondary: #c9cdd8;
+    --text-tertiary: #6b7280;
+    --brand: #7c8cff;
+    --brand-hover: #5b6ef5;
+    --glass-bg: rgba(20, 23, 28, 0.64);
+    --glass-border: rgba(255, 255, 255, 0.08);
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg-canvas: #0b0d11;
+  --bg-surface: #14171c;
+  --bg-elevated: #20242c;
+  --bg-muted: #20242c;
+  --border: #20242c;
+  --border-strong: #343a46;
+  --text-primary: #f7f8fa;
+  --text-secondary: #c9cdd8;
+  --text-tertiary: #6b7280;
+  --brand: #7c8cff;
+  --brand-hover: #5b6ef5;
+  --glass-bg: rgba(20, 23, 28, 0.64);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+html,
+body {
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Glassmorphism utility (floating navigation, elevated panels). */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
