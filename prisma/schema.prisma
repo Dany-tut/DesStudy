@@ -21,9 +21,10 @@ model Learner {
   streak       Int      @default(0)
   lastActiveOn String? // ISO date (YYYY-MM-DD) for streak calculation
 
-  attempts Attempt[]
-  progress LessonProgress[]
-  skills   SkillStat[]
+  attempts    Attempt[]
+  progress    LessonProgress[]
+  skills      SkillStat[]
+  submissions Submission[]
 }
 
 /// One recorded attempt at one exercise (PRD §7: Attempts, Average Score).
@@ -63,4 +64,19 @@ model SkillStat {
   totalTries   Int     @default(0)
 
   @@id([learnerId, skill])
+}
+
+/// A figma-link/file-upload submission awaiting human/mentor review — these
+/// exercise types can't be auto-graded (PRD note: no vision model in scope).
+model Submission {
+  id         String   @id @default(cuid())
+  learner    Learner  @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  learnerId  String
+  lessonSlug String
+  exerciseId String
+  kind       String // 'figma-link' | 'file-upload'
+  value      String // the Figma URL, or the stored file's public path
+  createdAt  DateTime @default(now())
+
+  @@index([learnerId, lessonSlug])
 }

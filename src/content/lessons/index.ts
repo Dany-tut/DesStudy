@@ -4,6 +4,9 @@ import { radiusScale } from './radius-scale';
 import { typeHierarchy } from './type-hierarchy';
 import { colorContrast } from './color-contrast';
 import { uxHeuristics } from './ux-heuristics';
+import { userFlows } from './user-flows';
+import { designTokens } from './design-tokens';
+import { componentsVariants } from './components-variants';
 
 /** Central registry — every built lesson, keyed by slug. */
 export const lessons: Record<string, Lesson> = {
@@ -12,6 +15,18 @@ export const lessons: Record<string, Lesson> = {
   [typeHierarchy.slug]: typeHierarchy,
   [colorContrast.slug]: colorContrast,
   [uxHeuristics.slug]: uxHeuristics,
+  [userFlows.slug]: userFlows,
+  [designTokens.slug]: designTokens,
+  [componentsVariants.slug]: componentsVariants,
 };
 
-export { spacing8pt, radiusScale, typeHierarchy, colorContrast, uxHeuristics };
+export {
+  spacing8pt,
+  radiusScale,
+  typeHierarchy,
+  colorContrast,
+  uxHeuristics,
+  userFlows,
+  designTokens,
+  componentsVariants,
+};

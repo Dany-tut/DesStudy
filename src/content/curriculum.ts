@@ -1,4 +1,13 @@
-import { spacing8pt, radiusScale, typeHierarchy, colorContrast, uxHeuristics } from './lessons';
+import {
+  spacing8pt,
+  radiusScale,
+  typeHierarchy,
+  colorContrast,
+  uxHeuristics,
+  userFlows,
+  designTokens,
+  componentsVariants,
+} from './lessons';
 import type { Lesson } from '@/lib/curriculum/types';
 
 export type Level = 'beginner' | 'medium' | 'advanced';
@@ -68,7 +77,7 @@ export const PATHS: LearningPath[] = [
     emoji: '🧭',
     lessons: [
       entry(uxHeuristics, { emoji: '🔍', popular: true }),
-      { slug: 'user-flows', title: 'Пользовательские потоки', minutes: 11, tasks: 9, level: 'medium', emoji: '🧭', status: 'soon' },
+      entry(userFlows, { emoji: '🧭' }),
     ],
   },
   {
@@ -77,8 +86,8 @@ export const PATHS: LearningPath[] = [
     description: 'Токены, компоненты, варианты, авто-лейаут.',
     emoji: '🧩',
     lessons: [
-      { slug: 'design-tokens', title: 'Дизайн-токены', minutes: 10, tasks: 11, level: 'medium', emoji: '🎛️', status: 'soon' },
-      { slug: 'components-variants', title: 'Компоненты и варианты', minutes: 14, tasks: 16, level: 'advanced', emoji: '🧩', status: 'soon' },
+      entry(designTokens, { emoji: '🎛️' }),
+      entry(componentsVariants, { emoji: '🧩' }),
     ],
   },
 ];

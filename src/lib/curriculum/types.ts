@@ -101,7 +101,43 @@ export interface OrderItem {
   size?: 'display' | 'title' | 'body' | 'caption' | 'button';
 }
 
-export type Exercise = ChooseExercise | TuneExercise | BuildExercise | OrderExercise;
+/**
+ * L2: submit a link to a real Figma file/frame for the described task.
+ * Cannot be graded correct/incorrect without a vision model (deliberately out
+ * of scope, same reasoning as BuildExercise above) — only the URL shape is
+ * validated. The learner's design itself goes to human/mentor review.
+ */
+export interface FigmaLinkExercise {
+  id: string;
+  type: 'figma-link';
+  prompt: string;
+  /** What the reviewer (or the learner, self-checking) should look for. */
+  checklist: string[];
+  explanation: string;
+}
+
+/**
+ * L2: attach a file (screenshot, export, PDF) for the described task. Same
+ * review-not-grade reasoning as FigmaLinkExercise.
+ */
+export interface FileUploadExercise {
+  id: string;
+  type: 'file-upload';
+  prompt: string;
+  /** HTML `accept` attribute value, e.g. "image/*,.pdf". */
+  accept: string;
+  maxSizeMB: number;
+  checklist: string[];
+  explanation: string;
+}
+
+export type Exercise =
+  | ChooseExercise
+  | TuneExercise
+  | BuildExercise
+  | OrderExercise
+  | FigmaLinkExercise
+  | FileUploadExercise;
 
 // ─────────────────────────────────────────────────────────────
 // LESSON — follows PRD Chapter 5 lesson structure.
@@ -112,6 +148,12 @@ export interface LessonExample {
   caption: string;
   /** Component key rendered by the example renderer. */
   visual: string;
+}
+
+export interface LessonVideo {
+  url: string;
+  caption: string;
+  provider?: 'youtube' | 'vimeo' | 'file';
 }
 
 export interface Lesson {
@@ -127,6 +169,8 @@ export interface Lesson {
   prerequisites: string[];
   /** Short, interactive theory — kept minimal by design. */
   theory: string[];
+  /** Optional short video(s) — embedded alongside theory. */
+  videos?: LessonVideo[];
   examples: LessonExample[];
   exercises: Exercise[];
   masteryChallenge: Exercise;
@@ -148,4 +192,11 @@ export interface ValidationOutcome {
   explanation: string;
   /** Optional targeted hint for the specific wrong answer. */
   hint?: string;
+  /**
+   * True for submission-style exercises (figma-link/file-upload): `correct`
+   * only reflects "a validly-shaped submission was made", not design quality.
+   * The player shows a distinct "submitted for review" state instead of a
+   * verdict.
+   */
+  reviewRequired?: boolean;
 }

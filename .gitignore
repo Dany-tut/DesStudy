@@ -7,3 +7,7 @@ out
 next-env.d.ts
 prisma/dev.db
 prisma/dev.db-journal
+
+# Runtime learner uploads — keep the directory, not its contents.
+public/uploads/*
+!public/uploads/.gitkeep

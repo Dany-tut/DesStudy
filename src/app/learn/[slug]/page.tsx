@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { lessons } from '@/content/lessons';
 import { ExampleVisual } from '@/components/examples/ExampleVisual';
 import { ExercisePlayer } from '@/components/exercises/ExercisePlayer';
+import { VideoEmbed } from '@/components/lesson/VideoEmbed';
 
 export default function LessonPage({
   params,
@@ -73,6 +74,18 @@ export default function LessonPage({
           </p>
         ))}
       </div>
+
+      {/* Video */}
+      {lesson.videos && lesson.videos.length > 0 && (
+        <>
+          <SectionTitle>Видео</SectionTitle>
+          <div className="space-y-6">
+            {lesson.videos.map((v, i) => (
+              <VideoEmbed key={i} video={v} />
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Examples */}
       <SectionTitle>Примеры</SectionTitle>

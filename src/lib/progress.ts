@@ -8,6 +8,8 @@ export interface RecordAttemptInput {
   tries: number;
   /** total exercises in the lesson, to compute completion */
   lessonTotal: number;
+  /** Present for figma-link/file-upload exercises — logs what was submitted for review. */
+  submission?: { kind: 'figma-link' | 'file-upload'; value: string };
 }
 
 /** YYYY-MM-DD in local time. */
@@ -35,11 +37,23 @@ function xpFor(correct: boolean, tries: number): number {
  * an Attempt; XP is only awarded on a correct solve.
  */
 export async function recordAttempt(learnerId: string, input: RecordAttemptInput) {
-  const { lessonSlug, exerciseId, skill, correct, tries, lessonTotal } = input;
+  const { lessonSlug, exerciseId, skill, correct, tries, lessonTotal, submission } = input;
 
   await prisma.attempt.create({
     data: { learnerId, lessonSlug, exerciseId, skill, correct, tries },
   });
+
+  if (submission) {
+    await prisma.submission.create({
+      data: {
+        learnerId,
+        lessonSlug,
+        exerciseId,
+        kind: submission.kind,
+        value: submission.value,
+      },
+    });
+  }
 
   // Per-skill rolling stats (weak/strong skills, adaptive difficulty).
   await prisma.skillStat.upsert({

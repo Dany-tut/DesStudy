@@ -111,7 +111,79 @@ export function ExampleVisual({ visual }: { visual: string }) {
       </div>
     );
   }
+  // Tokens — hardcoded one-off hex vs semantic tokens from the same palette.
+  if (visual === 'tokens-bad') {
+    return (
+      <Card>
+        <div className="flex gap-3">
+          <Swatch color="#FF6B6B" label="#FF6B6B" />
+          <Swatch color="#4ECDC4" label="#4ECDC4" />
+          <Swatch color="#FFE66D" label="#FFE66D" />
+        </div>
+        <p className="mt-3 text-caption text-tertiary">три экрана — три случайных хекса</p>
+      </Card>
+    );
+  }
+  if (visual === 'tokens-good') {
+    return (
+      <Card>
+        <div className="flex gap-3">
+          <Swatch color="var(--brand)" label="brand" />
+          <Swatch color="var(--success)" label="success" />
+          <Swatch color="var(--info)" label="info" />
+        </div>
+        <p className="mt-3 text-caption text-tertiary">один и тот же именованный набор везде</p>
+      </Card>
+    );
+  }
+
+  // Components — five near-duplicate one-off buttons vs one component with size variants.
+  if (visual === 'components-bad') {
+    return (
+      <Card>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-md bg-brand/70 px-3 py-[7px] text-[11px] text-on-brand">
+            Кнопка
+          </span>
+          <span className="rounded-sm bg-brand/70 px-4 py-[9px] text-[13px] text-on-brand">
+            Кнопка
+          </span>
+          <span className="rounded-lg bg-brand/70 px-[18px] py-[6px] text-[12px] text-on-brand">
+            Кнопка
+          </span>
+        </div>
+        <p className="mt-3 text-caption text-tertiary">3 разных слоя вместо одного компонента</p>
+      </Card>
+    );
+  }
+  if (visual === 'components-good') {
+    return (
+      <Card>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-lg bg-brand px-3 py-1.5 text-footnote font-medium text-on-brand">
+            sm
+          </span>
+          <span className="rounded-lg bg-brand px-5 py-2.5 text-callout font-medium text-on-brand">
+            md
+          </span>
+          <span className="rounded-lg bg-brand px-6 py-3 text-callout font-medium text-on-brand">
+            lg
+          </span>
+        </div>
+        <p className="mt-3 text-caption text-tertiary">один компонент, свойство size</p>
+      </Card>
+    );
+  }
   return null;
+}
+
+function Swatch({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="h-10 w-10 rounded-md border border-border" style={{ background: color }} />
+      <span className="text-caption text-tertiary">{label}</span>
+    </div>
+  );
 }
 
 function Chip({ radius }: { radius: number }) {

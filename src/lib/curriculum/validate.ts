@@ -5,6 +5,9 @@
  */
 import type { Exercise, ValidationOutcome, BuildAnswer } from './types';
 
+/** Shared with the FigmaLinkSubmit UI so validation and live-feedback never drift apart. */
+export const FIGMA_URL_PATTERN = /^https:\/\/(www\.)?figma\.com\/(file|design|proto)\/[a-zA-Z0-9]+/;
+
 export function validate(exercise: Exercise, answer: unknown): ValidationOutcome {
   switch (exercise.type) {
     case 'choose': {
@@ -62,6 +65,27 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
         hint = parts.join('; ') + '.';
       }
       return { correct, explanation: exercise.explanation, hint };
+    }
+    case 'figma-link': {
+      const url = typeof answer === 'string' ? answer.trim() : '';
+      const validShape = FIGMA_URL_PATTERN.test(url);
+      return {
+        correct: validShape,
+        reviewRequired: validShape,
+        explanation: exercise.explanation,
+        hint: validShape
+          ? undefined
+          : 'Похоже, это не ссылка на файл Figma — скопируй адрес через Share → Copy link.',
+      };
+    }
+    case 'file-upload': {
+      const submitted = typeof answer === 'string' && answer.length > 0;
+      return {
+        correct: submitted,
+        reviewRequired: submitted,
+        explanation: exercise.explanation,
+        hint: submitted ? undefined : 'Прикрепи файл, прежде чем отправлять на проверку.',
+      };
     }
     case 'order': {
       const order = Array.isArray(answer) ? (answer as string[]) : [];

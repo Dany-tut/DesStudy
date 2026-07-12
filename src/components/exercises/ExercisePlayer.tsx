@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, X, RotateCcw, Lightbulb, Sparkles } from 'lucide-react';
+import { Check, X, RotateCcw, Lightbulb, Sparkles, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Exercise, ValidationOutcome, BuildAnswer } from '@/lib/curriculum/types';
 import { validate } from '@/lib/curriculum/validate';
 import type { MentorReply } from '@/lib/ai/mentor';
 import { AutoLayoutCanvas } from './AutoLayoutCanvas';
 import { OrderCanvas } from './OrderCanvas';
+import { FigmaLinkSubmit } from './FigmaLinkSubmit';
+import { FileUploadZone } from './FileUploadZone';
 import { Button } from '@/components/ui/Button';
 import { Slider } from '@/components/ui/Slider';
 import { ChoiceCard } from '@/components/ui/ChoiceCard';
@@ -47,21 +49,28 @@ export function ExercisePlayer({
   const [mentorLoading, setMentorLoading] = useState(false);
 
   const solved = outcome?.correct ?? false;
+  const awaitingReview = solved && !!outcome?.reviewRequired;
 
   function answerLabel(value: Answer): string {
-    if (exercise.type === 'choose') {
-      return exercise.options.find((o) => o.id === value)?.label ?? String(value);
+    switch (exercise.type) {
+      case 'choose':
+        return exercise.options.find((o) => o.id === value)?.label ?? String(value);
+      case 'build': {
+        const v = value as BuildAnswer;
+        return `отступ ${v.gap}px, поля ${v.padding}px`;
+      }
+      case 'order': {
+        const ids = value as string[];
+        const byId = new Map(exercise.items.map((i) => [i.id, i.label]));
+        return ids.map((id) => byId.get(id) ?? id).join(' → ');
+      }
+      case 'figma-link':
+        return 'ссылка на Figma';
+      case 'file-upload':
+        return 'прикреплённый файл';
+      case 'tune':
+        return `${value}${exercise.unitLabel}`;
     }
-    if (exercise.type === 'build') {
-      const v = value as BuildAnswer;
-      return `отступ ${v.gap}px, поля ${v.padding}px`;
-    }
-    if (exercise.type === 'order') {
-      const ids = value as string[];
-      const byId = new Map(exercise.items.map((i) => [i.id, i.label]));
-      return ids.map((id) => byId.get(id) ?? id).join(' → ');
-    }
-    return `${value}${exercise.unitLabel}`;
   }
 
   async function askMentor(result: ValidationOutcome, nextAttempts: number, value: Answer) {
@@ -99,10 +108,20 @@ export function ExercisePlayer({
       onSolved?.(nextAttempts);
       void recordAttempt(nextAttempts);
     }
-    void askMentor(result, nextAttempts, choice);
+    // Submission-style exercises (figma-link/file-upload) aren't graded —
+    // asking the mentor to judge "correct/incorrect" on them doesn't apply.
+    if (!result.reviewRequired) {
+      void askMentor(result, nextAttempts, choice);
+    }
   }
 
   async function recordAttempt(tries: number) {
+    // file-upload already logs its Submission row from /api/upload at upload
+    // time; only figma-link needs the URL logged here, alongside the answer.
+    const submission =
+      exercise.type === 'figma-link' && typeof choice === 'string'
+        ? ({ kind: 'figma-link', value: choice } as const)
+        : undefined;
     try {
       await fetch('/api/attempt', {
         method: 'POST',
@@ -114,6 +133,7 @@ export function ExercisePlayer({
           correct: true,
           tries,
           lessonTotal,
+          submission,
         }),
       });
     } catch {
@@ -127,53 +147,92 @@ export function ExercisePlayer({
     setMentor(null);
   }
 
+  function renderControl() {
+    switch (exercise.type) {
+      case 'choose':
+        return (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {exercise.options.map((opt) => {
+              const isChosen = choice === opt.id;
+              const isCorrect = solved && opt.id === exercise.correctOptionId;
+              return (
+                <ChoiceCard
+                  key={opt.id}
+                  label={opt.label}
+                  selected={isChosen}
+                  correct={isCorrect}
+                  disabled={solved}
+                  onClick={() => setChoice(opt.id)}
+                />
+              );
+            })}
+          </div>
+        );
+      case 'tune':
+        return (
+          <TuneControl
+            exercise={exercise}
+            value={typeof choice === 'number' ? choice : exercise.min}
+            disabled={solved}
+            onChange={setChoice}
+          />
+        );
+      case 'build':
+        return (
+          <AutoLayoutCanvas
+            exercise={exercise}
+            value={(choice as BuildAnswer) ?? { gap: exercise.min, padding: exercise.min }}
+            disabled={solved}
+            onChange={(update) =>
+              setChoice((prev) =>
+                update((prev as BuildAnswer) ?? { gap: exercise.min, padding: exercise.min }),
+              )
+            }
+          />
+        );
+      case 'order':
+        return (
+          <OrderCanvas
+            exercise={exercise}
+            value={(choice as string[]) ?? exercise.items.map((i) => i.id)}
+            disabled={solved}
+            onChange={(order) => setChoice(order)}
+          />
+        );
+      case 'figma-link':
+        return (
+          <FigmaLinkSubmit
+            value={typeof choice === 'string' ? choice : ''}
+            disabled={solved}
+            onChange={setChoice}
+          />
+        );
+      case 'file-upload':
+        return (
+          <FileUploadZone
+            lessonSlug={lessonSlug}
+            exerciseId={exercise.id}
+            accept={exercise.accept}
+            maxSizeMB={exercise.maxSizeMB}
+            value={typeof choice === 'string' ? choice : null}
+            disabled={solved}
+            onChange={setChoice}
+          />
+        );
+      default: {
+        // Exhaustiveness guard — a TS error here means a new Exercise type
+        // was added without a matching case.
+        const neverExercise: never = exercise;
+        return neverExercise;
+      }
+    }
+  }
+
   return (
     <div className="rounded-xl border border-border bg-surface p-6">
       <p className="mb-5 text-callout font-medium text-primary">{exercise.prompt}</p>
 
-      {exercise.type === 'choose' ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {exercise.options.map((opt) => {
-            const isChosen = choice === opt.id;
-            const isCorrect = solved && opt.id === exercise.correctOptionId;
-            return (
-              <ChoiceCard
-                key={opt.id}
-                label={opt.label}
-                selected={isChosen}
-                correct={isCorrect}
-                disabled={solved}
-                onClick={() => setChoice(opt.id)}
-              />
-            );
-          })}
-        </div>
-      ) : exercise.type === 'tune' ? (
-        <TuneControl
-          exercise={exercise}
-          value={typeof choice === 'number' ? choice : exercise.min}
-          disabled={solved}
-          onChange={setChoice}
-        />
-      ) : exercise.type === 'build' ? (
-        <AutoLayoutCanvas
-          exercise={exercise}
-          value={(choice as BuildAnswer) ?? { gap: exercise.min, padding: exercise.min }}
-          disabled={solved}
-          onChange={(update) =>
-            setChoice((prev) =>
-              update((prev as BuildAnswer) ?? { gap: exercise.min, padding: exercise.min }),
-            )
-          }
-        />
-      ) : (
-        <OrderCanvas
-          exercise={exercise}
-          value={(choice as string[]) ?? exercise.items.map((i) => i.id)}
-          disabled={solved}
-          onChange={(order) => setChoice(order)}
-        />
-      )}
+      {renderControl()}
 
       {/* Feedback */}
       <AnimatePresence mode="wait">
@@ -185,11 +244,16 @@ export function ExercisePlayer({
             transition={{ duration: 0.18 }}
             className={[
               'mt-5 rounded-lg p-4 text-body',
-              outcome.correct ? 'bg-success/10' : 'bg-danger/10',
+              awaitingReview ? 'bg-brand/10' : outcome.correct ? 'bg-success/10' : 'bg-danger/10',
             ].join(' ')}
           >
             <div className="mb-1 flex items-center gap-2 font-medium">
-              {outcome.correct ? (
+              {awaitingReview ? (
+                <>
+                  <Clock size={16} className="text-brand" />
+                  <span className="text-primary">Отправлено на проверку</span>
+                </>
+              ) : outcome.correct ? (
                 <>
                   <Check size={16} className="text-success" />
                   <span className="text-primary">Верно</span>
@@ -252,6 +316,11 @@ export function ExercisePlayer({
               'Проверить'
             )}
           </Button>
+        ) : awaitingReview ? (
+          <span className="flex items-center gap-2 text-footnote text-secondary">
+            <Clock size={14} className="text-brand" />
+            Отправлено на проверку
+          </span>
         ) : (
           <span className="flex items-center gap-2 text-footnote text-secondary">
             <Check size={14} className="text-success" />
