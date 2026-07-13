@@ -41,21 +41,23 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface p-4 md:flex">
-        <div className="mb-8 px-2 pt-2">
-          <Brand />
-        </div>
-        <nav className="flex flex-col gap-1">
-          {NAV.map((item) => (
-            <SidebarLink key={item.href} item={item} active={isActive(item.href)} />
-          ))}
-        </nav>
-        <div className="mt-auto">
-          <SidebarLink
-            item={{ href: '/settings', label: 'Настройки', icon: Settings }}
-            active={isActive('/settings')}
-          />
+      {/* Desktop sidebar — floats as an inset glass panel, not a flush rail. */}
+      <aside className="sticky top-0 hidden h-screen w-[272px] shrink-0 p-3 md:block">
+        <div className="glass flex h-full flex-col rounded-2xl p-3 shadow-xl">
+          <div className="mb-7 px-2 pt-2">
+            <Brand />
+          </div>
+          <nav className="flex flex-col gap-1">
+            {NAV.map((item) => (
+              <SidebarLink key={item.href} item={item} active={isActive(item.href)} />
+            ))}
+          </nav>
+          <div className="mt-auto border-t border-border/60 pt-2">
+            <SidebarLink
+              item={{ href: '/settings', label: 'Настройки', icon: Settings }}
+              active={isActive('/settings')}
+            />
+          </div>
         </div>
       </aside>
 
@@ -71,16 +73,19 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
     <Link
       href={href}
       className={[
-        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-body transition-fast',
+        'flex items-center gap-3 rounded-xl px-3 py-3 text-callout transition-fast',
         active
           ? 'bg-brand/10 font-medium text-brand'
           : 'text-secondary hover:bg-hover hover:text-primary active:bg-pressed',
       ].join(' ')}
     >
-      <Icon size={18} className={active ? 'text-brand' : ''} />
+      <Icon size={20} className={active ? 'text-brand' : ''} />
       <span className="flex-1">{label}</span>
       {soon && (
-        <span className="rounded-full bg-muted px-1.5 py-0.5 text-caption text-tertiary">
+        <span
+          className="rounded-full bg-muted text-caption font-medium leading-none text-tertiary"
+          style={{ padding: '3px 8px' }}
+        >
           скоро
         </span>
       )}
