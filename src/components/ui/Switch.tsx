@@ -33,8 +33,9 @@ export function Switch({
           className="absolute inset-0 z-10 m-0 cursor-inherit opacity-0"
         />
         <motion.span
-          className="inline-block h-5 w-5 rounded-full bg-white shadow-sm"
-          animate={{ x: checked ? 22 : 4 }}
+          className="absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm"
+          initial={false}
+          animate={{ left: checked ? 24 : 4 }}
           transition={{ type: 'spring', stiffness: 500, damping: 35 }}
         />
       </span>

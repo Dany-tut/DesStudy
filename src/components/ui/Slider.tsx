@@ -86,7 +86,7 @@ export function Slider({
         const instVel = curPct - prevPct;
         vel += (instVel - vel) * 0.25;
         prevPct = curPct;
-        const target = Math.max(-14, Math.min(14, -vel * 2.2));
+        const target = Math.max(-18, Math.min(18, -vel * 2.9));
         tilt += (target - tilt) * 0.18;
         el.style.transform = `translateX(-50%) rotate(${tilt.toFixed(2)}deg)`;
       }
@@ -137,8 +137,8 @@ export function Slider({
       <div ref={trackRef} className="relative">
         <div
           ref={bubbleRef}
-          className="pointer-events-none absolute -top-9 z-10 origin-bottom rounded-lg bg-brand px-3 py-1 text-callout font-semibold tabular-nums text-on-brand shadow-lg will-change-transform"
-          style={{ left: centerX }}
+          className="pointer-events-none absolute z-10 origin-bottom rounded-lg bg-brand px-3 py-1 text-callout font-semibold tabular-nums text-on-brand shadow-lg will-change-transform"
+          style={{ left: centerX, bottom: 'calc(100% + 10px)' }}
           aria-hidden
         >
           {Math.round(live)}

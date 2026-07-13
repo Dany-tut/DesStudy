@@ -39,18 +39,18 @@ export function Stepper({
     const filled = min !== undefined && step > 0 ? Math.round((value - min) / step) : 0;
 
     return (
-      <div className="flex flex-col items-center gap-3">
-        {label && <p className="text-footnote text-secondary">{label}</p>}
-        <div className="flex items-center gap-3">
+      <div>
+        {label && <p className="mb-1.5 text-footnote text-secondary">{label}</p>}
+        <div className="flex items-center gap-1">
           <StepperButton icon={Minus} onClick={() => onChange(clamp(value - step))} disabled={disabled || atMin} label={decLabel} shape="square" />
-          <span className="min-w-[44px] text-center text-callout font-semibold tabular-nums text-primary">
+          <span className="w-16 select-none text-center text-callout font-semibold tabular-nums text-primary">
             {value}
             {unit}
           </span>
           <StepperButton icon={Plus} onClick={() => onChange(clamp(value + step))} disabled={disabled || atMax} label={incLabel} shape="square" />
         </div>
         {dotCount > 0 && (
-          <div className="flex gap-1">
+          <div className="mt-2.5 flex gap-1 px-1">
             {Array.from({ length: dotCount }).map((_, i) => (
               <span
                 key={i}
@@ -100,7 +100,9 @@ function StepperButton({
       aria-label={label}
       className={[
         'flex h-9 w-9 items-center justify-center text-primary transition-fast hover:bg-hover active:bg-pressed disabled:cursor-not-allowed disabled:text-tertiary disabled:hover:bg-transparent',
-        shape === 'round' ? 'rounded-full' : 'rounded-lg',
+        shape === 'round'
+          ? 'rounded-full border border-border bg-surface disabled:border-border/50'
+          : 'rounded-lg',
       ].join(' ')}
     >
       <Icon size={16} />
