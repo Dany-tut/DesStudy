@@ -161,6 +161,7 @@ export function AlignSnap() {
         style={{ height: FRAME_H }}
       >
         {/* Vertical guides (x): left / center / right */}
+        <div className={solved ? 'opacity-40 transition-fast' : 'transition-fast'} style={{ position: 'absolute', inset: 0 }}>
         <div
           className={['absolute top-0 bottom-0 transition-fast', guideActive('x', 'left') ? 'bg-brand' : 'bg-border'].join(' ')}
           style={{ left: INSET, width: guideActive('x', 'left') ? 2 : 1 }}
@@ -186,6 +187,7 @@ export function AlignSnap() {
           className={['absolute left-0 right-0 transition-fast', guideActive('y', 'bottom') ? 'bg-brand' : 'bg-border'].join(' ')}
           style={{ bottom: INSET, height: guideActive('y', 'bottom') ? 2 : 1 }}
         />
+        </div>
 
         {/* Draggable card */}
         <div

@@ -2,7 +2,12 @@
 
 import { useRef } from 'react';
 
-/** Mirrors src/design/tokens.ts `radius` (draggable range only — 'full' isn't a point on this scale). */
+/**
+ * Mirrors src/design/tokens.ts `radius`, plus `full` — at the top of the scale
+ * the corner rounds all the way to a pill/circle. On the 120px card `full` is
+ * 60px (half the side), which already renders as a full circle.
+ */
+const FULL = 60;
 const RADIUS_TOKENS = [
   { name: 'none', v: 0 },
   { name: 'sm', v: 6 },
@@ -10,6 +15,7 @@ const RADIUS_TOKENS = [
   { name: 'lg', v: 14 },
   { name: 'xl', v: 20 },
   { name: '2xl', v: 28 },
+  { name: 'full', v: FULL },
 ] as const;
 
 function nearestToken(v: number) {
@@ -111,36 +117,6 @@ export function RadiusDragTune({
         <p className="mt-0.5 h-[18px] text-footnote font-semibold text-brand">
           {snapped ? `radius.${snapped.name}` : ''}
         </p>
-        <div className="mt-4 flex flex-col gap-1">
-          {RADIUS_TOKENS.filter((t) => t.v <= max).map((t) => {
-            const active = snapped?.name === t.name;
-            return (
-              <button
-                key={t.name}
-                type="button"
-                disabled={disabled}
-                onClick={() => commit(t.v)}
-                className={[
-                  'flex items-center gap-3 rounded-lg px-2 py-1.5 text-left text-footnote transition-fast',
-                  active ? 'bg-brand/10 text-primary' : 'text-secondary hover:bg-hover',
-                  disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
-                ].join(' ')}
-              >
-                <span
-                  className={[
-                    'h-6 w-6 shrink-0 border transition-fast',
-                    active ? 'border-brand bg-brand/20' : 'border-border-strong bg-muted',
-                  ].join(' ')}
-                  style={{ borderRadius: Math.min(Math.round(t.v / 2), 13) }}
-                />
-                <span className="tabular-nums">
-                  <span className="font-medium">radius.{t.name}</span>
-                  <span className="text-tertiary"> · {t.v}px</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
       </div>
     </div>
   );

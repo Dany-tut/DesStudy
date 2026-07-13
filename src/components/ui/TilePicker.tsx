@@ -7,6 +7,10 @@ export interface TileOption<T extends string> {
   value: T;
   label: string;
   icon?: LucideIcon;
+  /** Short text shown in the tile's glyph box instead of an icon (e.g. a ratio "1.25"). */
+  glyph?: string;
+  /** Optional secondary line under the label. */
+  sublabel?: string;
 }
 
 /** Row of icon tiles for a single-pick choice — for options that read better as a glyph than a sentence. */
@@ -43,13 +47,17 @@ export function TilePicker<T extends string>({
           >
             <span
               className={[
-                'flex h-6 w-6 items-center justify-center rounded-md',
+                'flex h-6 items-center justify-center rounded-md px-1.5 text-callout tabular-nums',
+                opt.glyph ? 'min-w-6' : 'w-6',
                 active ? 'bg-brand text-on-brand' : 'bg-muted text-tertiary',
               ].join(' ')}
             >
-              {Icon && <Icon size={14} />}
+              {opt.glyph ?? (Icon && <Icon size={14} />)}
             </span>
             {opt.label}
+            {opt.sublabel && (
+              <span className={active ? 'text-brand/70' : 'text-tertiary'}>{opt.sublabel}</span>
+            )}
           </motion.button>
         );
       })}

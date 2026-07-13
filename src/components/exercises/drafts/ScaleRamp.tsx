@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Stepper } from '@/components/ui/Stepper';
+import { TilePicker } from '@/components/ui/TilePicker';
 
 /** Modular scale ratios common in typography. 1.25 is the UI sweet spot. */
 const RATIOS = [
@@ -49,35 +50,15 @@ export function ScaleRamp() {
       {/* Ratio picker */}
       <div className="mb-4">
         <p className="mb-2 text-footnote text-secondary">Соотношение</p>
-        <div className="flex flex-wrap gap-2">
-          {RATIOS.map((r) => {
-            const active = r.value === ratio;
-            return (
-              <button
-                key={r.value}
-                type="button"
-                onClick={() => setRatio(r.value)}
-                aria-pressed={active}
-                className={[
-                  'flex flex-col items-start rounded-lg px-3 py-2 text-left transition-fast',
-                  active
-                    ? 'bg-brand text-on-brand'
-                    : 'bg-muted text-secondary hover:bg-hover',
-                ].join(' ')}
-              >
-                <span className="text-callout font-semibold tabular-nums">{r.value}</span>
-                <span
-                  className={[
-                    'text-caption',
-                    active ? 'text-on-brand' : 'text-tertiary',
-                  ].join(' ')}
-                >
-                  {r.name}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <TilePicker
+          value={String(ratio)}
+          onChange={(v) => setRatio(Number(v))}
+          options={RATIOS.map((r) => ({
+            value: String(r.value),
+            glyph: String(r.value),
+            label: r.name,
+          }))}
+        />
         {isUiRatio && (
           <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-brand/10 px-3 py-1 text-caption font-medium text-brand">
             <Sparkles size={13} />

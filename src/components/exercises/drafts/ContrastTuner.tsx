@@ -112,7 +112,8 @@ export function ContrastTuner() {
             max={100}
             value={textL}
             onChange={(e) => setTextL(Number(e.target.value))}
-            className="w-full accent-brand"
+            className="ui-slider ui-slider--chunky"
+            style={{ '--pct': `${textL}%` } as React.CSSProperties}
           />
         </label>
 
@@ -127,7 +128,8 @@ export function ContrastTuner() {
             max={100}
             value={bgL}
             onChange={(e) => setBgL(Number(e.target.value))}
-            className="w-full accent-brand"
+            className="ui-slider ui-slider--chunky"
+            style={{ '--pct': `${bgL}%` } as React.CSSProperties}
           />
         </label>
       </div>

@@ -80,3 +80,43 @@ model Submission {
 
   @@index([learnerId, lessonSlug])
 }
+
+/// A teacher-authored lesson (Admin panel, no auth gate yet — see requireAdmin()
+/// in src/lib/admin.ts). Mirrors src/lib/curriculum/types.ts's `Lesson` shape;
+/// once `published`, it's merged alongside the static src/content lessons for
+/// learners at read time (src/content/lessons/index.ts).
+model AuthoredLesson {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  title            String
+  pathTitle        String // free-text grouping label shown on /learn
+  skill            String
+  difficulty       String // Difficulty: 'intro' | 'easy' | 'medium' | 'hard'
+  estimatedMinutes Int
+  objectives       String // JSON string[] — see src/lib/admin/schema.ts
+  prerequisites    String // JSON string[]
+  published        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  blocks ContentBlock[]
+}
+
+/// One ordered block inside an AuthoredLesson — theory line, video, or
+/// exercise. `payload` is a JSON string validated against the matching zod
+/// schema in src/lib/admin/schema.ts before every write (SQLite has no native
+/// JSON column in Prisma, and we want ONE source of truth for the shape:
+/// src/lib/curriculum/types.ts, not a duplicated Prisma model per exercise type).
+/// For `kind: 'exercise'`, the LAST such block (by `order`) becomes the
+/// lesson's masteryChallenge; the rest become `exercises[]` — no separate
+/// "is this the mastery one" flag to manage in the builder UI.
+model ContentBlock {
+  id       String         @id @default(cuid())
+  lesson   AuthoredLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId String
+  order    Int
+  kind     String // 'theory' | 'video' | 'exercise'
+  payload  String // JSON — shape depends on `kind`
+
+  @@index([lessonId, order])
+}

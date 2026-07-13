@@ -31,6 +31,22 @@
   /* Subtle interaction overlays — mirrors tokens.ts semanticColors. */
   --bg-hover: rgba(20, 23, 28, 0.05);
   --bg-pressed: rgba(20, 23, 28, 0.09);
+
+  /*
+   * Space-separated RGB channels, one per semantic color above — Tailwind's
+   * `bg-success/10` opacity-modifier syntax can't decompose a raw `var(--x)`
+   * hex string into channels, so it silently produces a transparent
+   * background. tailwind.config.ts's color entries wrap these in
+   * `rgb(var(--x-rgb) / <alpha-value>)` instead, which opacity modifiers CAN
+   * use. The hex variables above stay untouched for direct `var(--x)` usage
+   * (glass, canvas-grid, swatches) — this is a pure addition, not a rename.
+   */
+  --brand-rgb: 91 110 245;
+  --success-rgb: 47 181 124;
+  --warning-rgb: 229 161 58;
+  --danger-rgb: 229 72 77;
+  --info-rgb: 62 143 240;
+  --bg-muted-rgb: 238 240 244;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -50,6 +66,8 @@
     --glass-border: rgba(255, 255, 255, 0.08);
     --bg-hover: rgba(247, 248, 250, 0.06);
     --bg-pressed: rgba(247, 248, 250, 0.1);
+    --brand-rgb: 124 140 255;
+    --bg-muted-rgb: 32 36 44;
   }
 }
 
@@ -69,6 +87,8 @@
   --glass-border: rgba(255, 255, 255, 0.08);
   --bg-hover: rgba(247, 248, 250, 0.06);
   --bg-pressed: rgba(247, 248, 250, 0.1);
+  --brand-rgb: 124 140 255;
+  --bg-muted-rgb: 32 36 44;
 }
 
 html,

@@ -83,7 +83,7 @@ export function StatesLab() {
   const btnDisabledLook = liveState === 'disabled' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer';
 
   return (
-    <div className="flex flex-col gap-6 rounded-xl border border-border bg-surface p-5">
+    <div className="flex flex-col gap-6 rounded-xl border border-border bg-surface p-5 sm:rounded-2xl lg:rounded-3xl">
       {/* Header */}
       <div>
         <h3 className="text-callout font-semibold text-primary">Лаборатория состояний</h3>
@@ -96,7 +96,7 @@ export function StatesLab() {
         {/* LEFT — live preview + pill row */}
         <div className="flex flex-col gap-4">
           <div
-            className="canvas-grid flex h-[180px] items-center justify-center rounded-lg border border-border"
+            className="canvas-grid flex h-[180px] items-center justify-center rounded-lg border border-border sm:rounded-xl lg:rounded-2xl"
             style={{ backgroundColor: 'transparent' }}
           >
             <button
@@ -155,7 +155,7 @@ export function StatesLab() {
 
         {/* RIGHT — recipe + checklist */}
         <div className="flex flex-col gap-4">
-          <div className="rounded-lg border border-border bg-elevated p-4">
+          <div className="rounded-lg border border-border bg-elevated p-4 sm:rounded-xl lg:rounded-2xl">
             <div className="flex items-center justify-between">
               <span className="text-footnote font-semibold text-primary">
                 Рецепт: {STATES.find((s) => s.key === liveState)?.label}
@@ -179,7 +179,7 @@ export function StatesLab() {
           </div>
 
           {/* Checklist / проверка */}
-          <div className="rounded-lg border border-border bg-elevated p-4">
+          <div className="rounded-lg border border-border bg-elevated p-4 sm:rounded-xl lg:rounded-2xl">
             <div className="flex items-center justify-between">
               <span className="text-footnote font-semibold text-primary">Проверка состояний</span>
               <span

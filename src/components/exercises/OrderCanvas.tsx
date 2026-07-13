@@ -84,24 +84,31 @@ function OrderRow({
       dragListener={false}
       dragControls={controls}
       whileDrag={{ scale: 1.02, boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}
+      onPointerDown={(e: React.PointerEvent) => {
+        if (disabled) return;
+        // Start the drag from anywhere on the card, and stop the browser from
+        // turning the press-and-drag into a text selection.
+        controls.start(e);
+        e.preventDefault();
+      }}
+      style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
       className={[
-        'flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5',
-        disabled ? '' : 'hover:border-border-strong',
+        'flex select-none items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5',
+        disabled ? '' : 'cursor-grab touch-none hover:border-border-strong active:cursor-grabbing',
       ].join(' ')}
     >
       <GripVertical
         size={16}
-        onPointerDown={(e) => !disabled && controls.start(e)}
         className={[
           'shrink-0 text-tertiary transition-fast',
-          disabled ? '' : 'cursor-grab touch-none hover:text-primary active:cursor-grabbing',
+          disabled ? '' : 'hover:text-primary',
         ].join(' ')}
       />
       <span className="flex-1 truncate">
         <ItemLabel item={item} />
       </span>
       {!disabled && (
-        <span className="flex shrink-0 flex-col">
+        <span className="flex shrink-0 flex-col" onPointerDown={(e) => e.stopPropagation()}>
           <button
             onClick={() => onMove(index, index - 1)}
             disabled={index === 0}

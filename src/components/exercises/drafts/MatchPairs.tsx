@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 import { Check, RotateCcw } from 'lucide-react';
 
 /**
@@ -27,6 +27,38 @@ export function MatchPairs() {
   const [selectedLeft, setSelectedLeft] = useState<string | null>(null);
   const [matched, setMatched] = useState<string[]>([]);
   const [wrong, setWrong] = useState<{ left: string; right: string } | null>(null);
+
+  // Refs for measuring connector-line endpoints between matched pairs.
+  const boardRef = useRef<HTMLDivElement>(null);
+  const leftRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const rightRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [lines, setLines] = useState<{ id: string; x1: number; y1: number; x2: number; y2: number }[]>([]);
+
+  useLayoutEffect(() => {
+    function measure() {
+      const board = boardRef.current;
+      if (!board) return;
+      const base = board.getBoundingClientRect();
+      const next = matched
+        .map((id) => {
+          const l = leftRefs.current[id]?.getBoundingClientRect();
+          const r = rightRefs.current[id]?.getBoundingClientRect();
+          if (!l || !r) return null;
+          return {
+            id,
+            x1: l.right - base.left,
+            y1: l.top + l.height / 2 - base.top,
+            x2: r.left - base.left,
+            y2: r.top + r.height / 2 - base.top,
+          };
+        })
+        .filter(Boolean) as { id: string; x1: number; y1: number; x2: number; y2: number }[];
+      setLines(next);
+    }
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [matched]);
 
   const total = PAIRS.length;
   const done = matched.length;
@@ -71,7 +103,31 @@ export function MatchPairs() {
         </button>
       </div>
 
-      <div className="flex gap-4">
+      <div ref={boardRef} className="relative flex gap-4">
+        {/* Connector lines between matched pairs */}
+        <svg className="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible">
+          {lines.map((ln) => (
+            <line
+              key={ln.id}
+              x1={ln.x1}
+              y1={ln.y1}
+              x2={ln.x2}
+              y2={ln.y2}
+              className="text-success"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              style={{ animation: 'matchpairs-draw 0.3s ease' }}
+            />
+          ))}
+          {lines.map((ln) => (
+            <g key={`${ln.id}-dots`} className="text-success">
+              <circle cx={ln.x1} cy={ln.y1} r={3} fill="currentColor" />
+              <circle cx={ln.x2} cy={ln.y2} r={3} fill="currentColor" />
+            </g>
+          ))}
+        </svg>
+
         {/* Left column — tokens */}
         <ul className="flex flex-1 flex-col gap-2">
           {PAIRS.map((p) => {
@@ -81,6 +137,9 @@ export function MatchPairs() {
             return (
               <li key={p.id}>
                 <button
+                  ref={(el) => {
+                    leftRefs.current[p.id] = el;
+                  }}
                   disabled={isMatched}
                   onClick={() => pickLeft(p.id)}
                   style={isWrong ? { animation: 'matchpairs-shake 0.4s ease' } : undefined}
@@ -114,6 +173,9 @@ export function MatchPairs() {
             return (
               <li key={p.id}>
                 <button
+                  ref={(el) => {
+                    rightRefs.current[p.id] = el;
+                  }}
                   disabled={isMatched}
                   onClick={() => pickRight(p.id)}
                   style={isWrong ? { animation: 'matchpairs-shake 0.4s ease' } : undefined}
@@ -151,6 +213,10 @@ export function MatchPairs() {
           0%, 100% { transform: translateX(0); }
           25% { transform: translateX(-4px); }
           75% { transform: translateX(4px); }
+        }
+        @keyframes matchpairs-draw {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
       `}</style>
     </div>
