@@ -1,4 +1,5 @@
 import type { Lesson } from '@/lib/curriculum/types';
+import { Type, Palette, Bold, Square } from 'lucide-react';
 
 /** UI Foundations — typographic hierarchy (uses the drag-to-order canvas). */
 export const typeHierarchy: Lesson = {
@@ -28,12 +29,13 @@ export const typeHierarchy: Lesson = {
     {
       id: 'h-choose-1',
       type: 'choose',
+      picker: 'tiles',
       prompt: 'Чем НЕ стоит создавать иерархию в первую очередь?',
       options: [
-        { id: 'a', label: 'Размером шрифта' },
-        { id: 'b', label: 'Насыщенностью цвета' },
-        { id: 'c', label: 'Весом (bold/regular)' },
-        { id: 'd', label: 'Рамками и тенями' },
+        { id: 'a', label: 'Размер', icon: Type },
+        { id: 'b', label: 'Цвет', icon: Palette },
+        { id: 'c', label: 'Вес', icon: Bold },
+        { id: 'd', label: 'Рамки', icon: Square },
       ],
       correctOptionId: 'd',
       explanation:

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Sidebar } from '@/components/shell/Sidebar';
+import { APPLY_SNIPPET } from '@/lib/settings';
 
 export const metadata: Metadata = {
   title: 'DesStudy — Interactive Design Learning OS',
@@ -15,6 +16,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: APPLY_SNIPPET }} />
+      </head>
       <body>
         <div className="flex min-h-screen flex-col md:flex-row">
           <Sidebar />

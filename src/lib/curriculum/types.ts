@@ -7,6 +7,8 @@
  * before wiring a database.
  */
 
+import type { LucideIcon } from 'lucide-react';
+
 export type Difficulty = 'intro' | 'easy' | 'medium' | 'hard';
 
 // ─────────────────────────────────────────────────────────────
@@ -22,6 +24,14 @@ export interface ChooseExercise {
   prompt: string;
   /** Optional visual rendered above the options (component key). */
   visual?: string;
+  /**
+   * How the options are rendered. 'cards' (default) — ChoiceCard list.
+   * 'tiles' — TilePicker (icon glyph per option). 'swatches' — SwatchPicker
+   * (colored circle per option, for answers tied to a visual sample).
+   * 'segmented' — SegmentedControl (compact pill row; best for 2–3 short
+   * mutually-exclusive labels).
+   */
+  picker?: 'cards' | 'tiles' | 'swatches' | 'segmented';
   options: ChooseOption[];
   /** id of the correct option */
   correctOptionId: string;
@@ -34,6 +44,10 @@ export interface ChooseOption {
   label: string;
   /** Optional per-option hint shown when this wrong answer is picked. */
   hint?: string;
+  /** For picker: 'tiles' — the glyph shown on the tile. */
+  icon?: LucideIcon;
+  /** For picker: 'swatches' — CSS color/background for the swatch circle. */
+  swatch?: string;
 }
 
 /** L1: adjust a numeric value onto the correct grid step (e.g. spacing). */
@@ -49,6 +63,12 @@ export interface TuneExercise {
   correctValue: number;
   /** Acceptable absolute tolerance (0 = exact). */
   tolerance: number;
+  /**
+   * How the learner manipulates the value. 'slider' (default) — linear drag.
+   * 'radius' — a live corner-drag card, snapping to the radius token scale
+   * (matches the direct-manipulation feel of BuildExercise's canvas).
+   */
+  visual?: 'slider' | 'radius';
   explanation: string;
 }
 

@@ -26,18 +26,18 @@ export const radiusScale: Lesson = {
   ],
   exercises: [
     {
-      id: 'r-choose-1',
-      type: 'choose',
-      prompt: 'Какой радиус принадлежит шкале 6 · 10 · 14 · 20?',
-      options: [
-        { id: 'a', label: '11px', hint: '11 нет в шкале — это magic number.' },
-        { id: 'b', label: '14px' },
-        { id: 'c', label: '17px', hint: '17 вне шкалы. Ближайшие: 14 или 20.' },
-        { id: 'd', label: '5px', hint: '5 вне шкалы. Ближайший — 6.' },
-      ],
-      correctOptionId: 'b',
+      id: 'r-tune-1',
+      type: 'tune',
+      prompt: 'Потяни за угол карточки и поставь радиус на узел шкалы `radius.lg`.',
+      unitLabel: 'px',
+      min: 0,
+      max: 28,
+      step: 2,
+      correctValue: 14,
+      tolerance: 0,
+      visual: 'radius',
       explanation:
-        '14px — узловое значение шкалы (шаг lg). Остальные не принадлежат шкале и создают визуальный разнобой.',
+        '14px — узловое значение шкалы (`radius.lg`). Маркер примагничивается к шкале сам, поэтому промежуточные значения вроде 11 или 17 на ней не задержатся.',
     },
     {
       id: 'r-choose-2',

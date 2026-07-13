@@ -12,6 +12,40 @@ import { ChoiceCard } from '@/components/ui/ChoiceCard';
 import { TilePicker } from '@/components/ui/TilePicker';
 import { SwatchPicker } from '@/components/ui/SwatchPicker';
 import { AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { AutoLayoutCanvas } from '@/components/exercises/AutoLayoutCanvas';
+import { OrderCanvas } from '@/components/exercises/OrderCanvas';
+import { RadiusDragTune } from '@/components/exercises/RadiusDragTune';
+import { FigmaLinkSubmit } from '@/components/exercises/FigmaLinkSubmit';
+import { FileUploadZone } from '@/components/exercises/FileUploadZone';
+import { VideoEmbed } from '@/components/lesson/VideoEmbed';
+import type { BuildAnswer, BuildExercise, OrderExercise } from '@/lib/curriculum/types';
+
+/** Sample exercises used only to render the interactive surfaces in the showcase. */
+const DEMO_BUILD: BuildExercise = {
+  id: 'ds-build',
+  type: 'build',
+  prompt: '',
+  blocks: 3,
+  step: 4,
+  min: 0,
+  max: 48,
+  target: { gap: 16, padding: 24 },
+  explanation: '',
+};
+
+const DEMO_ORDER: OrderExercise = {
+  id: 'ds-order',
+  type: 'order',
+  prompt: '',
+  items: [
+    { id: 'title', label: 'Заголовок экрана', size: 'title' },
+    { id: 'body', label: 'Основной текст описания', size: 'body' },
+    { id: 'caption', label: 'Подпись · метка', size: 'caption' },
+    { id: 'cta', label: 'Действие', size: 'button' },
+  ],
+  correctOrder: ['title', 'body', 'caption', 'cta'],
+  explanation: '',
+};
 
 /**
  * Design System showcase — Chapter 3 (UX/UI Bible) made visible.
@@ -27,6 +61,11 @@ export default function DesignSystemPage() {
   const [padding, setPadding] = useState(16);
   const [align, setAlign] = useState<'left' | 'center' | 'right'>('center');
   const [sample, setSample] = useState<'a' | 'b' | 'c' | 'd'>('c');
+  const [build, setBuild] = useState<BuildAnswer>({ gap: 16, padding: 16 });
+  const [order, setOrder] = useState<string[]>(['body', 'title', 'cta', 'caption']);
+  const [rad, setRad] = useState(14);
+  const [figma, setFigma] = useState('');
+  const [upload, setUpload] = useState<string | null>(null);
 
   const toggle = () => {
     const next = !dark;
@@ -230,6 +269,64 @@ export default function DesignSystemPage() {
               ]}
             />
           </div>
+        </div>
+      </Section>
+
+      <div className="mb-8 mt-20 border-t border-border pt-10">
+        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-footnote text-brand">
+          <Sparkles size={14} />
+          Интерактивы упражнений
+        </div>
+        <p className="max-w-[560px] text-body text-secondary">
+          Полноценные интерактивные поверхности, которые встречает ученик в
+          уроках. Все живые — можно потрогать прямо здесь.
+        </p>
+      </div>
+
+      <Section title="Build — холст auto-layout (тип «build»)">
+        <AutoLayoutCanvas
+          exercise={DEMO_BUILD}
+          value={build}
+          disabled={false}
+          onChange={(update) => setBuild(update)}
+        />
+      </Section>
+
+      <Section title="Order — перетаскивание по порядку (тип «order»)">
+        <OrderCanvas exercise={DEMO_ORDER} value={order} disabled={false} onChange={setOrder} />
+      </Section>
+
+      <Section title="Tune · radius — тяни за угол (тип «tune», visual «radius»)">
+        <div className="max-w-[420px]">
+          <RadiusDragTune value={rad} min={0} max={28} onChange={setRad} />
+        </div>
+      </Section>
+
+      <Section title="Figma-link — сдача ссылки (тип «figma-link»)">
+        <FigmaLinkSubmit value={figma} disabled={false} onChange={setFigma} />
+      </Section>
+
+      <Section title="File-upload — загрузка файла (тип «file-upload»)">
+        <FileUploadZone
+          lessonSlug="design-system"
+          exerciseId="ds-upload"
+          accept="image/png,image/jpeg,application/pdf"
+          maxSizeMB={8}
+          value={upload}
+          disabled={false}
+          onChange={setUpload}
+        />
+      </Section>
+
+      <Section title="Video — видео урока (YouTube / Vimeo / файл)">
+        <div className="max-w-[560px]">
+          <VideoEmbed
+            video={{
+              url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+              caption: 'Пример встроенного видео урока',
+              provider: 'youtube',
+            }}
+          />
         </div>
       </Section>
     </main>

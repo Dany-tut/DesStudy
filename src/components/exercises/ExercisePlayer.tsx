@@ -10,9 +10,13 @@ import { AutoLayoutCanvas } from './AutoLayoutCanvas';
 import { OrderCanvas } from './OrderCanvas';
 import { FigmaLinkSubmit } from './FigmaLinkSubmit';
 import { FileUploadZone } from './FileUploadZone';
+import { RadiusDragTune } from './RadiusDragTune';
 import { Button } from '@/components/ui/Button';
 import { Slider } from '@/components/ui/Slider';
 import { ChoiceCard } from '@/components/ui/ChoiceCard';
+import { TilePicker } from '@/components/ui/TilePicker';
+import { SwatchPicker } from '@/components/ui/SwatchPicker';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 
 type Answer = string | number | BuildAnswer | string[] | null;
 
@@ -149,7 +153,38 @@ export function ExercisePlayer({
 
   function renderControl() {
     switch (exercise.type) {
-      case 'choose':
+      case 'choose': {
+        const selected = typeof choice === 'string' ? choice : '';
+        if (exercise.picker === 'tiles') {
+          return (
+            <TilePicker
+              options={exercise.options.map((o) => ({ value: o.id, label: o.label, icon: o.icon }))}
+              value={selected}
+              disabled={solved}
+              onChange={setChoice}
+            />
+          );
+        }
+        if (exercise.picker === 'swatches') {
+          return (
+            <SwatchPicker
+              options={exercise.options.map((o) => ({ value: o.id, label: o.label, swatch: o.swatch }))}
+              value={selected}
+              disabled={solved}
+              onChange={setChoice}
+            />
+          );
+        }
+        if (exercise.picker === 'segmented') {
+          return (
+            <SegmentedControl
+              options={exercise.options.map((o) => ({ value: o.id, label: o.label }))}
+              value={selected}
+              disabled={solved}
+              onChange={setChoice}
+            />
+          );
+        }
         return (
           <div className="grid gap-3 sm:grid-cols-2">
             {exercise.options.map((opt) => {
@@ -168,6 +203,7 @@ export function ExercisePlayer({
             })}
           </div>
         );
+      }
       case 'tune':
         return (
           <TuneControl
@@ -343,6 +379,18 @@ function TuneControl({
   disabled: boolean;
   onChange: (v: number) => void;
 }) {
+  if (exercise.visual === 'radius') {
+    return (
+      <RadiusDragTune
+        value={value}
+        min={exercise.min}
+        max={exercise.max}
+        disabled={disabled}
+        onChange={onChange}
+      />
+    );
+  }
+
   return (
     <div>
       <Slider

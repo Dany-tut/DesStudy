@@ -80,6 +80,27 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/*
+ * Accessibility preferences (see src/lib/settings.ts). Applied as data-attrs
+ * on <html> so they cascade to the whole app.
+ */
+/* Reduced motion — collapse every transition/animation to near-instant. */
+:root[data-motion='reduced'] *,
+:root[data-motion='reduced'] *::before,
+:root[data-motion='reduced'] *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+
+/* High contrast — promote every border to the stronger token + firmer text. */
+:root[data-contrast='high'] {
+  --border: var(--border-strong);
+  --text-secondary: var(--text-primary);
+  --text-tertiary: var(--text-secondary);
+}
+
 /* 8pt dotted grid background for the Interactive Canvas. */
 .canvas-grid {
   background-image: radial-gradient(var(--border-strong) 1px, transparent 1px);
@@ -116,6 +137,11 @@ body {
   cursor: pointer;
 }
 
+/* Variant B — chunky/thick track. */
+.ui-slider--chunky {
+  height: 14px;
+}
+
 .ui-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -140,6 +166,11 @@ body {
   box-shadow:
     0 2px 10px rgba(91, 110, 245, 0.45),
     0 0 0 6px rgba(91, 110, 245, 0.2);
+}
+
+.ui-slider--chunky::-moz-range-track,
+.ui-slider--chunky::-moz-range-progress {
+  height: 14px;
 }
 
 .ui-slider::-moz-range-track {

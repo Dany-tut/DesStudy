@@ -31,6 +31,7 @@ export const spacing8pt: Lesson = {
     {
       id: 'sp-choose-1',
       type: 'choose',
+      picker: 'segmented',
       prompt: 'Какое значение отступа соответствует 8pt-сетке?',
       options: [
         { id: 'a', label: '13px', hint: '13 не кратно 8 и не 4 — это magic number.' },
