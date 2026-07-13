@@ -18,6 +18,13 @@ import { RadiusDragTune } from '@/components/exercises/RadiusDragTune';
 import { FigmaLinkSubmit } from '@/components/exercises/FigmaLinkSubmit';
 import { FileUploadZone } from '@/components/exercises/FileUploadZone';
 import { VideoEmbed } from '@/components/lesson/VideoEmbed';
+import { BarBuilder } from '@/components/exercises/drafts/BarBuilder';
+import { ContrastTuner } from '@/components/exercises/drafts/ContrastTuner';
+import { AlignSnap } from '@/components/exercises/drafts/AlignSnap';
+import { MatchPairs } from '@/components/exercises/drafts/MatchPairs';
+import { ScaleRamp } from '@/components/exercises/drafts/ScaleRamp';
+import { Hotspot } from '@/components/exercises/drafts/Hotspot';
+import { StatesLab } from '@/components/exercises/drafts/StatesLab';
 import type { BuildAnswer, BuildExercise, OrderExercise } from '@/lib/curriculum/types';
 
 /** Sample exercises used only to render the interactive surfaces in the showcase. */
@@ -133,6 +140,36 @@ export default function DesignSystemPage() {
                 <span className="text-caption text-tertiary">{k}</span>
               </div>
             ))}
+        </div>
+      </Section>
+
+      <Section title="Отступы между блоками — вертикальный ритм">
+        <p className="mb-5 max-w-[560px] text-body text-secondary">
+          Расстояние между блоками задаётся теми же токенами. Чем крупнее
+          смысловая граница, тем больше отступ: внутри группы — тесно, между
+          секциями — просторно.
+        </p>
+        <div className="flex flex-col gap-6 sm:flex-row">
+          {([
+            { token: '3', label: 'Внутри группы', hint: 'подпись под полем' },
+            { token: '4', label: 'Между полями', hint: 'соседние элементы' },
+            { token: '8', label: 'Между группами', hint: 'логические блоки' },
+            { token: '14', label: 'Между секциями', hint: 'крупные разделы' },
+          ] as const).map(({ token, label, hint }) => (
+            <div key={token} className="flex-1 rounded-lg border border-border p-4">
+              <div className="mb-3 flex items-baseline justify-between">
+                <span className="text-footnote font-medium text-primary">{label}</span>
+                <span className="text-caption text-tertiary">
+                  space.{token} · {space[token as unknown as keyof typeof space]}
+                </span>
+              </div>
+              <div className="flex flex-col" style={{ gap: space[token as unknown as keyof typeof space] }}>
+                <div className="h-6 rounded-sm bg-muted" />
+                <div className="h-6 rounded-sm bg-muted" />
+              </div>
+              <p className="mt-3 text-caption text-tertiary">{hint}</p>
+            </div>
+          ))}
         </div>
       </Section>
 
@@ -275,6 +312,45 @@ export default function DesignSystemPage() {
       <div className="mb-8 mt-20 border-t border-border pt-10">
         <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-footnote text-brand">
           <Sparkles size={14} />
+          Новые типы интерактива · черновики
+        </div>
+        <p className="max-w-[600px] text-body text-secondary">
+          Кандидаты новых механик для уроков. Все живые — потрогай и выбери, что
+          пойдём доводить до продакшена. Дизайн черновой, важна суть механики.
+        </p>
+      </div>
+
+      <Section title="Bar-builder — собери нав/топ-бар как конструктор («bar-builder»)">
+        <BarBuilder />
+      </Section>
+
+      <Section title="Contrast — доведи цвет до WCAG («contrast»)">
+        <ContrastTuner />
+      </Section>
+
+      <Section title="Align — тащи к гайдам со снапом («align»)">
+        <AlignSnap />
+      </Section>
+
+      <Section title="Match — соедини токен со значением («match»)">
+        <MatchPairs />
+      </Section>
+
+      <Section title="Scale-ramp — собери типографическую шкалу («scale-ramp»)">
+        <ScaleRamp />
+      </Section>
+
+      <Section title="Hotspot — найди проблему на макете («hotspot»)">
+        <Hotspot />
+      </Section>
+
+      <Section title="States — состояния компонента («states»)">
+        <StatesLab />
+      </Section>
+
+      <div className="mb-8 mt-20 border-t border-border pt-10">
+        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-footnote text-brand">
+          <Sparkles size={14} />
           Интерактивы упражнений
         </div>
         <p className="max-w-[560px] text-body text-secondary">
@@ -335,8 +411,8 @@ export default function DesignSystemPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-14">
-      <h2 className="mb-5 text-title3 font-semibold text-primary">{title}</h2>
+    <section className="mb-24">
+      <h2 className="mb-6 text-title3 font-semibold text-primary">{title}</h2>
       {children}
     </section>
   );

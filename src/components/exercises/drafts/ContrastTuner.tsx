@@ -1,0 +1,143 @@
+'use client';
+
+import { useState } from 'react';
+import { Check, X } from 'lucide-react';
+
+function channelToLinear(c: number): number {
+  const s = c / 255;
+  return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+
+// Neutral grey from lightness 0..100 -> relative luminance (per WCAG 2.1)
+function luminanceFromLightness(lightness: number): number {
+  const v = Math.round((lightness / 100) * 255);
+  const lin = channelToLinear(v);
+  return 0.2126 * lin + 0.7152 * lin + 0.0722 * lin;
+}
+
+function greyHex(lightness: number): string {
+  const v = Math.round((lightness / 100) * 255);
+  const h = v.toString(16).padStart(2, '0');
+  return `#${h}${h}${h}`;
+}
+
+export function ContrastTuner() {
+  const [textL, setTextL] = useState(38);
+  const [bgL, setBgL] = useState(96);
+
+  const lumText = luminanceFromLightness(textL);
+  const lumBg = luminanceFromLightness(bgL);
+  const lighter = Math.max(lumText, lumBg);
+  const darker = Math.min(lumText, lumBg);
+  const ratio = (lighter + 0.05) / (darker + 0.05);
+  const ratioLabel = `${ratio.toFixed(2)}:1`;
+
+  const passAA = ratio >= 4.5;
+  const passAALarge = ratio >= 3;
+  const passAAA = ratio >= 7;
+
+  const textColor = greyHex(textL);
+  const bgColor = greyHex(bgL);
+
+  const badges = [
+    { key: 'aa', label: 'AA', hint: 'обычный', pass: passAA },
+    { key: 'aa-l', label: 'AA Large', hint: 'крупный', pass: passAALarge },
+    { key: 'aaa', label: 'AAA', hint: 'усиленный', pass: passAAA },
+  ];
+
+  return (
+    <div className="rounded-xl border border-border bg-surface p-5">
+      <div className="mb-4">
+        <h3 className="text-title3 text-primary">Тюнинг контраста</h3>
+        <p className="text-footnote text-secondary mt-1">
+          Добейся минимум AA — 4.5:1
+        </p>
+      </div>
+
+      {/* Live preview card */}
+      <div
+        className="rounded-lg border border-border p-6 transition-base"
+        style={{ backgroundColor: bgColor }}
+      >
+        <div className="text-title2" style={{ color: textColor }}>
+          Пример текста
+        </div>
+        <p className="text-body mt-2" style={{ color: textColor }}>
+          Хороший контраст делает интерфейс читаемым для всех.
+        </p>
+      </div>
+
+      {/* Ratio readout */}
+      <div className="mt-4 flex items-center justify-between rounded-lg bg-elevated border border-border px-4 py-3">
+        <span className="text-footnote text-secondary">Контраст</span>
+        <span
+          className={`text-title3 tabular-nums ${passAA ? 'text-success' : 'text-danger'}`}
+        >
+          {ratioLabel}
+        </span>
+      </div>
+
+      {/* Badges */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {badges.map((b) => (
+          <div
+            key={b.key}
+            className={`flex items-center gap-2 rounded-full border px-3 py-2 transition-fast ${
+              b.pass
+                ? 'border-success bg-success/10 text-success'
+                : 'border-border bg-muted text-tertiary'
+            }`}
+          >
+            {b.pass ? (
+              <Check size={14} strokeWidth={2.5} />
+            ) : (
+              <X size={14} strokeWidth={2.5} />
+            )}
+            <span className="text-footnote">{b.label}</span>
+            <span className="text-caption opacity-70">{b.hint}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Controls */}
+      <div className="mt-5 flex flex-col gap-5">
+        <label className="block">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-footnote text-secondary">Светлота текста</span>
+            <span className="text-footnote text-tertiary tabular-nums">{textL}</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={textL}
+            onChange={(e) => setTextL(Number(e.target.value))}
+            className="w-full accent-brand"
+          />
+        </label>
+
+        <label className="block">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-footnote text-secondary">Светлота фона</span>
+            <span className="text-footnote text-tertiary tabular-nums">{bgL}</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={bgL}
+            onChange={(e) => setBgL(Number(e.target.value))}
+            className="w-full accent-brand"
+          />
+        </label>
+      </div>
+
+      {passAA && (
+        <div className="mt-4 flex items-center gap-2 text-success">
+          <Check size={16} strokeWidth={2.5} />
+          <span className="text-footnote">Отлично — контраст проходит AA</span>
+        </div>
+      )}
+    </div>
+  );
+}
