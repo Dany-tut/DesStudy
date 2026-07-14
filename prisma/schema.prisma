@@ -1,14 +1,14 @@
 // DesStudy — data model (PRD Ch.5 / §7 Progress Tracking).
-// SQLite for zero-ops local dev; the schema ports to Postgres with only the
-// datasource provider changed. Mirrors src/lib/curriculum/types.ts.
+// Postgres (Neon / Vercel Postgres) — serverless-friendly; SQLite can't persist
+// on Vercel's read-only, ephemeral filesystem. Mirrors src/lib/curriculum/types.ts.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 /// An anonymous or (later) authenticated learner. Identified by a cookie for now.

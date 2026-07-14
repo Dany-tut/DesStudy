@@ -36,6 +36,7 @@ type Placement =
   | 'sidebarRight';
 type Variant = 'full' | 'burger' | 'mini';
 type PartKey = 'logo' | 'nav' | 'search' | 'cta' | 'avatar';
+type NavAlign = 'left' | 'center' | 'right';
 
 const PLACEMENTS: {
   key: Placement;
@@ -69,7 +70,7 @@ const TARGET = {
   placement: 'floatTop' as Placement,
   variant: 'full' as Variant,
   parts: { logo: true, nav: true, search: false, cta: true, avatar: false },
-  navCenter: true,
+  navAlign: 'center' as NavAlign,
 };
 
 const isSidebar = (p: Placement) => p === 'sidebarLeft' || p === 'sidebarRight';
@@ -84,7 +85,7 @@ export function BarBuilder() {
     cta: false,
     avatar: false,
   });
-  const [navCenter, setNavCenter] = useState(false);
+  const [navAlign, setNavAlign] = useState<NavAlign>('left');
   const [autoplay, setAutoplay] = useState(true);
   // Placement rail: a single row of icon squares. Clicking one morphs it out to
   // fill the whole row (icon + label) while the rest collapse away; clicking the
@@ -121,7 +122,56 @@ export function BarBuilder() {
     ro.observe(el);
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placement, variant, parts, navCenter]);
+  }, [placement, variant, parts, navAlign]);
+
+  // "Из чего собрать" is a horizontal rail that can outgrow the column. Make it
+  // scrollable by mouse wheel and by click-drag (grab + pull), not just trackpad.
+  const chipRailRef = useRef<HTMLDivElement>(null);
+  const chipDrag = useRef({ x: 0, scroll: 0, moved: false, active: false });
+
+  useEffect(() => {
+    const el = chipRailRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      if (delta === 0) return;
+      el.scrollLeft += delta;
+      e.preventDefault();
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  const onChipPointerDown = (e: React.PointerEvent) => {
+    const el = chipRailRef.current;
+    if (!el) return;
+    chipDrag.current = { x: e.clientX, scroll: el.scrollLeft, moved: false, active: true };
+  };
+  const onChipPointerMove = (e: React.PointerEvent) => {
+    const el = chipRailRef.current;
+    const d = chipDrag.current;
+    if (!el || !d.active) return;
+    const dx = e.clientX - d.x;
+    if (!d.moved && Math.abs(dx) > 4) {
+      d.moved = true;
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture is best-effort */
+      }
+    }
+    if (d.moved) el.scrollLeft = d.scroll - dx;
+  };
+  const onChipPointerUp = (e: React.PointerEvent) => {
+    const el = chipRailRef.current;
+    chipDrag.current.active = false;
+    try {
+      el?.releasePointerCapture(e.pointerId);
+    } catch {
+      /* capture is best-effort */
+    }
+  };
 
   const onThumbDown = (e: React.PointerEvent) => {
     const el = scrollRef.current;
@@ -183,7 +233,7 @@ export function BarBuilder() {
   const solved =
     placement === TARGET.placement &&
     variant === TARGET.variant &&
-    navCenter === TARGET.navCenter &&
+    navAlign === TARGET.navAlign &&
     (Object.keys(parts) as PartKey[]).every((k) => parts[k] === TARGET.parts[k]);
 
   return (
@@ -275,16 +325,17 @@ export function BarBuilder() {
           <p className="mb-2 text-footnote font-medium text-secondary">Навигация</p>
           <div className="inline-flex rounded-lg bg-muted p-1">
             {[
-              { v: false, label: 'Слева' },
-              { v: true, label: 'По центру' },
+              { v: 'left' as NavAlign, label: 'Слева' },
+              { v: 'center' as NavAlign, label: 'По центру' },
+              { v: 'right' as NavAlign, label: 'Справа' },
             ].map(({ v, label }) => (
               <button
                 key={label}
                 type="button"
-                onClick={() => setNavCenter(v)}
+                onClick={() => setNavAlign(v)}
                 className={[
                   'rounded-md px-4 py-2 text-footnote font-medium transition-fast',
-                  navCenter === v ? 'bg-brand text-on-brand' : 'text-secondary hover:text-primary',
+                  navAlign === v ? 'bg-brand text-on-brand' : 'text-secondary hover:text-primary',
                 ].join(' ')}
               >
                 {label}
@@ -295,16 +346,27 @@ export function BarBuilder() {
 
         <div>
           <p className="mb-2 text-footnote font-medium text-secondary">Из чего собрать</p>
-          {/* Horizontal scroll with edge fades — parts can exceed 5 */}
+          {/* Horizontal rail (parts can exceed the column). Scrolls by wheel and
+              by click-drag; an edge fade hints there's more to the right. */}
           <div className="relative">
-            <div className="hide-native-scroll flex touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-1">
+            <div
+              ref={chipRailRef}
+              onPointerDown={onChipPointerDown}
+              onPointerMove={onChipPointerMove}
+              onPointerUp={onChipPointerUp}
+              onPointerCancel={onChipPointerUp}
+              className="hide-native-scroll flex cursor-grab touch-pan-x select-none gap-2 overflow-x-auto overscroll-x-contain pb-1 active:cursor-grabbing"
+            >
               {PARTS.map(({ key, label }) => {
                 const on = parts[key];
                 return (
                   <button
                     key={key}
                     type="button"
-                    onClick={() => togglePart(key)}
+                    onClick={() => {
+                      if (chipDrag.current.moved) return;
+                      togglePart(key);
+                    }}
                     className={[
                       'flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-footnote font-medium transition-fast',
                       on
@@ -370,7 +432,7 @@ export function BarBuilder() {
               placement={placement}
               variant={variant}
               parts={parts}
-              navCenter={navCenter}
+              navAlign={navAlign}
             />
 
             {placement !== 'sidebarRight' && <PageContent placement={placement} />}
@@ -421,12 +483,12 @@ function BarPreview({
   placement,
   variant,
   parts,
-  navCenter,
+  navAlign,
 }: {
   placement: Placement;
   variant: Variant;
   parts: Record<PartKey, boolean>;
-  navCenter: boolean;
+  navAlign: NavAlign;
 }) {
   const sidebar = isSidebar(placement);
   const floating = placement === 'floatTop' || placement === 'floatBottom';
