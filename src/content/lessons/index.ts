@@ -4,6 +4,9 @@ import { radiusScale } from './radius-scale';
 import { typeHierarchy } from './type-hierarchy';
 import { colorContrast } from './color-contrast';
 import { uxHeuristics } from './ux-heuristics';
+import { uxHeuristicsControl } from './ux-heuristics-control';
+import { uxHeuristicsClarity } from './ux-heuristics-clarity';
+import { uxHeuristicsConsistency } from './ux-heuristics-consistency';
 import { userFlows } from './user-flows';
 import { designTokens } from './design-tokens';
 import { componentsVariants } from './components-variants';
@@ -30,6 +33,9 @@ export const lessons: Record<string, Lesson> = {
   [responsiveLayout.slug]: responsiveLayout,
   [navBars.slug]: navBars,
   [uxHeuristics.slug]: uxHeuristics,
+  [uxHeuristicsControl.slug]: uxHeuristicsControl,
+  [uxHeuristicsClarity.slug]: uxHeuristicsClarity,
+  [uxHeuristicsConsistency.slug]: uxHeuristicsConsistency,
   [userFlows.slug]: userFlows,
   [microcopy.slug]: microcopy,
   [designTokens.slug]: designTokens,
@@ -48,6 +54,9 @@ export {
   typeHierarchy,
   colorContrast,
   uxHeuristics,
+  uxHeuristicsControl,
+  uxHeuristicsClarity,
+  uxHeuristicsConsistency,
   userFlows,
   designTokens,
   componentsVariants,
