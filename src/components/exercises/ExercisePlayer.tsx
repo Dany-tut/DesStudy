@@ -8,8 +8,11 @@ import type {
   ValidationOutcome,
   BuildAnswer,
   BarBuildAnswer,
+  AlignAnswer,
+  ContrastAnswer,
+  ScaleRampAnswer,
 } from '@/lib/curriculum/types';
-import { validate } from '@/lib/curriculum/validate';
+import { validate, contrastRatio } from '@/lib/curriculum/validate';
 import type { MentorReply } from '@/lib/ai/mentor';
 import { AutoLayoutCanvas } from './AutoLayoutCanvas';
 import { BarBuilder } from './BarBuilder';
@@ -17,6 +20,12 @@ import { OrderCanvas } from './OrderCanvas';
 import { FigmaLinkSubmit } from './FigmaLinkSubmit';
 import { FileUploadZone } from './FileUploadZone';
 import { RadiusDragTune } from './RadiusDragTune';
+import { MatchPairs } from './drafts/MatchPairs';
+import { StatesLab } from './drafts/StatesLab';
+import { Hotspot } from './drafts/Hotspot';
+import { AlignSnap } from './drafts/AlignSnap';
+import { ContrastTuner } from './drafts/ContrastTuner';
+import { ScaleRamp } from './drafts/ScaleRamp';
 import { Button } from '@/components/ui/Button';
 import { Slider } from '@/components/ui/Slider';
 import { ChoiceCard } from '@/components/ui/ChoiceCard';
@@ -24,7 +33,18 @@ import { TilePicker } from '@/components/ui/TilePicker';
 import { SwatchPicker } from '@/components/ui/SwatchPicker';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 
-type Answer = string | number | BuildAnswer | BarBuildAnswer | string[] | null;
+type HotspotAnswer = { x: number; y: number };
+type Answer =
+  | string
+  | number
+  | BuildAnswer
+  | BarBuildAnswer
+  | AlignAnswer
+  | ContrastAnswer
+  | ScaleRampAnswer
+  | HotspotAnswer
+  | string[]
+  | null;
 
 const DEFAULT_BAR: BarBuildAnswer = {
   placement: 'static',
@@ -60,7 +80,15 @@ export function ExercisePlayer({
         ? exercise.items.map((i) => i.id)
         : exercise.type === 'bar-build'
           ? DEFAULT_BAR
-          : null;
+          : exercise.type === 'match'
+            ? []
+            : exercise.type === 'states'
+              ? ['default']
+              : exercise.type === 'contrast-tune'
+                ? { textL: 38, bgL: 96 }
+                : exercise.type === 'scale-ramp'
+                  ? { base: 16, ratio: 1.25 }
+                  : null;
   const [choice, setChoice] = useState<Answer>(initialChoice);
   const [outcome, setOutcome] = useState<ValidationOutcome | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -105,6 +133,32 @@ export function ExercisePlayer({
           mini: 'мини',
         };
         return `${placementRu[v.placement]}, ${variantRu[v.variant]}`;
+      }
+      case 'match': {
+        const ids = (value as string[]) ?? [];
+        return `сопоставлено ${ids.length} из ${exercise.pairs.length} пар`;
+      }
+      case 'states': {
+        const ids = (value as string[]) ?? [];
+        return `осмотрено ${ids.length} из 5 состояний`;
+      }
+      case 'hotspot': {
+        const p = value as HotspotAnswer | null;
+        return p ? `клик в точке ${Math.round(p.x)}%, ${Math.round(p.y)}%` : 'нет клика';
+      }
+      case 'align': {
+        const a = value as AlignAnswer;
+        const xl = { left: 'слева', center: 'по центру', right: 'справа' };
+        const yl = { top: 'сверху', middle: 'посередине', bottom: 'снизу' };
+        return a?.x && a?.y ? `${xl[a.x]} · ${yl[a.y]}` : 'не выровнено';
+      }
+      case 'contrast-tune': {
+        const v = value as ContrastAnswer;
+        return `контраст ${contrastRatio(v.textL, v.bgL).toFixed(2)}:1`;
+      }
+      case 'scale-ramp': {
+        const v = value as ScaleRampAnswer;
+        return `${v.base}px × ${v.ratio}`;
       }
     }
   }
@@ -294,6 +348,57 @@ export function ExercisePlayer({
             value={typeof choice === 'string' ? choice : null}
             disabled={solved}
             onChange={setChoice}
+          />
+        );
+      case 'match':
+        return (
+          <MatchPairs
+            pairs={exercise.pairs}
+            value={(choice as string[]) ?? []}
+            disabled={solved}
+            onChange={(m) => setChoice(m)}
+          />
+        );
+      case 'states':
+        return (
+          <StatesLab
+            value={(choice as string[]) ?? ['default']}
+            disabled={solved}
+            onChange={(v) => setChoice(v)}
+          />
+        );
+      case 'hotspot':
+        return (
+          <Hotspot
+            zone={exercise.zone}
+            value={(choice as HotspotAnswer) ?? null}
+            disabled={solved}
+            onChange={(p) => setChoice(p)}
+          />
+        );
+      case 'align':
+        return (
+          <AlignSnap
+            target={exercise.target}
+            disabled={solved}
+            onChange={(a) => setChoice(a as AlignAnswer)}
+          />
+        );
+      case 'contrast-tune':
+        return (
+          <ContrastTuner
+            targetRatio={exercise.targetRatio}
+            value={(choice as ContrastAnswer) ?? { textL: 38, bgL: 96 }}
+            disabled={solved}
+            onChange={(v) => setChoice(v)}
+          />
+        );
+      case 'scale-ramp':
+        return (
+          <ScaleRamp
+            value={(choice as ScaleRampAnswer) ?? { base: 16, ratio: 1.25 }}
+            disabled={solved}
+            onChange={(v) => setChoice(v)}
           />
         );
       default: {

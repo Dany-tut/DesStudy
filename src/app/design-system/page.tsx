@@ -26,6 +26,7 @@ import { MatchPairs } from '@/components/exercises/drafts/MatchPairs';
 import { ScaleRamp } from '@/components/exercises/drafts/ScaleRamp';
 import { Hotspot } from '@/components/exercises/drafts/Hotspot';
 import { StatesLab } from '@/components/exercises/drafts/StatesLab';
+import { FixTheScreen } from '@/components/exercises/drafts/FixTheScreen';
 import type { BuildAnswer, BuildExercise, OrderExercise } from '@/lib/curriculum/types';
 
 /** Sample exercises used only to render the interactive surfaces in the showcase. */
@@ -356,6 +357,10 @@ export default function DesignSystemPage() {
 
       <Section title="States — состояния компонента («states»)">
         <StatesLab />
+      </Section>
+
+      <Section title="Fix-the-screen — почини сломанный макет («fix-screen»)">
+        <FixTheScreen />
       </Section>
 
       <div className="mb-8 mt-20 border-t border-border pt-10">

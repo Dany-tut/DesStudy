@@ -266,7 +266,7 @@ export function BarBuilder() {
                     flexShrink: 0,
                     minWidth: 0,
                     width: expanded ? '100%' : hidden ? 0 : '2.75rem',
-                    marginLeft: i === 0 || hidden ? 0 : '0.375rem',
+                    marginLeft: expanded || i === 0 || hidden ? 0 : '0.375rem',
                     opacity: hidden ? 0 : 1,
                     borderWidth: hidden ? 0 : 1,
                     transitionProperty: 'width, margin, opacity',

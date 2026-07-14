@@ -37,25 +37,40 @@ const RECIPES: Record<StateKey, { tokens: string[]; note: string }> = {
   },
 };
 
-export function StatesLab() {
+/**
+ * Exercise type — "states". Dual-mode: no props → standalone showcase; pass
+ * `value`/`onChange` to drive it as a graded exercise (reports the visited-state
+ * keys up, correct once all five are inspected).
+ */
+export function StatesLab({
+  value,
+  disabled,
+  onChange,
+}: {
+  value?: string[];
+  disabled?: boolean;
+  onChange?: (visited: string[]) => void;
+} = {}) {
+  const controlled = onChange !== undefined;
   // Which state the learner forced via the pill row.
   const [forced, setForced] = useState<StateKey>('default');
   // Live pointer state on the real preview button (only relevant when forced === 'default').
   const [isHovering, setIsHovering] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
   // Which state pills have been inspected — drives the checklist progress.
-  const [visited, setVisited] = useState<Set<StateKey>>(new Set(['default']));
+  const [internalVisited, setInternalVisited] = useState<Set<StateKey>>(new Set(['default']));
+  const visited = controlled ? new Set((value ?? []) as StateKey[]) : internalVisited;
 
   function selectState(key: StateKey) {
+    if (disabled) return;
     setForced(key);
     setIsHovering(false);
     setIsPressing(false);
-    setVisited((prev) => {
-      if (prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.add(key);
-      return next;
-    });
+    if (visited.has(key)) return;
+    const next = new Set(visited);
+    next.add(key);
+    if (controlled) onChange!([...next]);
+    else setInternalVisited(next);
   }
 
   // Resolve the state actually being shown: a forced non-default pill wins,

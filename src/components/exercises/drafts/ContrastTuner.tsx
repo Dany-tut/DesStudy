@@ -21,9 +21,30 @@ function greyHex(lightness: number): string {
   return `#${h}${h}${h}`;
 }
 
-export function ContrastTuner() {
-  const [textL, setTextL] = useState(38);
-  const [bgL, setBgL] = useState(96);
+/**
+ * Exercise type — "contrast-tune". Dual-mode: no props → standalone showcase;
+ * pass `value`/`onChange` (+ optional `targetRatio`) to drive it as a graded
+ * exercise (reports {textL,bgL} up; the player renders the verdict).
+ */
+export function ContrastTuner({
+  targetRatio = 4.5,
+  value,
+  disabled,
+  onChange,
+}: {
+  targetRatio?: number;
+  value?: { textL: number; bgL: number };
+  disabled?: boolean;
+  onChange?: (v: { textL: number; bgL: number }) => void;
+} = {}) {
+  const controlled = onChange !== undefined;
+  const [internal, setInternal] = useState({ textL: 38, bgL: 96 });
+  const textL = controlled ? value?.textL ?? 38 : internal.textL;
+  const bgL = controlled ? value?.bgL ?? 96 : internal.bgL;
+  const setTextL = (v: number) =>
+    controlled ? onChange!({ textL: v, bgL }) : setInternal((s) => ({ ...s, textL: v }));
+  const setBgL = (v: number) =>
+    controlled ? onChange!({ textL, bgL: v }) : setInternal((s) => ({ ...s, bgL: v }));
 
   const lumText = luminanceFromLightness(textL);
   const lumBg = luminanceFromLightness(bgL);
@@ -45,14 +66,18 @@ export function ContrastTuner() {
     { key: 'aaa', label: 'AAA', hint: 'усиленный', pass: passAAA },
   ];
 
+  const reached = ratio >= targetRatio;
+
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
-      <div className="mb-4">
-        <h3 className="text-title3 text-primary">Тюнинг контраста</h3>
-        <p className="text-footnote text-secondary mt-1">
-          Добейся минимум AA — 4.5:1
-        </p>
-      </div>
+    <div className={controlled ? '' : 'rounded-xl border border-border bg-surface p-5'}>
+      {!controlled && (
+        <div className="mb-4">
+          <h3 className="text-title3 text-primary">Тюнинг контраста</h3>
+          <p className="text-footnote text-secondary mt-1">
+            Добейся минимум AA — 4.5:1
+          </p>
+        </div>
+      )}
 
       {/* Live preview card */}
       <div
@@ -112,6 +137,7 @@ export function ContrastTuner() {
             max={100}
             value={textL}
             onChange={(e) => setTextL(Number(e.target.value))}
+            disabled={disabled}
             className="ui-slider ui-slider--chunky"
             style={{ '--pct': `${textL}%` } as React.CSSProperties}
           />
@@ -128,16 +154,23 @@ export function ContrastTuner() {
             max={100}
             value={bgL}
             onChange={(e) => setBgL(Number(e.target.value))}
+            disabled={disabled}
             className="ui-slider ui-slider--chunky"
             style={{ '--pct': `${bgL}%` } as React.CSSProperties}
           />
         </label>
       </div>
 
-      {passAA && (
+      {!controlled && passAA && (
         <div className="mt-4 flex items-center gap-2 text-success">
           <Check size={16} strokeWidth={2.5} />
           <span className="text-footnote">Отлично — контраст проходит AA</span>
+        </div>
+      )}
+      {controlled && reached && (
+        <div className="mt-4 flex items-center gap-2 text-success">
+          <Check size={16} strokeWidth={2.5} />
+          <span className="text-footnote">Цель {targetRatio}:1 достигнута</span>
         </div>
       )}
     </div>

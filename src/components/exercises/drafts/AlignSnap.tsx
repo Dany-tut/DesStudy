@@ -1,7 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Move, Check } from 'lucide-react';
+import type { AlignAnswer } from '@/lib/curriculum/types';
 
 const FRAME_H = 260;
 const BOX_W = 112;
@@ -65,7 +66,16 @@ function nearestSnap<K extends string>(value: number, cands: Record<K, number>):
  * guides (left / center / right, top / middle / bottom) on an 8pt grid.
  * Fully self-contained; own state. Shown in the design-system showcase.
  */
-export function AlignSnap() {
+export function AlignSnap({
+  target,
+  disabled,
+  onChange,
+}: {
+  target?: AlignAnswer;
+  disabled?: boolean;
+  onChange?: (align: { x: string | null; y: string | null }) => void;
+} = {}) {
+  const controlled = onChange !== undefined;
   const frameRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
   const grabRef = useRef({ x: 0, y: 0 });
@@ -75,7 +85,9 @@ export function AlignSnap() {
   const [dragging, setDragging] = useState(false);
   const [goalIdx, setGoalIdx] = useState(0);
 
-  const goal = GOALS[goalIdx];
+  const goal: Goal = target
+    ? { x: target.x, y: target.y, title: '' }
+    : GOALS[goalIdx];
 
   // Derive current alignment from pos (only reliable once frame is measured).
   const cx = frameW ? xCandidates(frameW) : null;
@@ -88,6 +100,12 @@ export function AlignSnap() {
 
   const solved = frameW > 0 && xAlign === goal.x && yAlign === goal.y;
 
+  // In controlled (exercise) mode, report the current alignment up so the player
+  // can validate it against the target.
+  useEffect(() => {
+    if (controlled) onChange!({ x: xAlign, y: yAlign });
+  }, [xAlign, yAlign, controlled]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function measure() {
     const rect = frameRef.current?.getBoundingClientRect();
     if (rect) setFrameW(rect.width);
@@ -95,6 +113,7 @@ export function AlignSnap() {
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (disabled) return;
     const rect = measure();
     if (!rect) return;
     grabRef.current = { x: e.clientX - rect.left - pos.left, y: e.clientY - rect.top - pos.top };
@@ -136,23 +155,25 @@ export function AlignSnap() {
     axis === 'x' ? xAlign === key : yAlign === key;
 
   return (
-    <div className="w-full max-w-[420px] rounded-2xl border border-border bg-surface p-5">
-      {/* Header: goal + check */}
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-caption font-semibold uppercase tracking-wide text-tertiary">Задание</p>
-          <p className="mt-1 text-callout font-semibold text-primary">{goal.title}</p>
+    <div className={controlled ? 'w-full max-w-[420px]' : 'w-full max-w-[420px] rounded-2xl border border-border bg-surface p-5'}>
+      {/* Header: goal + check (standalone only — player shows prompt & verdict) */}
+      {!controlled && (
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-caption font-semibold uppercase tracking-wide text-tertiary">Задание</p>
+            <p className="mt-1 text-callout font-semibold text-primary">{goal.title}</p>
+          </div>
+          <span
+            className={[
+              'inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-footnote font-semibold transition-base',
+              solved ? 'bg-success/15 text-success' : 'bg-muted text-tertiary',
+            ].join(' ')}
+          >
+            <Check size={13} strokeWidth={3} />
+            {solved ? 'Готово' : 'В процессе'}
+          </span>
         </div>
-        <span
-          className={[
-            'inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-footnote font-semibold transition-base',
-            solved ? 'bg-success/15 text-success' : 'bg-muted text-tertiary',
-          ].join(' ')}
-        >
-          <Check size={13} strokeWidth={3} />
-          {solved ? 'Готово' : 'В процессе'}
-        </span>
-      </div>
+      )}
 
       {/* Frame */}
       <div
@@ -234,13 +255,15 @@ export function AlignSnap() {
             x {Math.round(pos.left)} · y {Math.round(pos.top)} · сетка 8pt
           </p>
         </div>
-        <button
-          type="button"
-          onClick={nextGoal}
-          className="shrink-0 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
-        >
-          Другая цель
-        </button>
+        {!controlled && (
+          <button
+            type="button"
+            onClick={nextGoal}
+            className="shrink-0 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
+          >
+            Другая цель
+          </button>
+        )}
       </div>
     </div>
   );

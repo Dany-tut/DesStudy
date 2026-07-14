@@ -2,16 +2,21 @@
 
 import { useState, useRef, useLayoutEffect } from 'react';
 import { Check, RotateCcw } from 'lucide-react';
+import type { MatchPair } from '@/lib/curriculum/types';
 
 /**
- * DRAFT exercise type — "match": connect each design token to its value by tapping.
- * Tap a left token (brand ring), then tap a right value. Correct → both lock green;
- * wrong → brief danger flash, then deselect. Fully self-contained for showcase eval.
+ * Exercise type — "match": connect each token/label on the left to its value on
+ * the right by tapping. Tap a left item (brand ring), then tap its right match.
+ * Correct → both lock green; wrong → brief danger flash, then deselect.
+ *
+ * Dual-mode: with no props it runs standalone (design-system showcase) on the
+ * default token pairs; pass `pairs`/`value`/`onChange` to drive it as a graded
+ * exercise inside ExercisePlayer (reports the matched-id list up for validation).
  */
 
 type Pair = { id: string; token: string; value: string };
 
-const PAIRS: Pair[] = [
+const DEFAULT_PAIRS: Pair[] = [
   { id: 'space2', token: 'space.2', value: '8px' },
   { id: 'space4', token: 'space.4', value: '16px' },
   { id: 'space8', token: 'space.8', value: '32px' },
@@ -19,13 +24,39 @@ const PAIRS: Pair[] = [
   { id: 'radiusFull', token: 'radius.full', value: '9999px' },
 ];
 
-// Deterministic shuffle of the right column (no Math.random — blocked in some contexts).
-const VALUE_ORDER: string[] = ['32px', '9999px', '16px', '14px', '8px'];
-const RIGHT: Pair[] = VALUE_ORDER.map((v) => PAIRS.find((p) => p.value === v)!);
+// Deterministic offset of the right column so it isn't pre-aligned with the
+// left (no Math.random — blocked in some contexts). Rotating by 2 is enough to
+// scramble the visual pairing for any list length ≥ 3.
+function rightOrder<T>(items: T[]): T[] {
+  if (items.length < 3) return items;
+  const k = 2 % items.length;
+  return [...items.slice(k), ...items.slice(0, k)];
+}
 
-export function MatchPairs() {
+export function MatchPairs({
+  pairs: pairsProp,
+  value,
+  disabled,
+  onChange,
+}: {
+  pairs?: MatchPair[];
+  value?: string[];
+  disabled?: boolean;
+  onChange?: (matched: string[]) => void;
+} = {}) {
+  const controlled = onChange !== undefined;
+  const PAIRS: Pair[] = pairsProp
+    ? pairsProp.map((p) => ({ id: p.id, token: p.left, value: p.right }))
+    : DEFAULT_PAIRS;
+  const RIGHT: Pair[] = rightOrder(PAIRS);
+
   const [selectedLeft, setSelectedLeft] = useState<string | null>(null);
-  const [matched, setMatched] = useState<string[]>([]);
+  const [internalMatched, setInternalMatched] = useState<string[]>([]);
+  const matched = controlled ? value ?? [] : internalMatched;
+  const setMatched = (next: string[]) => {
+    if (controlled) onChange!(next);
+    else setInternalMatched(next);
+  };
   const [wrong, setWrong] = useState<{ left: string; right: string } | null>(null);
 
   // Refs for measuring connector-line endpoints between matched pairs.
@@ -71,14 +102,14 @@ export function MatchPairs() {
   }
 
   function pickLeft(id: string) {
-    if (matched.includes(id) || wrong) return;
+    if (disabled || matched.includes(id) || wrong) return;
     setSelectedLeft((cur) => (cur === id ? null : id));
   }
 
   function pickRight(id: string) {
-    if (!selectedLeft || matched.includes(id) || wrong) return;
+    if (disabled || !selectedLeft || matched.includes(id) || wrong) return;
     if (id === selectedLeft) {
-      setMatched((m) => [...m, id]);
+      setMatched([...matched, id]);
       setSelectedLeft(null);
     } else {
       // Wrong pairing → flash danger on both for ~500ms, then deselect.
@@ -94,13 +125,15 @@ export function MatchPairs() {
         <p className="text-footnote font-semibold text-secondary tabular-nums">
           {done} / {total} сопоставлено
         </p>
-        <button
-          onClick={reset}
-          className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-medium text-secondary transition-fast hover:border-border-strong hover:text-primary active:bg-pressed"
-        >
-          <RotateCcw size={14} />
-          Сбросить
-        </button>
+        {!controlled && (
+          <button
+            onClick={reset}
+            className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-medium text-secondary transition-fast hover:border-border-strong hover:text-primary active:bg-pressed"
+          >
+            <RotateCcw size={14} />
+            Сбросить
+          </button>
+        )}
       </div>
 
       <div ref={boardRef} className="relative flex gap-4">
@@ -207,7 +240,7 @@ export function MatchPairs() {
         </ul>
       </div>
 
-      {allDone && (
+      {allDone && !controlled && (
         <div className="flex items-center gap-2 rounded-lg border border-success bg-success/10 px-3 py-3 text-callout font-medium text-success">
           <Check size={18} className="shrink-0" />
           Все пары сопоставлены — отлично!

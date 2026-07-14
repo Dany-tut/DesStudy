@@ -3,34 +3,68 @@
 import { useState, useRef } from 'react';
 import { Check, X } from 'lucide-react';
 
-// Correct hotspot zone, expressed in % relative to the mockup container.
+// Default hotspot zone, expressed in % relative to the mockup container.
 // The tiny primary button sits in the bottom-right corner — that's the problem.
-const ZONE = { x0: 74, y0: 82, x1: 98, y1: 98 };
+const DEFAULT_ZONE = { x0: 74, y0: 82, x1: 98, y1: 98 };
 
 type Marker = { x: number; y: number; correct: boolean };
 
-export function Hotspot() {
-  const [marker, setMarker] = useState<Marker | null>(null);
+/**
+ * Exercise type — "hotspot": click the problem area on a mockup. Dual-mode:
+ * no props → standalone showcase; pass `value`/`onChange` (+ optional `zone`)
+ * to drive it as a graded exercise. Reports the click point {x,y} in % up for
+ * validation; the player renders the verdict.
+ */
+export function Hotspot({
+  zone = DEFAULT_ZONE,
+  value,
+  disabled,
+  onChange,
+}: {
+  zone?: { x0: number; y0: number; x1: number; y1: number };
+  value?: { x: number; y: number } | null;
+  disabled?: boolean;
+  onChange?: (point: { x: number; y: number }) => void;
+} = {}) {
+  const controlled = onChange !== undefined;
+  const ZONE = zone;
+  const [internalMarker, setInternalMarker] = useState<Marker | null>(null);
+  const marker: Marker | null = controlled
+    ? value
+      ? {
+          x: value.x,
+          y: value.y,
+          correct: value.x >= ZONE.x0 && value.x <= ZONE.x1 && value.y >= ZONE.y0 && value.y <= ZONE.y1,
+        }
+      : null
+    : internalMarker;
   const mockRef = useRef<HTMLDivElement>(null);
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (disabled) return;
     const rect = mockRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
+    if (controlled) {
+      onChange!({ x, y });
+      return;
+    }
     const correct =
       x >= ZONE.x0 && x <= ZONE.x1 && y >= ZONE.y0 && y <= ZONE.y1;
-    setMarker({ x, y, correct });
+    setInternalMarker({ x, y, correct });
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
-      <div className="mb-4">
-        <h3 className="text-title3 text-primary">Найди проблему</h3>
-        <p className="mt-1 text-footnote text-secondary">
-          Где нарушена доступность тапа? Кликни по проблемному месту.
-        </p>
-      </div>
+    <div className={controlled ? '' : 'rounded-xl border border-border bg-surface p-5'}>
+      {!controlled && (
+        <div className="mb-4">
+          <h3 className="text-title3 text-primary">Найди проблему</h3>
+          <p className="mt-1 text-footnote text-secondary">
+            Где нарушена доступность тапа? Кликни по проблемному месту.
+          </p>
+        </div>
+      )}
 
       {/* Fake app screen mockup */}
       <div
@@ -115,8 +149,8 @@ export function Hotspot() {
         )}
       </div>
 
-      {/* Feedback */}
-      {marker && (
+      {/* Feedback — only in standalone mode; the player renders its own verdict */}
+      {!controlled && marker && (
         <div
           className={[
             'mt-4 flex items-center gap-2 rounded-lg border px-4 py-3 transition-base',
@@ -138,7 +172,7 @@ export function Hotspot() {
         </div>
       )}
 
-      {!marker && (
+      {!controlled && !marker && (
         <p className="mt-4 text-caption text-tertiary">
           Подсказка: минимальный размер тап-цели — 44×44px.
         </p>

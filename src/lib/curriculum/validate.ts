@@ -181,5 +181,84 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
           : 'Порядок пока неверный — что должно привлекать внимание первым, а что последним?',
       };
     }
+    case 'match': {
+      const matched = Array.isArray(answer) ? (answer as string[]) : [];
+      const total = exercise.pairs.length;
+      const correct = matched.length === total;
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct ? undefined : `Сопоставлено ${matched.length} из ${total} — соедини оставшиеся пары.`,
+      };
+    }
+    case 'states': {
+      const visited = Array.isArray(answer) ? (answer as string[]) : [];
+      const correct = STATE_KEYS.every((k) => visited.includes(k));
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : `Осмотрено ${visited.length} из ${STATE_KEYS.length} состояний — открой каждое.`,
+      };
+    }
+    case 'hotspot': {
+      const p = (answer ?? {}) as { x?: number; y?: number };
+      const z = exercise.zone;
+      const correct =
+        typeof p.x === 'number' &&
+        typeof p.y === 'number' &&
+        p.x >= z.x0 &&
+        p.x <= z.x1 &&
+        p.y >= z.y0 &&
+        p.y <= z.y1;
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct ? undefined : exercise.hint ?? 'Не тут — посмотри внимательнее на элементы действия.',
+      };
+    }
+    case 'align': {
+      const a = (answer ?? {}) as Partial<AlignAnswer>;
+      const t = exercise.target;
+      const xOk = a.x === t.x;
+      const yOk = a.y === t.y;
+      const correct = xOk && yOk;
+      const xLabel = { left: 'по левому краю', center: 'по центру', right: 'по правому краю' };
+      const yLabel = { top: 'по верху', middle: 'посередине', bottom: 'по низу' };
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : `Нужно выровнять ${xLabel[t.x]} · ${yLabel[t.y]}. Тащи карточку к нужным направляющим.`,
+      };
+    }
+    case 'contrast-tune': {
+      const a = (answer ?? {}) as Partial<ContrastAnswer>;
+      const ratio = contrastRatio(Number(a.textL ?? 0), Number(a.bgL ?? 0));
+      const correct = ratio >= exercise.targetRatio;
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : `Сейчас ${ratio.toFixed(2)}:1 — нужно минимум ${exercise.targetRatio}:1. Разведи светлоту текста и фона.`,
+      };
+    }
+    case 'scale-ramp': {
+      const a = (answer ?? {}) as Partial<ScaleRampAnswer>;
+      const baseOk = Number(a.base) === exercise.targetBase;
+      const ratioOk = Number(a.ratio) === exercise.targetRatio;
+      const correct = baseOk && ratioOk;
+      let hint: string | undefined;
+      if (!correct) {
+        const parts: string[] = [];
+        if (!baseOk) parts.push(`базовый размер должен быть ${exercise.targetBase}px`);
+        if (!ratioOk) parts.push(`соотношение — ${exercise.targetRatio}`);
+        hint = parts.join('; ') + '.';
+      }
+      return { correct, explanation: exercise.explanation, hint };
+    }
   }
 }

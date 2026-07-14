@@ -31,27 +31,49 @@ const STEPS = [
  * Learner picks a base body size and a modular ratio, then sees a full
  * type scale render live: size = base * ratio^n, rounded to whole px.
  */
-export function ScaleRamp() {
-  const [ratio, setRatio] = useState<number>(UI_RATIO);
-  const [base, setBase] = useState<number>(16);
+/**
+ * Exercise type — "scale-ramp". Dual-mode: no props → standalone showcase; pass
+ * `value`/`onChange` to drive it as a graded exercise (reports {base,ratio} up;
+ * the player validates against the target and renders the verdict).
+ */
+export function ScaleRamp({
+  value,
+  disabled,
+  onChange,
+}: {
+  value?: { base: number; ratio: number };
+  disabled?: boolean;
+  onChange?: (v: { base: number; ratio: number }) => void;
+} = {}) {
+  const controlled = onChange !== undefined;
+  const [internal, setInternal] = useState({ base: 16, ratio: UI_RATIO });
+  const ratio = controlled ? value?.ratio ?? UI_RATIO : internal.ratio;
+  const base = controlled ? value?.base ?? 16 : internal.base;
+  const setRatio = (v: number) =>
+    controlled ? onChange!({ base, ratio: v }) : setInternal((s) => ({ ...s, ratio: v }));
+  const setBase = (v: number) =>
+    controlled ? onChange!({ base: v, ratio }) : setInternal((s) => ({ ...s, base: v }));
 
   const isUiRatio = ratio === UI_RATIO;
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-5">
+    <div className={controlled ? '' : 'rounded-2xl border border-border bg-surface p-5'}>
       {/* Header */}
-      <div className="mb-5">
-        <h3 className="text-title3 font-semibold text-primary">Модульная шкала</h3>
-        <p className="mt-1 text-footnote text-secondary">
-          Хорошая шкала — это ОДНО соотношение, применённое последовательно.
-        </p>
-      </div>
+      {!controlled && (
+        <div className="mb-5">
+          <h3 className="text-title3 font-semibold text-primary">Модульная шкала</h3>
+          <p className="mt-1 text-footnote text-secondary">
+            Хорошая шкала — это ОДНО соотношение, применённое последовательно.
+          </p>
+        </div>
+      )}
 
       {/* Ratio picker */}
       <div className="mb-4">
         <p className="mb-2 text-footnote text-secondary">Соотношение</p>
         <TilePicker
           value={String(ratio)}
+          disabled={disabled}
           onChange={(v) => setRatio(Number(v))}
           options={RATIOS.map((r) => ({
             value: String(r.value),
@@ -77,6 +99,7 @@ export function ScaleRamp() {
           max={18}
           step={1}
           variant="pill"
+          disabled={disabled}
           onChange={setBase}
         />
       </div>
