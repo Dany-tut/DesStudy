@@ -86,6 +86,9 @@ export function BarBuilder() {
   });
   const [navCenter, setNavCenter] = useState(false);
   const [autoplay, setAutoplay] = useState(true);
+  // Placement rail: collapsed to a row of icon squares; the active one expands
+  // into a labelled pill on top of its neighbours. Click again to collapse.
+  const [railOpen, setRailOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
@@ -188,37 +191,78 @@ export function BarBuilder() {
       <div className="flex flex-col gap-5">
         <div>
           <p className="mb-2 text-footnote font-medium text-secondary">Как бар сидит на странице</p>
-          <div className="flex flex-col gap-2">
-            {PLACEMENTS.map(({ key, label, icon: Icon, hint }) => {
-              const active = placement === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setPlacement(key)}
-                  className={[
-                    'flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-fast',
-                    active
-                      ? 'border-brand bg-brand/10 text-primary'
-                      : 'border-border bg-surface text-secondary hover:bg-hover hover:text-primary',
-                  ].join(' ')}
-                >
-                  <span
+          <div className="relative w-fit">
+            {/* Collapsed row — one icon square per placement */}
+            <div className="flex gap-1.5">
+              {PLACEMENTS.map(({ key, label, icon: Icon }) => {
+                const active = placement === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-label={label}
+                    onClick={() => {
+                      if (active && railOpen) setRailOpen(false);
+                      else {
+                        setPlacement(key);
+                        setRailOpen(true);
+                      }
+                    }}
                     className={[
-                      'flex h-8 w-8 items-center justify-center rounded-lg',
-                      active ? 'bg-brand text-on-brand' : 'bg-muted text-tertiary',
+                      'flex h-11 w-11 items-center justify-center rounded-xl border transition-fast',
+                      active
+                        ? 'border-brand bg-brand/10 text-brand'
+                        : 'border-border bg-surface text-tertiary hover:bg-hover hover:text-primary',
                     ].join(' ')}
                   >
-                    <Icon size={16} />
+                    <Icon size={17} />
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Expanded pill — overlays neighbours, anchored over its square */}
+            {railOpen &&
+              (() => {
+                const i = PLACEMENTS.findIndex((p) => p.key === placement);
+                const p = PLACEMENTS[i];
+                const Icon = p.icon;
+                const anchorRight = i >= 3;
+                const icon = (
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[11px] bg-brand text-on-brand">
+                    <Icon size={17} />
                   </span>
-                  <span className="flex-1">
-                    <span className="block text-callout font-medium text-primary">{label}</span>
-                    <span className="block text-caption text-tertiary">{hint}</span>
+                );
+                const text = (
+                  <span
+                    className="flex flex-col overflow-hidden whitespace-nowrap px-2 text-left"
+                    style={{ animation: 'barrail-text 0.28s ease' }}
+                  >
+                    <span className="text-callout font-medium text-primary">{p.label}</span>
+                    <span className="text-caption text-tertiary">{p.hint}</span>
                   </span>
-                  {active && <Check size={16} className="text-brand" />}
-                </button>
-              );
-            })}
+                );
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setRailOpen(false)}
+                    style={anchorRight ? { right: (5 - i) * 50 } : { left: i * 50 }}
+                    className="absolute top-0 z-20 flex h-11 items-center rounded-xl border border-brand bg-elevated px-0.5 shadow-lg"
+                  >
+                    {anchorRight ? (
+                      <>
+                        {text}
+                        {icon}
+                      </>
+                    ) : (
+                      <>
+                        {icon}
+                        {text}
+                      </>
+                    )}
+                  </button>
+                );
+              })()}
           </div>
         </div>
 
@@ -243,31 +287,6 @@ export function BarBuilder() {
         </div>
 
         <div>
-          <p className="mb-2 text-footnote font-medium text-secondary">Из чего собрать</p>
-          <div className="flex flex-wrap gap-2">
-            {PARTS.map(({ key, label }) => {
-              const on = parts[key];
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => togglePart(key)}
-                  className={[
-                    'flex items-center gap-2 rounded-full border px-3 py-2 text-footnote font-medium transition-fast',
-                    on
-                      ? 'border-brand bg-brand/10 text-brand'
-                      : 'border-border bg-muted text-secondary hover:text-primary',
-                  ].join(' ')}
-                >
-                  {on ? <Check size={14} /> : <Plus size={14} />}
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
           <p className="mb-2 text-footnote font-medium text-secondary">Навигация</p>
           <div className="inline-flex rounded-lg bg-muted p-1">
             {[
@@ -286,6 +305,35 @@ export function BarBuilder() {
                 {label}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-footnote font-medium text-secondary">Из чего собрать</p>
+          {/* Horizontal scroll with edge fades — parts can exceed 5 */}
+          <div className="relative">
+            <div className="hide-native-scroll flex gap-2 overflow-x-auto pb-1">
+              {PARTS.map(({ key, label }) => {
+                const on = parts[key];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => togglePart(key)}
+                    className={[
+                      'flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-footnote font-medium transition-fast',
+                      on
+                        ? 'border-brand bg-brand/10 text-brand'
+                        : 'border-border bg-muted text-secondary hover:text-primary',
+                    ].join(' ')}
+                  >
+                    {on ? <Check size={14} /> : <Plus size={14} />}
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-canvas to-transparent" />
           </div>
         </div>
 
@@ -367,6 +415,13 @@ export function BarBuilder() {
           )}
         </div>
       </div>
+
+      <style>{`
+        @keyframes barrail-text {
+          from { max-width: 0; opacity: 0; }
+          to { max-width: 16rem; opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }
