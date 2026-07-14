@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Check, Play } from 'lucide-react';
+import { Check, Play, Pause } from 'lucide-react';
 
 /**
  * DRAFT exercise — "easing-curve": drag the two Bézier control points to match a
@@ -35,7 +35,7 @@ export function EasingCurve() {
   const [targetIdx, setTargetIdx] = useState(0);
   const [p1, setP1] = useState<Pt>({ x: 0.25, y: 0.25 });
   const [p2, setP2] = useState<Pt>({ x: 0.75, y: 0.75 });
-  const [runKey, setRunKey] = useState(0);
+  const [playing, setPlaying] = useState(true);
 
   const target = TARGETS[targetIdx];
   const near = (a: Pt, b: Pt) => Math.abs(a.x - b.x) <= TOL && Math.abs(a.y - b.y) <= TOL;
@@ -130,15 +130,22 @@ export function EasingCurve() {
           <div className="rounded-xl border border-border bg-canvas p-3">
             <div className="relative h-8">
               <span
-                key={runKey}
+                // Restart the loop whenever the curve changes, so the preview
+                // always reflects the current easing without a manual replay.
+                key={timing}
                 className="absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-brand"
                 style={{
                   left: 0,
-                  animation: `desstudy-ease-run 1.1s ${timing} forwards`,
+                  animation: `desstudy-ease-run 1.6s ${timing} infinite`,
+                  animationPlayState: playing ? 'running' : 'paused',
                 }}
               />
             </div>
-            <style>{`@keyframes desstudy-ease-run { to { left: calc(100% - 20px); } }`}</style>
+            <style>{`@keyframes desstudy-ease-run {
+              0% { left: 0; }
+              62% { left: calc(100% - 20px); }
+              100% { left: calc(100% - 20px); }
+            }`}</style>
           </div>
 
           <p className="text-caption tabular-nums text-tertiary break-all">{timing}</p>
@@ -146,10 +153,18 @@ export function EasingCurve() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setRunKey((k) => k + 1)}
+              onClick={() => setPlaying((p) => !p)}
               className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
             >
-              <Play size={13} /> Проиграть
+              {playing ? (
+                <>
+                  <Pause size={13} /> Пауза
+                </>
+              ) : (
+                <>
+                  <Play size={13} /> Проиграть
+                </>
+              )}
             </button>
             <button
               type="button"

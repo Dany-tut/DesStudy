@@ -1,5 +1,6 @@
 import type { Lesson } from '@/lib/curriculum/types';
 import { designThinkingIntro } from './design-thinking-intro';
+import { figmaIntro } from './figma-intro';
 import { spacing8pt } from './spacing-8pt';
 import { radiusScale } from './radius-scale';
 import { typeHierarchy } from './type-hierarchy';
@@ -32,6 +33,7 @@ import { microcopy } from './microcopy';
 /** Central registry — every built lesson, keyed by slug. */
 export const lessons: Record<string, Lesson> = {
   [designThinkingIntro.slug]: designThinkingIntro,
+  [figmaIntro.slug]: figmaIntro,
   [spacing8pt.slug]: spacing8pt,
   [radiusScale.slug]: radiusScale,
   [typeHierarchy.slug]: typeHierarchy,
@@ -64,6 +66,7 @@ export const lessons: Record<string, Lesson> = {
 
 export {
   designThinkingIntro,
+  figmaIntro,
   spacing8pt,
   radiusScale,
   typeHierarchy,

@@ -116,6 +116,15 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
           {lesson.sections.map((s, i) => (
             <section key={i} className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
               <h2 className="text-title3 font-semibold text-primary">{s.heading}</h2>
+              {s.body && s.body.length > 0 && (
+                <div className="mt-4 max-w-[70ch] space-y-3">
+                  {s.body.map((p, j) => (
+                    <p key={j} className="text-body text-secondary">
+                      <Bold text={p} />
+                    </p>
+                  ))}
+                </div>
+              )}
               {s.chips && s.chips.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {s.chips.map((c, j) => (
@@ -125,15 +134,6 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
                     >
                       {c}
                     </span>
-                  ))}
-                </div>
-              )}
-              {s.body && s.body.length > 0 && (
-                <div className="mt-4 max-w-[70ch] space-y-3">
-                  {s.body.map((p, j) => (
-                    <p key={j} className="text-body text-secondary">
-                      <Bold text={p} />
-                    </p>
                   ))}
                 </div>
               )}

@@ -1,5 +1,6 @@
 import {
   designThinkingIntro,
+  figmaIntro,
   spacing8pt,
   radiusScale,
   typeHierarchy,
@@ -90,6 +91,7 @@ export const PATHS: LearningPath[] = [
     emoji: '📐',
     lessons: [
       entry(designThinkingIntro, { emoji: '🎓' }),
+      entry(figmaIntro, { emoji: '🖌️' }),
       entry(spacing8pt, { emoji: '📏', popular: true }),
       entry(radiusScale, { emoji: '⬜' }),
       entry(typeHierarchy, { emoji: '🔤', popular: true }),

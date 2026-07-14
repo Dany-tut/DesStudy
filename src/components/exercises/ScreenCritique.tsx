@@ -11,7 +11,7 @@ import {
   Hotel,
   Check,
   CircleHelp,
-  X,
+  Lightbulb,
   RotateCcw,
   Tag,
   Sparkles,
@@ -28,7 +28,7 @@ import type { FixReply } from '@/lib/ai/mentor';
  * against ground truth in THREE states — because design is subjective:
  *   • верно  (green)  — matches the strongest reading
  *   • спорно (yellow) — a defensible-but-not-only-right reading; mentor explains
- *   • мимо   (red)    — breaks the hierarchy / misreads the screen
+ *   • иначе  (coral)  — reads against the hierarchy; softened, not a "wrong" buzzer
  * Self-contained prototype rendered in /design-system, mirroring the same dark
  * banking "Премиум карта" screen so the two genres sit side by side.
  */
@@ -144,7 +144,7 @@ const VERDICT_UI: Record<
 > = {
   right: { ring: '#3FB950', label: 'Верно', icon: Check, text: 'text-[#3FB950]', bg: 'bg-[#3FB950]/10' },
   debatable: { ring: '#E3B341', label: 'Спорно', icon: CircleHelp, text: 'text-[#E3B341]', bg: 'bg-[#E3B341]/10' },
-  wrong: { ring: '#F85149', label: 'Мимо', icon: X, text: 'text-[#F85149]', bg: 'bg-[#F85149]/10' },
+  wrong: { ring: '#E0785F', label: 'Иначе', icon: Lightbulb, text: 'text-[#E0785F]', bg: 'bg-[#E0785F]/10' },
 };
 
 /** Mentor verdict on a free-text fix → same green/yellow/red language. */
@@ -242,7 +242,7 @@ export function ScreenCritique() {
         Теперь диагноз ставишь ты. Кликни зону на экране и повесь на неё роль из палитры справа — что
         это по смыслу: главный акцент, второстепенное, реклама или фон. Можно дописать, что бы ты
         здесь поправил. Потом «Проверить»: дизайн субъективен, поэтому оценка в трёх цветах —
-        зелёный «верно», жёлтый «спорно, но защитимо», красный «мимо».
+        зелёный «верно», жёлтый «спорно, но защитимо», коралловый «прочитывается иначе».
       </p>
 
       <div className="grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)]">
