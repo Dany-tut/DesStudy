@@ -92,7 +92,7 @@ export const componentsVariants: Lesson = {
         placement: 'floatBottom',
         variant: 'burger',
         parts: { logo: true, nav: true, search: false, cta: true, avatar: false },
-        navCenter: false,
+        navAlign: 'left',
       },
       explanation:
         'На мобильном большой пункт-меню не помещается: навигация сворачивается в бургер, а плавающая нижняя плашка держит ключевые действия в зоне большого пальца. Это тот же компонент-бар, просто другой вариант под контекст — не новый экран.',

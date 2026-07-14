@@ -133,7 +133,7 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
       const t = exercise.target;
       const placementOk = a.placement === t.placement;
       const variantOk = a.variant === t.variant;
-      const navOk = a.navCenter === t.navCenter;
+      const navOk = a.navAlign === t.navAlign;
       const partsOk =
         !!a.parts &&
         (Object.keys(t.parts) as BarPartKey[]).every((k) => a.parts?.[k] === t.parts[k]);
@@ -163,8 +163,10 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
           if (missing.length) parts.push(`не хватает: ${missing.map((k) => labels[k]).join(', ')}`);
           if (extra.length) parts.push(`лишнее: ${extra.map((k) => labels[k]).join(', ')}`);
           hint = parts.join('; ') + '.';
-        } else if (!navOk)
-          hint = t.navCenter ? 'Навигацию поставь по центру.' : 'Навигацию выровняй слева.';
+        } else if (!navOk) {
+          const navLabel = { left: 'слева', center: 'по центру', right: 'справа' } as const;
+          hint = `Навигацию выровняй ${navLabel[t.navAlign]}.`;
+        }
       }
       return { correct, explanation: exercise.explanation, hint };
     }
