@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   GraduationCap,
   Search,
@@ -175,7 +175,7 @@ export function BarBuilder({
 
         <div>
           <p className="mb-2 text-footnote font-medium text-secondary">Из чего собрать</p>
-          <div className="flex flex-wrap gap-2">
+          <EdgeFadeRow>
             {PARTS.map(({ key, label }) => {
               const on = parts[key];
               return (
@@ -184,7 +184,7 @@ export function BarBuilder({
                   type="button"
                   onClick={() => togglePart(key)}
                   className={[
-                    'flex items-center gap-2 rounded-full border px-3 py-2 text-footnote font-medium transition-fast',
+                    'flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-footnote font-medium transition-fast',
                     on
                       ? 'border-brand bg-brand/10 text-brand'
                       : 'border-border bg-muted text-secondary hover:text-primary',
@@ -195,7 +195,7 @@ export function BarBuilder({
                 </button>
               );
             })}
-          </div>
+          </EdgeFadeRow>
         </div>
 
         <div>
@@ -257,6 +257,58 @@ export function BarBuilder({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Horizontal scroller with edge-aware fades: the left fade only appears once
+ * you've scrolled away from the start, the right fade hides once you hit the
+ * end — so a fade always signals "there's more this way" and never lies.
+ */
+function EdgeFadeRow({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ start: false, end: false });
+
+  const update = () => {
+    const el = ref.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setEdges({
+      start: el.scrollLeft > 1,
+      end: el.scrollLeft < maxScroll - 1,
+    });
+  };
+
+  useEffect(() => {
+    update();
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="relative">
+      <div
+        ref={ref}
+        onScroll={update}
+        className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {children}
+      </div>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-surface to-transparent transition-opacity duration-200"
+        style={{ opacity: edges.start ? 1 : 0 }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-surface to-transparent transition-opacity duration-200"
+        style={{ opacity: edges.end ? 1 : 0 }}
+      />
     </div>
   );
 }
