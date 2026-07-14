@@ -74,7 +74,7 @@ export function EasingCurve() {
   }
 
   return (
-    <div className="w-full max-w-[460px] rounded-2xl border border-border bg-surface p-5">
+    <div className="w-full max-w-[560px] rounded-2xl border border-border bg-surface p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <p className="text-caption font-semibold uppercase tracking-wide text-tertiary">Задание</p>
@@ -84,7 +84,7 @@ export function EasingCurve() {
         </div>
         <span
           className={[
-            'inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-footnote font-semibold transition-base',
+            'inline-flex shrink-0 items-center justify-center gap-1 rounded-full px-3 py-1 text-footnote font-semibold transition-base min-w-[6.5rem]',
             solved ? 'bg-success/15 text-success' : 'bg-muted text-tertiary',
           ].join(' ')}
         >
@@ -147,14 +147,14 @@ export function EasingCurve() {
             <button
               type="button"
               onClick={() => setRunKey((k) => k + 1)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
             >
               <Play size={13} /> Проиграть
             </button>
             <button
               type="button"
               onClick={next}
-              className="rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
+              className="shrink-0 whitespace-nowrap rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
             >
               Другая цель
             </button>

@@ -50,7 +50,7 @@ export function TapTarget() {
         </div>
         <span
           className={[
-            'inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1 text-footnote font-semibold transition-base',
+            'inline-flex shrink-0 items-center justify-center gap-1 rounded-full px-3 py-1 text-footnote font-semibold transition-base min-w-[6rem]',
             ok ? 'bg-success/15 text-success' : 'bg-muted text-tertiary',
           ].join(' ')}
         >
