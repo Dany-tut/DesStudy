@@ -212,11 +212,14 @@ export function BarBuilder() {
                     }
                   }}
                   style={{
-                    flex: expanded ? '1 1 0%' : hidden ? '0 0 0px' : '0 0 2.75rem',
+                    flexGrow: 0,
+                    flexShrink: 0,
+                    minWidth: 0,
+                    width: expanded ? '100%' : hidden ? 0 : '2.75rem',
                     marginLeft: i === 0 || hidden ? 0 : '0.375rem',
                     opacity: hidden ? 0 : 1,
                     borderWidth: hidden ? 0 : 1,
-                    transitionProperty: 'flex-basis, flex-grow, margin, opacity',
+                    transitionProperty: 'width, margin, opacity',
                     transitionDuration: '320ms',
                     transitionTimingFunction: 'cubic-bezier(0.22,1,0.36,1)',
                   }}
