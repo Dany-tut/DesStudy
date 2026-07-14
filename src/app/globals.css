@@ -47,6 +47,7 @@
   --danger-rgb: 229 72 77;
   --info-rgb: 62 143 240;
   --bg-muted-rgb: 238 240 244;
+  --border-rgb: 225 228 235;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -68,6 +69,7 @@
     --bg-pressed: rgba(247, 248, 250, 0.1);
     --brand-rgb: 124 140 255;
     --bg-muted-rgb: 32 36 44;
+    --border-rgb: 32 36 44;
   }
 }
 
@@ -89,6 +91,7 @@
   --bg-pressed: rgba(247, 248, 250, 0.1);
   --brand-rgb: 124 140 255;
   --bg-muted-rgb: 32 36 44;
+  --border-rgb: 32 36 44;
 }
 
 html,

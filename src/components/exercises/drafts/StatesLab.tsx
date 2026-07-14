@@ -164,8 +164,8 @@ export function StatesLab() {
                 {liveState}
               </span>
             </div>
-            <p className="mt-2 text-caption text-secondary">{recipe.note}</p>
-            <ul className="mt-3 flex flex-col gap-1">
+            <p className="mt-2 min-h-[2.5rem] text-caption text-secondary">{recipe.note}</p>
+            <ul className="mt-3 flex min-h-[6.75rem] flex-col gap-1">
               {recipe.tokens.map((t) => (
                 <li
                   key={t}

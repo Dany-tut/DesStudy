@@ -237,7 +237,7 @@ export function BarBuilder() {
               })}
             </div>
 
-            {/* Expanded pill — overlays neighbours, anchored over its square */}
+            {/* Expanded pill — overlays the whole row, grows out of its square */}
             {railOpen &&
               (() => {
                 const i = PLACEMENTS.findIndex((p) => p.key === placement);
@@ -245,29 +245,27 @@ export function BarBuilder() {
                 const Icon = p.icon;
                 const anchorRight = i >= 3;
                 const icon = (
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[11px] bg-brand text-on-brand">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-brand text-on-brand">
                     <Icon size={17} />
                   </span>
                 );
                 const text = (
-                  <span
-                    className="flex flex-col overflow-hidden whitespace-nowrap px-2 text-left"
-                    style={{
-                      animation: railClosing
-                        ? 'barrail-text-out 0.26s ease forwards'
-                        : 'barrail-text 0.28s ease',
-                    }}
-                  >
-                    <span className="text-callout font-medium text-primary">{p.label}</span>
-                    <span className="text-caption text-tertiary">{p.hint}</span>
+                  <span className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden whitespace-nowrap px-2 text-left">
+                    <span className="truncate text-callout font-medium text-primary">{p.label}</span>
+                    <span className="truncate text-caption text-tertiary">{p.hint}</span>
                   </span>
                 );
                 return (
                   <button
                     type="button"
                     onClick={closeRail}
-                    style={anchorRight ? { right: (5 - i) * 50 } : { left: i * 50 }}
-                    className="absolute top-0 z-20 flex h-11 items-center rounded-xl border border-brand bg-elevated px-0.5 shadow-lg"
+                    style={{
+                      transformOrigin: `${i * 50 + 22}px center`,
+                      animation: railClosing
+                        ? 'barrail-pill-out 0.24s cubic-bezier(0.4,0,1,1) forwards'
+                        : 'barrail-pill 0.32s cubic-bezier(0.22,1,0.36,1)',
+                    }}
+                    className="absolute inset-0 z-20 flex items-center rounded-xl border border-brand bg-elevated px-0.5 shadow-lg"
                   >
                     {anchorRight ? (
                       <>
@@ -332,7 +330,7 @@ export function BarBuilder() {
           <p className="mb-2 text-footnote font-medium text-secondary">Из чего собрать</p>
           {/* Horizontal scroll with edge fades — parts can exceed 5 */}
           <div className="relative">
-            <div className="hide-native-scroll flex gap-2 overflow-x-auto pb-1">
+            <div className="hide-native-scroll flex touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-1">
               {PARTS.map(({ key, label }) => {
                 const on = parts[key];
                 return (
@@ -437,13 +435,14 @@ export function BarBuilder() {
       </div>
 
       <style>{`
-        @keyframes barrail-text {
-          from { max-width: 0; opacity: 0; }
-          to { max-width: 16rem; opacity: 1; }
+        @keyframes barrail-pill {
+          from { opacity: 0; transform: scale(0.82); }
+          60% { opacity: 1; }
+          to { opacity: 1; transform: scale(1); }
         }
-        @keyframes barrail-text-out {
-          from { max-width: 16rem; opacity: 1; }
-          to { max-width: 0; opacity: 0; }
+        @keyframes barrail-pill-out {
+          from { opacity: 1; transform: scale(1); }
+          to { opacity: 0; transform: scale(0.82); }
         }
       `}</style>
     </div>
