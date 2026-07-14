@@ -28,7 +28,11 @@ import { Hotspot } from '@/components/exercises/drafts/Hotspot';
 import { TrimZone } from '@/components/exercises/TrimZone';
 import { NestedRadius } from '@/components/exercises/NestedRadius';
 import { StatesLab } from '@/components/exercises/drafts/StatesLab';
+import { SpotDiff } from '@/components/exercises/drafts/SpotDiff';
+import { TapTarget } from '@/components/exercises/drafts/TapTarget';
+import { EasingCurve } from '@/components/exercises/drafts/EasingCurve';
 import { FixTheScreen } from '@/components/exercises/FixTheScreen';
+import { ScreenWalkthrough } from '@/components/exercises/ScreenWalkthrough';
 import type { BuildAnswer, BuildExercise, OrderExercise } from '@/lib/curriculum/types';
 
 /** Sample exercises used only to render the interactive surfaces in the showcase. */
@@ -373,6 +377,22 @@ export default function DesignSystemPage() {
 
       <Section title="Fix-the-screen — почини сломанный макет («fix-screen»)">
         <FixTheScreen />
+      </Section>
+
+      <Section title="Screen-walkthrough — послойный разбор экрана («screen-walkthrough»)">
+        <ScreenWalkthrough />
+      </Section>
+
+      <Section title="Spot-diff — найди несогласованность («spot-diff»)">
+        <SpotDiff />
+      </Section>
+
+      <Section title="Tap-target — дотяни кнопку до 44px («tap-target»)">
+        <TapTarget />
+      </Section>
+
+      <Section title="Easing-curve — собери кривую анимации («easing-curve»)">
+        <EasingCurve />
       </Section>
 
       <div className="mb-8 mt-20 border-t border-border pt-10">

@@ -8,10 +8,14 @@ import { uxHeuristicsControl } from './ux-heuristics-control';
 import { uxHeuristicsClarity } from './ux-heuristics-clarity';
 import { uxHeuristicsConsistency } from './ux-heuristics-consistency';
 import { userFlows } from './user-flows';
+import { userFlowsEdge } from './user-flows-edge';
+import { informationArchitecture } from './information-architecture';
 import { designTokens } from './design-tokens';
 import { componentsVariants } from './components-variants';
 import { navBars } from './nav-bars';
 import { forms } from './forms';
+import { formsValidation } from './forms-validation';
+import { formsStructure } from './forms-structure';
 import { emptyStates } from './empty-states';
 import { microTypography } from './micro-typography';
 import { gridsComposition } from './grids-composition';
@@ -39,12 +43,16 @@ export const lessons: Record<string, Lesson> = {
   [uxHeuristicsClarity.slug]: uxHeuristicsClarity,
   [uxHeuristicsConsistency.slug]: uxHeuristicsConsistency,
   [userFlows.slug]: userFlows,
+  [userFlowsEdge.slug]: userFlowsEdge,
+  [informationArchitecture.slug]: informationArchitecture,
   [microcopy.slug]: microcopy,
   [designTokens.slug]: designTokens,
   [componentsVariants.slug]: componentsVariants,
   [figmaComponentsSlots.slug]: figmaComponentsSlots,
   [aiDesignTools.slug]: aiDesignTools,
   [forms.slug]: forms,
+  [formsValidation.slug]: formsValidation,
+  [formsStructure.slug]: formsStructure,
   [emptyStates.slug]: emptyStates,
   [briefResearch.slug]: briefResearch,
   [researchMethods.slug]: researchMethods,
@@ -62,10 +70,14 @@ export {
   uxHeuristicsClarity,
   uxHeuristicsConsistency,
   userFlows,
+  userFlowsEdge,
+  informationArchitecture,
   designTokens,
   componentsVariants,
   navBars,
   forms,
+  formsValidation,
+  formsStructure,
   emptyStates,
   microTypography,
   gridsComposition,
