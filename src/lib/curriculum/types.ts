@@ -287,6 +287,42 @@ export interface ScaleRampAnswer {
   ratio: number;
 }
 
+/**
+ * L1: trim the invisible extra font space (trim zone) around a text label so its
+ * optical padding becomes symmetric — the direct-manipulation version of
+ * `text-box-trim`. Correct once the trim reaches the target within tolerance.
+ */
+export interface TrimZoneExercise {
+  id: string;
+  type: 'trim-zone';
+  /** Label rendered inside the box (e.g. "Submit"). */
+  label: string;
+  /** Trim amount, in px, that removes the extra space. */
+  targetTrim: number;
+  /** Max trim on the slider. */
+  maxTrim: number;
+  tolerance: number;
+  prompt: string;
+  explanation: string;
+}
+
+/**
+ * L1: set the radius of a nested element so it is concentric with its container.
+ * The learner drags the inner radius; correct when inner = outer − padding.
+ */
+export interface NestedRadiusExercise {
+  id: string;
+  type: 'nested-radius';
+  /** Container (outer) radius in px. */
+  outerRadius: number;
+  /** Padding between container and nested element, in px. */
+  padding: number;
+  /** Max inner radius on the slider. */
+  maxRadius: number;
+  prompt: string;
+  explanation: string;
+}
+
 export type Exercise =
   | ChooseExercise
   | TuneExercise
@@ -300,7 +336,9 @@ export type Exercise =
   | HotspotExercise
   | AlignExercise
   | ContrastTuneExercise
-  | ScaleRampExercise;
+  | ScaleRampExercise
+  | TrimZoneExercise
+  | NestedRadiusExercise;
 
 // ─────────────────────────────────────────────────────────────
 // LESSON — follows PRD Chapter 5 lesson structure.

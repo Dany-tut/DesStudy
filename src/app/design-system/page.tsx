@@ -25,6 +25,8 @@ import { AlignSnap } from '@/components/exercises/drafts/AlignSnap';
 import { MatchPairs } from '@/components/exercises/drafts/MatchPairs';
 import { ScaleRamp } from '@/components/exercises/drafts/ScaleRamp';
 import { Hotspot } from '@/components/exercises/drafts/Hotspot';
+import { TrimZone } from '@/components/exercises/TrimZone';
+import { NestedRadius } from '@/components/exercises/NestedRadius';
 import { StatesLab } from '@/components/exercises/drafts/StatesLab';
 import { FixTheScreen } from '@/components/exercises/drafts/FixTheScreen';
 import type { BuildAnswer, BuildExercise, OrderExercise } from '@/lib/curriculum/types';
@@ -68,6 +70,8 @@ export default function DesignSystemPage() {
   const [notifications, setNotifications] = useState(true);
   const [choice, setChoice] = useState<string | null>('flex');
   const [padding, setPadding] = useState(16);
+  const [trim, setTrim] = useState(0);
+  const [innerRadius, setInnerRadius] = useState(0);
   const [align, setAlign] = useState<'left' | 'center' | 'right'>('center');
   const [sample, setSample] = useState<'a' | 'b' | 'c' | 'd'>('c');
   const [build, setBuild] = useState<BuildAnswer>({ gap: 16, padding: 16 });
@@ -357,6 +361,14 @@ export default function DesignSystemPage() {
 
       <Section title="States — состояния компонента («states»)">
         <StatesLab />
+      </Section>
+
+      <Section title="Trim-zone — подрежь поле шрифта («trim-zone»)">
+        <TrimZone label="Submit" targetTrim={9} maxTrim={18} value={trim} onChange={setTrim} />
+      </Section>
+
+      <Section title="Nested-radius — концентричные скругления («nested-radius»)">
+        <NestedRadius outerRadius={24} padding={8} maxRadius={24} value={innerRadius} onChange={setInnerRadius} />
       </Section>
 
       <Section title="Fix-the-screen — почини сломанный макет («fix-screen»)">

@@ -262,5 +262,32 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
       }
       return { correct, explanation: exercise.explanation, hint };
     }
+    case 'trim-zone': {
+      const trim = Number(answer);
+      const correct = Math.abs(trim - exercise.targetTrim) <= exercise.tolerance;
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : trim < exercise.targetTrim
+            ? 'Ещё осталось лишнее поле шрифта сверху и снизу — подрежь сильнее.'
+            : 'Перебор — ты срезал уже сами буквы. Отпусти немного назад.',
+      };
+    }
+    case 'nested-radius': {
+      const inner = Number(answer);
+      const target = exercise.outerRadius - exercise.padding;
+      const correct = inner === target;
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : inner > target
+            ? 'Внутренний радиус великоват — дуги не совпадут. Вспомни: внутренний = внешний − отступ.'
+            : 'Внутренний радиус маловат — угол кнопки острее угла карточки.',
+      };
+    }
   }
 }

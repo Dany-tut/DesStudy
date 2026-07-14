@@ -26,6 +26,8 @@ import { Hotspot } from './drafts/Hotspot';
 import { AlignSnap } from './drafts/AlignSnap';
 import { ContrastTuner } from './drafts/ContrastTuner';
 import { ScaleRamp } from './drafts/ScaleRamp';
+import { TrimZone } from './TrimZone';
+import { NestedRadius } from './NestedRadius';
 import { Button } from '@/components/ui/Button';
 import { Slider } from '@/components/ui/Slider';
 import { ChoiceCard } from '@/components/ui/ChoiceCard';
@@ -88,7 +90,9 @@ export function ExercisePlayer({
                 ? { textL: 38, bgL: 96 }
                 : exercise.type === 'scale-ramp'
                   ? { base: 16, ratio: 1.25 }
-                  : null;
+                  : exercise.type === 'trim-zone' || exercise.type === 'nested-radius'
+                    ? 0
+                    : null;
   const [choice, setChoice] = useState<Answer>(initialChoice);
   const [outcome, setOutcome] = useState<ValidationOutcome | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -160,6 +164,10 @@ export function ExercisePlayer({
         const v = value as ScaleRampAnswer;
         return `${v.base}px × ${v.ratio}`;
       }
+      case 'trim-zone':
+        return `срез ${value}px`;
+      case 'nested-radius':
+        return `внутренний радиус ${value}px`;
     }
   }
 
@@ -397,6 +405,28 @@ export function ExercisePlayer({
         return (
           <ScaleRamp
             value={(choice as ScaleRampAnswer) ?? { base: 16, ratio: 1.25 }}
+            disabled={solved}
+            onChange={(v) => setChoice(v)}
+          />
+        );
+      case 'trim-zone':
+        return (
+          <TrimZone
+            label={exercise.label}
+            targetTrim={exercise.targetTrim}
+            maxTrim={exercise.maxTrim}
+            value={typeof choice === 'number' ? choice : 0}
+            disabled={solved}
+            onChange={(v) => setChoice(v)}
+          />
+        );
+      case 'nested-radius':
+        return (
+          <NestedRadius
+            outerRadius={exercise.outerRadius}
+            padding={exercise.padding}
+            maxRadius={exercise.maxRadius}
+            value={typeof choice === 'number' ? choice : 0}
             disabled={solved}
             onChange={(v) => setChoice(v)}
           />
