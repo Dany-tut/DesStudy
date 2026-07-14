@@ -5,6 +5,7 @@ import { Clock, Target, Trophy, CheckCircle2, BookOpen } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Lesson } from '@/lib/curriculum/types';
 import { ExampleVisual } from '@/components/examples/ExampleVisual';
+import { LectureVisual } from '@/components/examples/LectureVisual';
 import { ExercisePlayer } from '@/components/exercises/ExercisePlayer';
 import { VideoEmbed } from '@/components/lesson/VideoEmbed';
 
@@ -139,7 +140,7 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
               )}
               {s.visual && (
                 <div className="mt-5">
-                  <ExampleVisual visual={s.visual} />
+                  <LectureVisual visual={s.visual} />
                 </div>
               )}
             </section>
