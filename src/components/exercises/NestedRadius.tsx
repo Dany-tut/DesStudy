@@ -69,6 +69,7 @@ export function NestedRadius({
           max={maxRadius}
           step={1}
           unit="px"
+          accent={concentric ? 'var(--success-rgb)' : undefined}
           disabled={disabled}
           onChange={onChange}
         />

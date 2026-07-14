@@ -426,7 +426,9 @@ export function BarBuilder() {
               isSidebar(placement) ? 'flex' : 'block',
             ].join(' ')}
           >
-            {placement === 'sidebarRight' && <PageContent placement={placement} />}
+            {(placement === 'sidebarRight' || placement === 'floatBottom') && (
+              <PageContent placement={placement} />
+            )}
 
             <BarPreview
               placement={placement}
@@ -435,7 +437,9 @@ export function BarBuilder() {
               navAlign={navAlign}
             />
 
-            {placement !== 'sidebarRight' && <PageContent placement={placement} />}
+            {placement !== 'sidebarRight' && placement !== 'floatBottom' && (
+              <PageContent placement={placement} />
+            )}
           </div>
 
           {/* Floating overlay scrollbar — always painted above the bar */}

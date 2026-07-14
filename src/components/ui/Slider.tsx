@@ -101,6 +101,7 @@ export function Slider({
   step = 1,
   disabled,
   unit = '',
+  accent,
   onChange,
 }: {
   value: number;
@@ -109,6 +110,8 @@ export function Slider({
   step?: number;
   disabled?: boolean;
   unit?: string;
+  /** When set, recolors the track/thumb/bubble. Pass an "R G B" triplet. */
+  accent?: string;
   onChange: (value: number) => void;
 }) {
   const [live, setLive] = useState(value);
@@ -195,8 +198,12 @@ export function Slider({
     onChange(next);
   }
 
+  const accentVars = accent
+    ? ({ '--brand': `rgb(${accent})`, '--brand-rgb': accent } as React.CSSProperties)
+    : undefined;
+
   return (
-    <div>
+    <div style={accentVars}>
       {/* Range labels */}
       <div className="mb-8 flex items-baseline justify-between">
         <span className="text-footnote text-tertiary">

@@ -216,8 +216,8 @@ body {
   background: var(--bg-surface);
   border: 3px solid var(--brand);
   box-shadow:
-    0 2px 6px rgba(91, 110, 245, 0.35),
-    0 0 0 4px rgba(91, 110, 245, 0.14);
+    0 2px 6px rgb(var(--brand-rgb) / 0.35),
+    0 0 0 4px rgb(var(--brand-rgb) / 0.14);
   cursor: pointer;
   transition:
     transform 140ms cubic-bezier(0.2, 0, 0, 1),
@@ -229,8 +229,8 @@ body {
 .ui-slider:active::-webkit-slider-thumb {
   transform: scale(1.15);
   box-shadow:
-    0 2px 10px rgba(91, 110, 245, 0.45),
-    0 0 0 6px rgba(91, 110, 245, 0.2);
+    0 2px 10px rgb(var(--brand-rgb) / 0.45),
+    0 0 0 6px rgb(var(--brand-rgb) / 0.2);
 }
 
 .ui-slider--chunky::-moz-range-track,
@@ -258,7 +258,7 @@ body {
   border-radius: 9999px;
   background: var(--bg-surface);
   border: 3px solid var(--brand);
-  box-shadow: 0 2px 6px rgba(91, 110, 245, 0.35);
+  box-shadow: 0 2px 6px rgb(var(--brand-rgb) / 0.35);
   cursor: pointer;
 }
 
