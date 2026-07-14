@@ -11,6 +11,8 @@ import type {
   AlignAnswer,
   ContrastAnswer,
   ScaleRampAnswer,
+  EasingAnswer,
+  TapTargetAnswer,
 } from '@/lib/curriculum/types';
 import { validate, contrastRatio } from '@/lib/curriculum/validate';
 import type { MentorReply } from '@/lib/ai/mentor';
@@ -26,11 +28,15 @@ import { Hotspot } from './drafts/Hotspot';
 import { AlignSnap } from './drafts/AlignSnap';
 import { ContrastTuner } from './drafts/ContrastTuner';
 import { ScaleRamp } from './drafts/ScaleRamp';
+import { EasingCurve } from './drafts/EasingCurve';
+import { SpotDiff } from './drafts/SpotDiff';
+import { TapTarget } from './drafts/TapTarget';
 import { TrimZone } from './TrimZone';
 import { NestedRadius } from './NestedRadius';
 import { ResizeFrame } from './ResizeFrame';
 import { Elevation } from './Elevation';
 import { FixTheScreen } from './FixTheScreen';
+import { ScreenCritiqueExercise } from './ScreenCritiqueExercise';
 import { FIX_INITIAL, fixSolvedCount, type FixScreenAnswer } from '@/lib/curriculum/fixScreen';
 import { Button } from '@/components/ui/Button';
 import { Slider } from '@/components/ui/Slider';
@@ -49,6 +55,8 @@ type Answer =
   | ContrastAnswer
   | ScaleRampAnswer
   | HotspotAnswer
+  | EasingAnswer
+  | TapTargetAnswer
   | FixScreenAnswer
   | string[]
   | null;
@@ -101,9 +109,15 @@ export function ExercisePlayer({
                       ? exercise.minWidth
                       : exercise.type === 'elevation'
                         ? 0
-                        : exercise.type === 'fix-screen'
-                          ? FIX_INITIAL
-                          : null;
+                        : exercise.type === 'easing'
+                          ? { p1: { x: 0.25, y: 0.25 }, p2: { x: 0.75, y: 0.75 } }
+                          : exercise.type === 'tap-target'
+                            ? { w: 30, h: 28 }
+                            : exercise.type === 'spot-diff'
+                              ? null
+                              : exercise.type === 'fix-screen'
+                                ? FIX_INITIAL
+                                : null;
   const [choice, setChoice] = useState<Answer>(initialChoice);
   const [outcome, setOutcome] = useState<ValidationOutcome | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -112,6 +126,23 @@ export function ExercisePlayer({
 
   const solved = outcome?.correct ?? false;
   const awaitingReview = solved && !!outcome?.reviewRequired;
+
+  // screen-critique owns its whole flow (diagnose → reconstruct → results) and
+  // records its own attempt — render it directly, skipping the generic shell.
+  if (exercise.type === 'screen-critique') {
+    return (
+      <div className="rounded-xl border border-border bg-surface p-6">
+        <p className="mb-5 text-callout font-medium text-primary">{exercise.prompt}</p>
+        <ScreenCritiqueExercise
+          exercise={exercise}
+          lessonSlug={lessonSlug}
+          skill={skill}
+          lessonTotal={lessonTotal}
+          onSolved={onSolved}
+        />
+      </div>
+    );
+  }
 
   function answerLabel(value: Answer): string {
     switch (exercise.type) {
@@ -183,10 +214,24 @@ export function ExercisePlayer({
         return `ширина ${Math.round(value as number)}px`;
       case 'elevation':
         return `уровень ${value}`;
+      case 'easing': {
+        const v = value as EasingAnswer;
+        return v
+          ? `cubic-bezier(${v.p1.x.toFixed(2)}, ${v.p1.y.toFixed(2)}, ${v.p2.x.toFixed(2)}, ${v.p2.y.toFixed(2)})`
+          : 'кривая не задана';
+      }
+      case 'spot-diff':
+        return value == null ? 'нет клика' : `выбрана плитка ${(value as number) + 1}`;
+      case 'tap-target': {
+        const v = value as TapTargetAnswer;
+        return v ? `${v.w}×${v.h}px` : 'нет размера';
+      }
       case 'fix-screen': {
         const solved = fixSolvedCount(value as FixScreenAnswer);
         return `исправлено ${solved} из 6 нарушений`;
       }
+      case 'screen-critique':
+        return 'разбор экрана';
     }
   }
 
@@ -474,6 +519,33 @@ export function ExercisePlayer({
             onChange={(v) => setChoice(v)}
           />
         );
+      case 'easing':
+        return (
+          <EasingCurve
+            target={exercise.target}
+            value={(choice as EasingAnswer) ?? null}
+            disabled={solved}
+            onChange={(v) => setChoice(v)}
+          />
+        );
+      case 'spot-diff':
+        return (
+          <SpotDiff
+            roundId={exercise.roundId}
+            value={typeof choice === 'number' ? choice : null}
+            disabled={solved}
+            onChange={(picked) => setChoice(picked)}
+          />
+        );
+      case 'tap-target':
+        return (
+          <TapTarget
+            min={exercise.min}
+            value={(choice as TapTargetAnswer) ?? { w: 30, h: 28 }}
+            disabled={solved}
+            onChange={(v) => setChoice(v)}
+          />
+        );
       case 'fix-screen':
         return (
           <FixTheScreen
@@ -482,6 +554,10 @@ export function ExercisePlayer({
             onChange={(next) => setChoice(next)}
           />
         );
+      // screen-critique is self-contained — handled by an early return above and
+      // never reaches renderControl; this case only satisfies exhaustiveness.
+      case 'screen-critique':
+        return null;
       default: {
         // Exhaustiveness guard — a TS error here means a new Exercise type
         // was added without a matching case.

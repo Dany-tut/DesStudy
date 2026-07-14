@@ -95,10 +95,12 @@ function ValueBubble({ text }: { text: string }) {
 }
 
 /**
- * A field of glowing dots drifting chaotically inside the filled portion of the
- * track — a little "charged" celebration when the answer lands. Canvas-drawn
- * with additive glow, clipped to the filled width (a rounded-cap pill) so the
- * particles never spill past the fill edge. Honors prefers-reduced-motion.
+ * A stream of glowing sparks that shoot out of the thumb and race back along the
+ * filled track, fading as they go — a "charged" celebration when the answer
+ * lands. Particles are emitted at the fill edge (thumb center) with an energetic
+ * leftward velocity plus vertical jitter, drawn with additive glow + a motion
+ * trail, and recycled once spent. Clipped to the filled width so nothing spills
+ * past the fill edge. Honors prefers-reduced-motion (static twinkle, no flight).
  */
 function TrackParticles({ fillW, height }: { fillW: number; height: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -125,23 +127,35 @@ function TrackParticles({ fillW, height }: { fillW: number; height: number }) {
       .split(/[\s,]+/)
       .map(Number);
 
-    // Each particle drifts with a gentle wander; a per-particle phase drives a
-    // twinkling opacity so the field reads as alive rather than a steady spray.
-    const N = 14;
-    type P = { x: number; y: number; vx: number; vy: number; r: number; ph: number; sp: number };
     // Deterministic pseudo-random (Math.random is unavailable in some sandboxes;
-    // a cheap LCG seeded off the index keeps particles varied but reproducible).
-    let seed = 1337;
+    // a cheap LCG keeps emission varied but reproducible).
+    let seed = 20259;
     const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-    const ps: P[] = Array.from({ length: N }, () => ({
-      x: rnd(),
-      y: rnd(),
-      vx: (rnd() - 0.5) * 0.006,
-      vy: (rnd() - 0.5) * 0.02,
-      r: 0.9 + rnd() * 1.6,
-      ph: rnd() * Math.PI * 2,
-      sp: 0.04 + rnd() * 0.06,
-    }));
+
+    // Particles live in canvas px. Emitted at the right edge (thumb), flying left.
+    type P = { x: number; y: number; vx: number; vy: number; r: number; life: number; max: number };
+    const N = 26;
+    const midY = () => canvas.height / 2;
+
+    const spawn = (p: P) => {
+      p.x = canvas.width - 2 * dpr; // right at the thumb
+      p.y = midY() + (rnd() - 0.5) * canvas.height * 0.5;
+      // Fast leftward launch that eases off; slight vertical spray.
+      p.vx = -(1.6 + rnd() * 2.6) * dpr;
+      p.vy = (rnd() - 0.5) * 0.9 * dpr;
+      p.r = (0.8 + rnd() * 1.8) * dpr;
+      p.max = 34 + rnd() * 30;
+      p.life = 0;
+    };
+
+    const ps: P[] = Array.from({ length: N }, () => {
+      const p: P = { x: 0, y: 0, vx: 0, vy: 0, r: 0, life: 0, max: 1 };
+      spawn(p);
+      // Stagger initial positions so the stream is full immediately.
+      p.life = rnd() * p.max;
+      p.x = canvas.width - p.life * (2 * dpr);
+      return p;
+    });
 
     let raf = 0;
     let alive = true;
@@ -154,34 +168,40 @@ function TrackParticles({ fillW, height }: { fillW: number; height: number }) {
     };
     resize(fillRef.current);
 
+    const dot = (x: number, y: number, rad: number, a: number) => {
+      const grd = ctx.createRadialGradient(x, y, 0, x, y, rad * 4);
+      grd.addColorStop(0, `rgba(${r},${g},${b},${a})`);
+      grd.addColorStop(0.35, `rgba(${r},${g},${b},${a * 0.4})`);
+      grd.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(x, y, rad * 4, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
     const draw = () => {
       const w = fillRef.current;
       if (Math.abs(w * dpr - canvas.width) > 1) resize(w);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.globalCompositeOperation = 'lighter';
+
       for (const p of ps) {
-        if (!reduce) {
-          p.x += p.vx;
-          p.y += p.vy;
-          p.ph += p.sp;
-          // Wrap horizontally, bounce vertically — stays inside the line.
-          if (p.x < 0) p.x += 1;
-          if (p.x > 1) p.x -= 1;
-          if (p.y < 0.1 || p.y > 0.9) p.vy *= -1;
-          p.y = Math.max(0.1, Math.min(0.9, p.y));
+        if (reduce) {
+          // Static field of soft glows, no motion.
+          dot(p.x, midY() + (p.y - midY()) * 0.3, p.r, 0.4);
+          continue;
         }
-        const twinkle = reduce ? 0.6 : 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(p.ph));
-        const px = p.x * canvas.width;
-        const py = p.y * canvas.height;
-        const rad = p.r * dpr;
-        const grd = ctx.createRadialGradient(px, py, 0, px, py, rad * 3.5);
-        grd.addColorStop(0, `rgba(${r},${g},${b},${twinkle})`);
-        grd.addColorStop(0.4, `rgba(${r},${g},${b},${twinkle * 0.35})`);
-        grd.addColorStop(1, `rgba(${r},${g},${b},0)`);
-        ctx.fillStyle = grd;
-        ctx.beginPath();
-        ctx.arc(px, py, rad * 3.5, 0, Math.PI * 2);
-        ctx.fill();
+        p.life += 1;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.965; // ease the launch
+        // Fade in fast, then out over the lifetime.
+        const t = p.life / p.max;
+        const a = Math.max(0, Math.min(1, t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85)) * 0.85;
+        // Short motion trail behind the spark.
+        dot(p.x - p.vx * 1.4, p.y, p.r * 0.7, a * 0.4);
+        dot(p.x, p.y, p.r, a);
+        if (p.life >= p.max || p.x < -4 * dpr) spawn(p);
       }
       if (alive) raf = requestAnimationFrame(draw);
     };

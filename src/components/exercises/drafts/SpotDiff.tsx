@@ -2,43 +2,50 @@
 
 import { useState } from 'react';
 import { Check, RotateCcw } from 'lucide-react';
+import { SPOT_ROUNDS, SPOT_TILES } from '@/lib/curriculum/spotDiff';
 
 /**
- * DRAFT exercise — "spot-diff": a row of near-identical UI tiles, one of which
- * quietly breaks the system (wrong radius, off brand tint, heavier weight, extra
+ * "spot-diff" exercise: a row of near-identical UI tiles, one of which quietly
+ * breaks the system (wrong radius, off brand tint, heavier weight, extra
  * padding). The learner clicks the odd one out — training the consistency eye
- * that catches drift in a real design review. Self-contained; own state.
+ * that catches drift in a real design review.
+ *
+ * Optional props promote this draft to a real exercise: with `onChange` the
+ * pick is lifted to the player (controlled, fixed `roundId`); with no props it
+ * cycles rounds self-contained in the gallery. Round presets live in
+ * `@/lib/curriculum/spotDiff` so the validator shares the answer key.
  */
 
-type Round = {
-  /** Which tile (index) is the inconsistent one. */
-  oddIndex: number;
-  /** Human description of the break, shown after solving. */
-  flaw: string;
-  /** Style overrides applied only to the odd tile. */
-  odd: React.CSSProperties;
-};
+export function SpotDiff({
+  roundId,
+  value,
+  disabled,
+  onChange,
+}: {
+  roundId?: number;
+  value?: number | null;
+  disabled?: boolean;
+  onChange?: (picked: number) => void;
+} = {}) {
+  const controlled = onChange != null;
+  const [internalRound, setInternalRound] = useState(0);
+  const [internalPicked, setInternalPicked] = useState<number | null>(null);
 
-const ROUNDS: Round[] = [
-  { oddIndex: 2, flaw: 'радиус угла выбивается из шкалы (16px вместо 8px)', odd: { borderRadius: 16 } },
-  { oddIndex: 0, flaw: 'оттенок фона чуть теплее — не из палитры', odd: { background: '#efe7dc' } },
-  { oddIndex: 3, flaw: 'внутренние поля больше остальных (сетка сбита)', odd: { padding: 22 } },
-  { oddIndex: 1, flaw: 'насыщенность акцента ниже — другой токен', odd: { opacity: 0.55 } },
-];
-
-const TILES = 4;
-
-export function SpotDiff() {
-  const [roundIdx, setRoundIdx] = useState(0);
-  const [picked, setPicked] = useState<number | null>(null);
-
-  const round = ROUNDS[roundIdx];
+  const roundIdx = roundId ?? internalRound;
+  const round = SPOT_ROUNDS[roundIdx];
+  const picked = controlled ? value ?? null : internalPicked;
   const solved = picked === round.oddIndex;
   const wrong = picked !== null && picked !== round.oddIndex;
 
+  function pick(i: number) {
+    if (disabled || picked !== null) return;
+    if (controlled) onChange!(i);
+    else setInternalPicked(i);
+  }
+
   function next() {
-    setRoundIdx((i) => (i + 1) % ROUNDS.length);
-    setPicked(null);
+    setInternalRound((i) => (i + 1) % SPOT_ROUNDS.length);
+    setInternalPicked(null);
   }
 
   return (
@@ -62,7 +69,7 @@ export function SpotDiff() {
       </div>
 
       <div className="grid grid-cols-4 gap-3">
-        {Array.from({ length: TILES }).map((_, i) => {
+        {Array.from({ length: SPOT_TILES }).map((_, i) => {
           const isOdd = i === round.oddIndex;
           const isPicked = picked === i;
           const reveal = picked !== null;
@@ -70,8 +77,8 @@ export function SpotDiff() {
             <button
               key={i}
               type="button"
-              onClick={() => picked === null && setPicked(i)}
-              disabled={picked !== null}
+              onClick={() => pick(i)}
+              disabled={disabled || picked !== null}
               className={[
                 'flex flex-col gap-2 rounded-lg border-2 p-3 text-left transition-fast',
                 reveal && isOdd
@@ -103,13 +110,15 @@ export function SpotDiff() {
               ? 'Не эта — приглядись к радиусам, оттенкам и полям.'
               : 'Три плитки одинаковы, одна — нет.'}
         </p>
-        <button
-          type="button"
-          onClick={next}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
-        >
-          <RotateCcw size={13} /> Другой набор
-        </button>
+        {!controlled && (
+          <button
+            type="button"
+            onClick={next}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
+          >
+            <RotateCcw size={13} /> Другой набор
+          </button>
+        )}
       </div>
     </div>
   );

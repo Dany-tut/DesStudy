@@ -16,6 +16,13 @@ import type {
   TapTargetAnswer,
 } from './types';
 import { FIX_DEFECTS, fixSolvedCount, type FixScreenAnswer } from './fixScreen';
+import {
+  critiqueSolved,
+  rebuiltCount,
+  defectiveZones,
+  emptyCritiqueAnswer,
+  type CritiqueAnswer,
+} from './screenCritique';
 import { SPOT_ROUNDS } from './spotDiff';
 
 /** Per-axis tolerance when matching an easing curve's control points. */

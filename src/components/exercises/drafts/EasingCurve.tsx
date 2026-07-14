@@ -30,14 +30,34 @@ function toSvg(p: Pt): { x: number; y: number } {
   return { x: p.x * S, y: S - p.y * S };
 }
 
-export function EasingCurve() {
+type EasingValue = { p1: Pt; p2: Pt };
+
+/**
+ * Optional props promote this draft to a real exercise: with `onChange` the two
+ * control points are lifted to the player (controlled) and `target` is fixed by
+ * the exercise; with no props it cycles targets self-contained in the gallery.
+ */
+export function EasingCurve({
+  target: targetProp,
+  value,
+  disabled,
+  onChange,
+}: {
+  target?: Target;
+  value?: EasingValue | null;
+  disabled?: boolean;
+  onChange?: (v: EasingValue) => void;
+} = {}) {
+  const controlled = onChange != null;
   const svgRef = useRef<SVGSVGElement>(null);
   const [targetIdx, setTargetIdx] = useState(0);
-  const [p1, setP1] = useState<Pt>({ x: 0.25, y: 0.25 });
-  const [p2, setP2] = useState<Pt>({ x: 0.75, y: 0.75 });
+  const [internalP1, setInternalP1] = useState<Pt>({ x: 0.25, y: 0.25 });
+  const [internalP2, setInternalP2] = useState<Pt>({ x: 0.75, y: 0.75 });
   const [playing, setPlaying] = useState(true);
 
-  const target = TARGETS[targetIdx];
+  const target = targetProp ?? TARGETS[targetIdx];
+  const p1 = value?.p1 ?? internalP1;
+  const p2 = value?.p2 ?? internalP2;
   const near = (a: Pt, b: Pt) => Math.abs(a.x - b.x) <= TOL && Math.abs(a.y - b.y) <= TOL;
   const solved = near(p1, target.p1) && near(p2, target.p2);
 
@@ -45,15 +65,22 @@ export function EasingCurve() {
 
   function drag(which: 'p1' | 'p2') {
     return (e: React.PointerEvent) => {
+      if (disabled) return;
       e.preventDefault();
       const rect = svgRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const set = which === 'p1' ? setP1 : setP2;
       const move = (ev: PointerEvent) => {
         const x = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
         // Allow slight overshoot on y (−0.3..1.3) so springy curves are reachable.
         const y = Math.max(-0.3, Math.min(1.3, 1 - (ev.clientY - rect.top) / rect.height));
-        set({ x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
+        const np = { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 };
+        if (controlled) {
+          onChange!(which === 'p1' ? { p1: np, p2 } : { p1, p2: np });
+        } else if (which === 'p1') {
+          setInternalP1(np);
+        } else {
+          setInternalP2(np);
+        }
       };
       const up = () => {
         window.removeEventListener('pointermove', move);
@@ -166,13 +193,15 @@ export function EasingCurve() {
                 </>
               )}
             </button>
-            <button
-              type="button"
-              onClick={next}
-              className="shrink-0 whitespace-nowrap rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
-            >
-              Другая цель
-            </button>
+            {!controlled && (
+              <button
+                type="button"
+                onClick={next}
+                className="shrink-0 whitespace-nowrap rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
+              >
+                Другая цель
+              </button>
+            )}
           </div>
         </div>
       </div>
