@@ -16,6 +16,8 @@ import {
   aiDesignTools,
   briefResearch,
   paletteElements,
+  responsiveLayout,
+  microcopy,
 } from './lessons';
 import type { Lesson } from '@/lib/curriculum/types';
 
@@ -79,6 +81,7 @@ export const PATHS: LearningPath[] = [
       entry(colorContrast, { emoji: '🎨' }),
       entry(microTypography, { emoji: '✍️' }),
       entry(gridsComposition, { emoji: '🔲', popular: true }),
+      entry(responsiveLayout, { emoji: '📱' }),
       entry(navBars, { emoji: '🧱' }),
     ],
   },
@@ -91,6 +94,7 @@ export const PATHS: LearningPath[] = [
       entry(uxHeuristics, { emoji: '🔍', popular: true }),
       entry(userFlows, { emoji: '🧭' }),
       entry(forms, { emoji: '📝' }),
+      entry(microcopy, { emoji: '✏️' }),
       entry(emptyStates, { emoji: '🗂️' }),
     ],
   },

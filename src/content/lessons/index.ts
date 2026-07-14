@@ -16,6 +16,8 @@ import { figmaComponentsSlots } from './figma-components-slots';
 import { aiDesignTools } from './ai-design-tools';
 import { briefResearch } from './brief-research';
 import { paletteElements } from './palette-elements';
+import { responsiveLayout } from './responsive-layout';
+import { microcopy } from './microcopy';
 
 /** Central registry — every built lesson, keyed by slug. */
 export const lessons: Record<string, Lesson> = {
@@ -25,9 +27,11 @@ export const lessons: Record<string, Lesson> = {
   [colorContrast.slug]: colorContrast,
   [microTypography.slug]: microTypography,
   [gridsComposition.slug]: gridsComposition,
+  [responsiveLayout.slug]: responsiveLayout,
   [navBars.slug]: navBars,
   [uxHeuristics.slug]: uxHeuristics,
   [userFlows.slug]: userFlows,
+  [microcopy.slug]: microcopy,
   [designTokens.slug]: designTokens,
   [componentsVariants.slug]: componentsVariants,
   [figmaComponentsSlots.slug]: figmaComponentsSlots,
@@ -56,4 +60,6 @@ export {
   aiDesignTools,
   briefResearch,
   paletteElements,
+  responsiveLayout,
+  microcopy,
 };
