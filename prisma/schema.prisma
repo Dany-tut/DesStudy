@@ -7,8 +7,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Pooled connection for the serverless runtime; direct connection for
+  // migrations (prisma migrate deploy). Vercel's Postgres/Neon integration
+  // injects both env vars automatically.
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 /// An anonymous or (later) authenticated learner. Identified by a cookie for now.
