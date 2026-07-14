@@ -24,7 +24,7 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
   const done = solved.size === allExercises.length;
 
   return (
-    <main className="mx-auto max-w-[760px] px-6 py-12">
+    <main className="mx-auto max-w-[1200px] px-8 py-12">
       {/* Sticky progress */}
       <div className="glass sticky top-4 z-sticky mb-10 flex items-center gap-4 rounded-full px-5 py-3">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
@@ -49,7 +49,7 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
         </span>
       </div>
 
-      <ul className="mt-6 space-y-2">
+      <ul className="mt-6 max-w-[70ch] space-y-2">
         {lesson.objectives.map((o) => (
           <li key={o} className="flex items-start gap-2 text-body text-secondary">
             <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-brand" />
@@ -60,7 +60,7 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
 
       {/* Theory */}
       <SectionTitle>Теория</SectionTitle>
-      <div className="space-y-3">
+      <div className="max-w-[70ch] space-y-3">
         {lesson.theory.map((t, i) => (
           <p key={i} className="text-body text-secondary">
             <Bold text={t} />

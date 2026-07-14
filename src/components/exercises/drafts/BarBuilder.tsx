@@ -86,28 +86,10 @@ export function BarBuilder() {
   });
   const [navCenter, setNavCenter] = useState(false);
   const [autoplay, setAutoplay] = useState(true);
-  // Placement rail: collapsed to a row of icon squares; the active one expands
-  // into a labelled pill on top of its neighbours. Click again to collapse.
+  // Placement rail: a row of icon squares. The active one widens in place to
+  // reveal its label; its neighbours stay put and get pushed aside. Clicking the
+  // active square again collapses it back to an icon. Width is CSS-animated.
   const [railOpen, setRailOpen] = useState(false);
-  const [railClosing, setRailClosing] = useState(false);
-  const railTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Play the reverse morph, then unmount the pill once it finishes.
-  const closeRail = () => {
-    if (railClosing) return;
-    setRailClosing(true);
-    railTimer.current = setTimeout(() => {
-      setRailOpen(false);
-      setRailClosing(false);
-    }, 260);
-  };
-  // Open (or switch to) a placement, cancelling any in-flight close.
-  const openRail = (key: Placement) => {
-    if (railTimer.current) clearTimeout(railTimer.current);
-    setRailClosing(false);
-    setPlacement(key);
-    setRailOpen(true);
-  };
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
@@ -210,77 +192,47 @@ export function BarBuilder() {
       <div className="flex flex-col gap-5">
         <div>
           <p className="mb-2 text-footnote font-medium text-secondary">Как бар сидит на странице</p>
-          <div className="relative w-fit">
-            {/* Collapsed row — one icon square per placement */}
-            <div className="flex gap-1.5">
-              {PLACEMENTS.map(({ key, label, icon: Icon }) => {
-                const active = placement === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    aria-label={label}
-                    onClick={() => {
-                      if (active && railOpen && !railClosing) closeRail();
-                      else openRail(key);
-                    }}
-                    className={[
-                      'flex h-11 w-11 items-center justify-center rounded-xl border transition-fast',
-                      active
-                        ? 'border-brand bg-brand/10 text-brand'
-                        : 'border-border bg-surface text-tertiary hover:bg-hover hover:text-primary',
-                    ].join(' ')}
-                  >
-                    <Icon size={17} />
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Expanded pill — overlays the whole row, grows out of its square */}
-            {railOpen &&
-              (() => {
-                const i = PLACEMENTS.findIndex((p) => p.key === placement);
-                const p = PLACEMENTS[i];
-                const Icon = p.icon;
-                const anchorRight = i >= 3;
-                const icon = (
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] bg-brand text-on-brand">
+          <div className="flex w-fit gap-1.5">
+            {PLACEMENTS.map(({ key, label, icon: Icon, hint }) => {
+              const active = placement === key;
+              const expanded = active && railOpen;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-label={label}
+                  onClick={() => {
+                    if (active) setRailOpen((o) => !o);
+                    else {
+                      setPlacement(key);
+                      setRailOpen(true);
+                    }
+                  }}
+                  className={[
+                    'flex h-11 items-center rounded-xl border transition-fast',
+                    active
+                      ? 'border-brand bg-brand/10 text-brand'
+                      : 'border-border bg-surface text-tertiary hover:bg-hover hover:text-primary',
+                  ].join(' ')}
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center">
                     <Icon size={17} />
                   </span>
-                );
-                const text = (
-                  <span className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden whitespace-nowrap px-2 text-left">
-                    <span className="truncate text-callout font-medium text-primary">{p.label}</span>
-                    <span className="truncate text-caption text-tertiary">{p.hint}</span>
-                  </span>
-                );
-                return (
-                  <button
-                    type="button"
-                    onClick={closeRail}
-                    style={{
-                      transformOrigin: `${i * 50 + 22}px center`,
-                      animation: railClosing
-                        ? 'barrail-pill-out 0.24s cubic-bezier(0.4,0,1,1) forwards'
-                        : 'barrail-pill 0.32s cubic-bezier(0.22,1,0.36,1)',
-                    }}
-                    className="absolute inset-0 z-20 flex items-center rounded-xl border border-brand bg-elevated px-0.5 shadow-lg"
+                  {/* Label reveals by animating the grid column from 0fr → 1fr */}
+                  <span
+                    className="grid transition-all duration-300 ease-out"
+                    style={{ gridTemplateColumns: expanded ? '1fr' : '0fr' }}
                   >
-                    {anchorRight ? (
-                      <>
-                        {text}
-                        {icon}
-                      </>
-                    ) : (
-                      <>
-                        {icon}
-                        {text}
-                      </>
-                    )}
-                  </button>
-                );
-              })()}
+                    <span className="flex min-w-0 flex-col justify-center overflow-hidden whitespace-nowrap pr-3 text-left">
+                      <span className="truncate text-callout font-medium leading-tight text-primary">
+                        {label}
+                      </span>
+                      <span className="truncate text-caption leading-tight text-tertiary">{hint}</span>
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -379,18 +331,6 @@ export function BarBuilder() {
             Автопроигрыш
           </button>
         </div>
-
-        <div
-          className={[
-            'flex items-center gap-2 rounded-lg px-3 py-3 text-footnote transition-base',
-            solved ? 'bg-success/10 text-success' : 'bg-muted text-tertiary',
-          ].join(' ')}
-        >
-          {solved ? <Check size={16} /> : <Layers size={16} />}
-          {solved
-            ? 'Собрано верно — плавающий бар сверху, полный вид, лого + навигация по центру + CTA.'
-            : 'Цель: плавающий бар сверху, полный вид, логотип + навигация по центру + кнопка CTA.'}
-        </div>
       </div>
 
       {/* ── Live preview (scrollable page) ───────────────────── */}
@@ -433,18 +373,6 @@ export function BarBuilder() {
           )}
         </div>
       </div>
-
-      <style>{`
-        @keyframes barrail-pill {
-          from { opacity: 0; transform: scale(0.82); }
-          60% { opacity: 1; }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes barrail-pill-out {
-          from { opacity: 1; transform: scale(1); }
-          to { opacity: 0; transform: scale(0.82); }
-        }
-      `}</style>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   userFlows,
   designTokens,
   componentsVariants,
+  navBars,
 } from './lessons';
 import type { Lesson } from '@/lib/curriculum/types';
 
@@ -68,6 +69,7 @@ export const PATHS: LearningPath[] = [
       entry(radiusScale, { emoji: '⬜' }),
       entry(typeHierarchy, { emoji: '🔤', popular: true }),
       entry(colorContrast, { emoji: '🎨' }),
+      entry(navBars, { emoji: '🧱' }),
     ],
   },
   {

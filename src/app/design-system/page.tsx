@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Sun, Moon, Check, Sparkles, ArrowRight, Lock } from 'lucide-react';
 import { space, radius, semanticColors } from '@/design/tokens';
+import { loadSettings, applySettings, saveSettings } from '@/lib/settings';
 import { Button } from '@/components/ui/Button';
 import { Stepper } from '@/components/ui/Stepper';
 import { Slider } from '@/components/ui/Slider';
@@ -74,10 +75,19 @@ export default function DesignSystemPage() {
   const [figma, setFigma] = useState('');
   const [upload, setUpload] = useState<string | null>(null);
 
+  // Sync the button with the theme already applied to <html> (persisted in
+  // localStorage and set pre-paint by APPLY_SNIPPET), so no "dead" first click.
+  useEffect(() => {
+    setDark(document.documentElement.dataset.theme === 'dark');
+  }, []);
+
   const toggle = () => {
     const next = !dark;
     setDark(next);
-    document.documentElement.setAttribute('data-theme', next ? 'dark' : 'light');
+    const settings = loadSettings();
+    settings.theme = next ? 'dark' : 'light';
+    applySettings(settings);
+    saveSettings(settings);
   };
 
   return (

@@ -174,6 +174,39 @@ export function ExampleVisual({ visual }: { visual: string }) {
       </Card>
     );
   }
+  // Navigation bars — everything crammed into one fixed row vs floating +
+  // collapsed into a burger for the items that don't fit.
+  if (visual === 'nav-bad') {
+    const items = ['Главная', 'Продукт', 'Цены', 'Блог', 'О нас', 'Контакты', 'Помощь'];
+    return (
+      <Card>
+        <div className="flex items-center gap-3 overflow-hidden rounded-md border border-border-strong bg-canvas px-3 py-2.5">
+          <span className="h-4 w-4 shrink-0 rounded-sm bg-brand/60" />
+          <div className="flex shrink-0 gap-3 whitespace-nowrap">
+            {items.map((label) => (
+              <span key={label} className="text-caption text-secondary">
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+        <p className="mt-3 text-caption text-tertiary">7 пунктов текстом — на узком экране обрежется</p>
+      </Card>
+    );
+  }
+  if (visual === 'nav-good') {
+    return (
+      <Card>
+        <div className="mx-auto flex w-fit items-center gap-4 rounded-full border border-border-strong bg-canvas px-4 py-2.5 shadow-sm">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="h-5 w-5 rounded-md bg-brand/50" />
+          ))}
+          <span className="rounded-full bg-muted px-2 py-1 text-caption text-tertiary">Ещё</span>
+        </div>
+        <p className="mt-3 text-caption text-tertiary">4 иконки + бургер для остального</p>
+      </Card>
+    );
+  }
   return null;
 }
 

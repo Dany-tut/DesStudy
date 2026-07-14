@@ -7,6 +7,7 @@ import { uxHeuristics } from './ux-heuristics';
 import { userFlows } from './user-flows';
 import { designTokens } from './design-tokens';
 import { componentsVariants } from './components-variants';
+import { navBars } from './nav-bars';
 
 /** Central registry — every built lesson, keyed by slug. */
 export const lessons: Record<string, Lesson> = {
@@ -18,6 +19,7 @@ export const lessons: Record<string, Lesson> = {
   [userFlows.slug]: userFlows,
   [designTokens.slug]: designTokens,
   [componentsVariants.slug]: componentsVariants,
+  [navBars.slug]: navBars,
 };
 
 export {
@@ -29,4 +31,5 @@ export {
   userFlows,
   designTokens,
   componentsVariants,
+  navBars,
 };
