@@ -9,7 +9,28 @@ import type {
   BuildAnswer,
   BarBuildAnswer,
   BarPartKey,
+  AlignAnswer,
+  ContrastAnswer,
+  ScaleRampAnswer,
 } from './types';
+
+/** Interaction states inspected in a `states` exercise (must match StatesLab). */
+export const STATE_KEYS = ['default', 'hover', 'active', 'focus', 'disabled'] as const;
+
+/** WCAG relative luminance for a neutral grey given lightness 0..100. */
+export function luminanceFromLightness(lightness: number): number {
+  const s = Math.round((lightness / 100) * 255) / 255;
+  return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+
+/** WCAG contrast ratio between two neutral greys given their lightness 0..100. */
+export function contrastRatio(textL: number, bgL: number): number {
+  const a = luminanceFromLightness(textL);
+  const b = luminanceFromLightness(bgL);
+  const lighter = Math.max(a, b);
+  const darker = Math.min(a, b);
+  return (lighter + 0.05) / (darker + 0.05);
+}
 
 const PLACEMENT_LABEL: Record<BarBuildAnswer['placement'], string> = {
   static: 'статичный',

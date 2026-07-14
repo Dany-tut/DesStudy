@@ -599,24 +599,24 @@ function BarPreview({
           </span>
         )}
 
+        {/* Leading spacer pushes a right-aligned nav across to the trailing edge */}
+        {parts.nav && navAlign === 'right' && <span className="flex-1" />}
+
         {parts.nav &&
           (variant === 'burger' ? (
-            <>
-              {!navCenter && <span className="flex-1" />}
-              <span
-                className={[
-                  'flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-secondary',
-                  navCenter ? 'mx-auto' : '',
-                ].join(' ')}
-              >
-                <Menu size={16} />
-              </span>
-            </>
+            <span
+              className={[
+                'flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-secondary',
+                navAlign === 'center' ? 'mx-auto' : '',
+              ].join(' ')}
+            >
+              <Menu size={16} />
+            </span>
           ) : (
             <nav
               className={[
                 'flex items-center gap-4',
-                navCenter ? 'flex-1 justify-center' : '',
+                navAlign === 'center' ? 'flex-1 justify-center' : '',
               ].join(' ')}
             >
               {['Главная', 'Курсы', 'О нас'].map((l) => (
@@ -627,8 +627,9 @@ function BarPreview({
             </nav>
           ))}
 
-        {/* Spacer pushes trailing items right when nav isn't centered */}
-        {!(parts.nav && (navCenter || variant === 'burger')) && <span className="flex-1" />}
+        {/* Trailing spacer pushes trailing items right when nav is left-aligned
+            (or absent). Centered nav grows itself; right nav uses the leading one. */}
+        {(!parts.nav || navAlign === 'left') && <span className="flex-1" />}
 
         {parts.search && !mini && (
           <span className="flex items-center gap-2 rounded-full bg-muted px-3 py-2 text-caption text-tertiary">

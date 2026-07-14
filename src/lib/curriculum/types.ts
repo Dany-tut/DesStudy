@@ -184,6 +184,109 @@ export interface BarBuildAnswer {
   navCenter: boolean;
 }
 
+/**
+ * L1: connect each item in the left column to its match in the right column by
+ * tapping. Validated deterministically — correct once every pair is matched.
+ * (Promoted from the design-system draft "MatchPairs".)
+ */
+export interface MatchExercise {
+  id: string;
+  type: 'match';
+  prompt: string;
+  pairs: MatchPair[];
+  explanation: string;
+}
+
+export interface MatchPair {
+  id: string;
+  /** Left-column token/label. */
+  left: string;
+  /** Right-column value/label it maps to. */
+  right: string;
+}
+
+/**
+ * L1: inspect every interaction state (default/hover/active/focus/disabled) of a
+ * live component. An exploration exercise — correct once all states are visited.
+ * (Promoted from the draft "StatesLab".)
+ */
+export interface StatesExercise {
+  id: string;
+  type: 'states';
+  prompt: string;
+  explanation: string;
+}
+
+/**
+ * L1: click the problem area on a mockup. Validated by whether the click lands
+ * inside the target zone (percentages of the mockup box). (Promoted from
+ * the draft "Hotspot".)
+ */
+export interface HotspotExercise {
+  id: string;
+  type: 'hotspot';
+  prompt: string;
+  /** Target zone in % of the mockup: [x0,y0] top-left → [x1,y1] bottom-right. */
+  zone: { x0: number; y0: number; x1: number; y1: number };
+  /** Which mockup scene to render. */
+  scene?: 'tap-target';
+  hint?: string;
+  explanation: string;
+}
+
+/**
+ * L1: drag a card so it snaps to the requested alignment (x: left/center/right,
+ * y: top/middle/bottom) on an 8pt grid. (Promoted from the draft "AlignSnap".)
+ */
+export interface AlignExercise {
+  id: string;
+  type: 'align';
+  prompt: string;
+  target: AlignAnswer;
+  explanation: string;
+}
+
+export interface AlignAnswer {
+  x: 'left' | 'center' | 'right';
+  y: 'top' | 'middle' | 'bottom';
+}
+
+/**
+ * L1: tune text/background lightness until the WCAG contrast ratio reaches the
+ * target (e.g. 4.5 for AA). (Promoted from the draft "ContrastTuner".)
+ */
+export interface ContrastTuneExercise {
+  id: string;
+  type: 'contrast-tune';
+  prompt: string;
+  /** Minimum contrast ratio to reach, e.g. 4.5 (AA) or 7 (AAA). */
+  targetRatio: number;
+  explanation: string;
+}
+
+export interface ContrastAnswer {
+  textL: number;
+  bgL: number;
+}
+
+/**
+ * L1: pick a base body size and a modular ratio so the type scale matches the
+ * target. (Promoted from the draft "ScaleRamp".)
+ */
+export interface ScaleRampExercise {
+  id: string;
+  type: 'scale-ramp';
+  prompt: string;
+  targetBase: number;
+  targetRatio: number;
+  explanation: string;
+}
+
+export interface ScaleRampAnswer {
+  base: number;
+  ratio: number;
+}
+
 export type Exercise =
   | ChooseExercise
   | TuneExercise
@@ -191,7 +294,13 @@ export type Exercise =
   | OrderExercise
   | FigmaLinkExercise
   | FileUploadExercise
-  | BarBuildExercise;
+  | BarBuildExercise
+  | MatchExercise
+  | StatesExercise
+  | HotspotExercise
+  | AlignExercise
+  | ContrastTuneExercise
+  | ScaleRampExercise;
 
 // ─────────────────────────────────────────────────────────────
 // LESSON — follows PRD Chapter 5 lesson structure.
