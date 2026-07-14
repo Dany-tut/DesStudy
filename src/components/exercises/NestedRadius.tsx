@@ -70,6 +70,7 @@ export function NestedRadius({
           step={1}
           unit="px"
           accent={concentric ? 'var(--success-rgb)' : undefined}
+          celebrate={concentric}
           disabled={disabled}
           onChange={onChange}
         />

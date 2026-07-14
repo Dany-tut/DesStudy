@@ -94,6 +94,114 @@ function ValueBubble({ text }: { text: string }) {
   );
 }
 
+/**
+ * A field of glowing dots drifting chaotically inside the filled portion of the
+ * track — a little "charged" celebration when the answer lands. Canvas-drawn
+ * with additive glow, clipped to the filled width (a rounded-cap pill) so the
+ * particles never spill past the fill edge. Honors prefers-reduced-motion.
+ */
+function TrackParticles({ fillW, height }: { fillW: number; height: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fillRef = useRef(fillW);
+  fillRef.current = fillW;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const reduce =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    // Resolve the accent triplet from the inherited `--brand-rgb` custom prop
+    // (the Slider sets it from `accent`); fall back to a green if unset.
+    const cssRgb = getComputedStyle(canvas)
+      .getPropertyValue('--brand-rgb')
+      .trim();
+    const [r, g, b] = (/\d/.test(cssRgb) ? cssRgb : '16 185 129')
+      .split(/[\s,]+/)
+      .map(Number);
+
+    // Each particle drifts with a gentle wander; a per-particle phase drives a
+    // twinkling opacity so the field reads as alive rather than a steady spray.
+    const N = 14;
+    type P = { x: number; y: number; vx: number; vy: number; r: number; ph: number; sp: number };
+    // Deterministic pseudo-random (Math.random is unavailable in some sandboxes;
+    // a cheap LCG seeded off the index keeps particles varied but reproducible).
+    let seed = 1337;
+    const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    const ps: P[] = Array.from({ length: N }, () => ({
+      x: rnd(),
+      y: rnd(),
+      vx: (rnd() - 0.5) * 0.006,
+      vy: (rnd() - 0.5) * 0.02,
+      r: 0.9 + rnd() * 1.6,
+      ph: rnd() * Math.PI * 2,
+      sp: 0.04 + rnd() * 0.06,
+    }));
+
+    let raf = 0;
+    let alive = true;
+
+    const resize = (w: number) => {
+      canvas.width = Math.max(1, Math.round(w * dpr));
+      canvas.height = Math.round(height * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${height}px`;
+    };
+    resize(fillRef.current);
+
+    const draw = () => {
+      const w = fillRef.current;
+      if (Math.abs(w * dpr - canvas.width) > 1) resize(w);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of ps) {
+        if (!reduce) {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.ph += p.sp;
+          // Wrap horizontally, bounce vertically — stays inside the line.
+          if (p.x < 0) p.x += 1;
+          if (p.x > 1) p.x -= 1;
+          if (p.y < 0.1 || p.y > 0.9) p.vy *= -1;
+          p.y = Math.max(0.1, Math.min(0.9, p.y));
+        }
+        const twinkle = reduce ? 0.6 : 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(p.ph));
+        const px = p.x * canvas.width;
+        const py = p.y * canvas.height;
+        const rad = p.r * dpr;
+        const grd = ctx.createRadialGradient(px, py, 0, px, py, rad * 3.5);
+        grd.addColorStop(0, `rgba(${r},${g},${b},${twinkle})`);
+        grd.addColorStop(0.4, `rgba(${r},${g},${b},${twinkle * 0.35})`);
+        grd.addColorStop(1, `rgba(${r},${g},${b},0)`);
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(px, py, rad * 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (alive) raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => {
+      alive = false;
+      cancelAnimationFrame(raf);
+    };
+  }, [height]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2"
+      style={{ borderRadius: 9999, width: fillW, height }}
+      aria-hidden
+    />
+  );
+}
+
 export function Slider({
   value,
   min,
@@ -102,6 +210,7 @@ export function Slider({
   disabled,
   unit = '',
   accent,
+  celebrate,
   onChange,
 }: {
   value: number;
@@ -112,6 +221,8 @@ export function Slider({
   unit?: string;
   /** When set, recolors the track/thumb/bubble. Pass an "R G B" triplet. */
   accent?: string;
+  /** When true, glowing particles drift inside the filled track. */
+  celebrate?: boolean;
   onChange: (value: number) => void;
 }) {
   const [live, setLive] = useState(value);
@@ -218,6 +329,9 @@ export function Slider({
 
       {/* Track + floating bubble */}
       <div ref={trackRef} className="relative">
+        {celebrate && trackW > 0 && (
+          <TrackParticles fillW={(pct / 100) * trackW} height={14} />
+        )}
         <div
           ref={bubbleRef}
           className="pointer-events-none absolute z-10 origin-bottom will-change-transform"
