@@ -10,7 +10,7 @@ export default async function DashboardPage() {
 
   if (!learner) {
     return (
-      <main className="mx-auto max-w-[720px] px-6 py-16">
+      <main className="mx-auto max-w-[1200px] px-8 py-16">
         <h1 className="text-title1 font-bold text-primary">Дашборд</h1>
         <p className="mt-3 text-body text-secondary">
           Пройди первое упражнение, и здесь появится твой прогресс.
@@ -33,7 +33,7 @@ export default async function DashboardPage() {
   const strong = [...ranked].reverse().slice(0, 3);
 
   return (
-    <main className="mx-auto max-w-[720px] px-6 py-16">
+    <main className="mx-auto max-w-[1200px] px-8 py-16">
       <h1 className="text-title1 font-bold text-primary">Дашборд</h1>
       <p className="mt-2 text-body text-secondary">Твой измеримый прогресс.</p>
 

@@ -33,7 +33,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-[640px] px-6 py-12 md:py-16">
+    <main className="mx-auto max-w-[1200px] px-8 py-12 md:py-16">
       <h1 className="text-title1 font-bold text-primary">Настройки</h1>
       <p className="mt-2 text-body text-secondary">
         Всё применяется сразу и сохраняется на этом устройстве.

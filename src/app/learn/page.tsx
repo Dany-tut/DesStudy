@@ -47,7 +47,7 @@ export default async function LearnPage() {
   const authoredLessons = await getAuthoredEntries();
 
   return (
-    <main className="mx-auto max-w-[900px] px-6 py-10">
+    <main className="mx-auto max-w-[1200px] px-8 py-10">
       {/* Header — Kodree-style: title + search + streak */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

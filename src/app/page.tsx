@@ -20,7 +20,7 @@ export default async function HomePage() {
     ) ?? PATHS[0].lessons[0];
 
   return (
-    <main className="mx-auto max-w-[900px] px-6 py-12">
+    <main className="mx-auto max-w-[1200px] px-8 py-12">
       {/* Hero */}
       <section className="mb-10">
         <h1 className="text-title1 font-bold text-primary">

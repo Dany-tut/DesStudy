@@ -89,6 +89,25 @@ export function BarBuilder() {
   // Placement rail: collapsed to a row of icon squares; the active one expands
   // into a labelled pill on top of its neighbours. Click again to collapse.
   const [railOpen, setRailOpen] = useState(false);
+  const [railClosing, setRailClosing] = useState(false);
+  const railTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Play the reverse morph, then unmount the pill once it finishes.
+  const closeRail = () => {
+    if (railClosing) return;
+    setRailClosing(true);
+    railTimer.current = setTimeout(() => {
+      setRailOpen(false);
+      setRailClosing(false);
+    }, 260);
+  };
+  // Open (or switch to) a placement, cancelling any in-flight close.
+  const openRail = (key: Placement) => {
+    if (railTimer.current) clearTimeout(railTimer.current);
+    setRailClosing(false);
+    setPlacement(key);
+    setRailOpen(true);
+  };
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
@@ -202,11 +221,8 @@ export function BarBuilder() {
                     type="button"
                     aria-label={label}
                     onClick={() => {
-                      if (active && railOpen) setRailOpen(false);
-                      else {
-                        setPlacement(key);
-                        setRailOpen(true);
-                      }
+                      if (active && railOpen && !railClosing) closeRail();
+                      else openRail(key);
                     }}
                     className={[
                       'flex h-11 w-11 items-center justify-center rounded-xl border transition-fast',
@@ -236,7 +252,11 @@ export function BarBuilder() {
                 const text = (
                   <span
                     className="flex flex-col overflow-hidden whitespace-nowrap px-2 text-left"
-                    style={{ animation: 'barrail-text 0.28s ease' }}
+                    style={{
+                      animation: railClosing
+                        ? 'barrail-text-out 0.26s ease forwards'
+                        : 'barrail-text 0.28s ease',
+                    }}
                   >
                     <span className="text-callout font-medium text-primary">{p.label}</span>
                     <span className="text-caption text-tertiary">{p.hint}</span>
@@ -245,7 +265,7 @@ export function BarBuilder() {
                 return (
                   <button
                     type="button"
-                    onClick={() => setRailOpen(false)}
+                    onClick={closeRail}
                     style={anchorRight ? { right: (5 - i) * 50 } : { left: i * 50 }}
                     className="absolute top-0 z-20 flex h-11 items-center rounded-xl border border-brand bg-elevated px-0.5 shadow-lg"
                   >
@@ -420,6 +440,10 @@ export function BarBuilder() {
         @keyframes barrail-text {
           from { max-width: 0; opacity: 0; }
           to { max-width: 16rem; opacity: 1; }
+        }
+        @keyframes barrail-text-out {
+          from { max-width: 16rem; opacity: 1; }
+          to { max-width: 0; opacity: 0; }
         }
       `}</style>
     </div>

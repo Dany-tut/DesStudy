@@ -81,7 +81,7 @@ export default function DesignSystemPage() {
   };
 
   return (
-    <main className="mx-auto max-w-[960px] px-6 py-12">
+    <main className="mx-auto max-w-[1200px] px-8 py-12">
       <header className="mb-16 flex items-start justify-between">
         <div>
           <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-footnote text-secondary">

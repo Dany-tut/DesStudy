@@ -18,7 +18,7 @@ export default async function AdminPage() {
   });
 
   return (
-    <main className="mx-auto max-w-[760px] px-6 py-12">
+    <main className="mx-auto max-w-[1200px] px-8 py-12">
       <div className="mb-8 flex items-center gap-2 rounded-lg bg-warning/10 px-4 py-3 text-footnote text-warning">
         <ShieldAlert size={16} className="shrink-0" />
         Без защиты входа — временно, пока препод один. Не делись этой ссылкой.
