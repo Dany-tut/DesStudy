@@ -18,6 +18,8 @@ import { gridsComposition } from './grids-composition';
 import { figmaComponentsSlots } from './figma-components-slots';
 import { aiDesignTools } from './ai-design-tools';
 import { briefResearch } from './brief-research';
+import { researchMethods } from './research-methods';
+import { insightsToConcept } from './insights-to-concept';
 import { paletteElements } from './palette-elements';
 import { responsiveLayout } from './responsive-layout';
 import { microcopy } from './microcopy';
@@ -45,6 +47,8 @@ export const lessons: Record<string, Lesson> = {
   [forms.slug]: forms,
   [emptyStates.slug]: emptyStates,
   [briefResearch.slug]: briefResearch,
+  [researchMethods.slug]: researchMethods,
+  [insightsToConcept.slug]: insightsToConcept,
   [paletteElements.slug]: paletteElements,
 };
 
@@ -68,6 +72,8 @@ export {
   figmaComponentsSlots,
   aiDesignTools,
   briefResearch,
+  researchMethods,
+  insightsToConcept,
   paletteElements,
   responsiveLayout,
   microcopy,

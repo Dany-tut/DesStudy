@@ -18,6 +18,8 @@ import {
   figmaComponentsSlots,
   aiDesignTools,
   briefResearch,
+  researchMethods,
+  insightsToConcept,
   paletteElements,
   responsiveLayout,
   microcopy,
@@ -123,6 +125,8 @@ export const PATHS: LearningPath[] = [
     emoji: '🗺️',
     lessons: [
       entry(briefResearch, { emoji: '📋', popular: true }),
+      entry(researchMethods, { emoji: '🔬' }),
+      entry(insightsToConcept, { emoji: '💡' }),
       entry(paletteElements, { emoji: '🎨' }),
     ],
   },
