@@ -75,6 +75,20 @@ export const designTokens: Lesson = {
       explanation:
         '`radius.lg = 14px` — стандартный узел шкалы для крупных карточек. Токен даёт этому конкретному числу имя и место в системе, а не оставляет его «на глаз».',
     },
+    {
+      id: 'dt-match-1',
+      type: 'match',
+      prompt: 'Соедини каждый токен с его значением из шкалы.',
+      pairs: [
+        { id: 'space2', left: 'space.2', right: '8px' },
+        { id: 'space4', left: 'space.4', right: '16px' },
+        { id: 'space8', left: 'space.8', right: '32px' },
+        { id: 'radiusLg', left: 'radius.lg', right: '14px' },
+        { id: 'radiusFull', left: 'radius.full', right: '9999px' },
+      ],
+      explanation:
+        'Значения токенов лежат на своих шкалах: space кратен базовому шагу (8·n), radius.full = 9999px даёт полностью круглую форму. Держа значения в голове как имена, а не числа, ты собираешь интерфейс из системы, а не из случайных величин.',
+    },
   ],
   masteryChallenge: {
     id: 'dt-choose-3',
