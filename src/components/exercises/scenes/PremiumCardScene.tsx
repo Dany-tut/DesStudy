@@ -230,7 +230,7 @@ export function PremiumCardScene({
               style={{ background: APP.surface }}
             >
               <span className="text-[11px] font-medium leading-tight">{text}</span>
-              {(!broken || i === 0) && (
+              {!broken && (
                 <span className="text-[10px]" style={{ color: APP.textDim }}>
                   {pct}
                 </span>

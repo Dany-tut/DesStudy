@@ -10,7 +10,7 @@ import {
   roleById,
   defectById,
   gradeRole,
-  gradeDefect,
+  gradeDefects,
   worseVerdict,
   correctFixId,
   defectiveZones,
@@ -78,7 +78,8 @@ export function ScreenCritiqueExercise({
 
   const solved = critiqueSolved(exercise, answer);
   const rebuilt = rebuiltCount(exercise, answer);
-  const diagnosedCount = new Set([...Object.keys(answer.roles), ...Object.keys(answer.defects)]).size;
+  const defectedIds = Object.keys(answer.defects).filter((id) => (answer.defects[id]?.length ?? 0) > 0);
+  const diagnosedCount = new Set([...Object.keys(answer.roles), ...defectedIds]).size;
 
   // Per-zone verdicts, computed only after "Проверить".
   const verdicts = useMemo(() => {
@@ -86,7 +87,7 @@ export function ScreenCritiqueExercise({
     const out: Record<string, { role?: Verdict; defect?: Verdict; worst?: Verdict }> = {};
     zones.forEach((z) => {
       const role = answer.roles[z.id] ? gradeRole(z, answer.roles[z.id]) : undefined;
-      const defect = answer.defects[z.id] ? gradeDefect(z, answer.defects[z.id]) : undefined;
+      const defect = gradeDefects(z, answer.defects[z.id] ?? []);
       if (role || defect) out[z.id] = { role, defect, worst: worseVerdict(role, defect) };
     });
     return out;
@@ -100,8 +101,22 @@ export function ScreenCritiqueExercise({
 
   const setRole = (role: CritiqueRoleId) =>
     selected && setAnswer((a) => ({ ...a, roles: { ...a.roles, [selected]: role } }));
-  const setDefect = (defect: CritiqueDefectId) =>
-    selected && setAnswer((a) => ({ ...a, defects: { ...a.defects, [selected]: defect } }));
+  // Toggle a defect in/out of the zone's multi-select. "Здесь всё чисто" (none)
+  // is exclusive — picking it clears the rest, and picking any real defect clears it.
+  const toggleDefect = (defect: CritiqueDefectId) =>
+    selected &&
+    setAnswer((a) => {
+      const cur = a.defects[selected] ?? [];
+      let next: CritiqueDefectId[];
+      if (defect === 'none') {
+        next = cur.includes('none') ? [] : ['none'];
+      } else if (cur.includes(defect)) {
+        next = cur.filter((d) => d !== defect);
+      } else {
+        next = [...cur.filter((d) => d !== 'none'), defect];
+      }
+      return { ...a, defects: { ...a.defects, [selected]: next } };
+    });
   const setFix = (fixId: string) =>
     selected && setAnswer((a) => ({ ...a, fixes: { ...a.fixes, [selected]: fixId } }));
   const setNote = (note: string) =>
@@ -240,21 +255,33 @@ export function ScreenCritiqueExercise({
 
                   {/* Defect */}
                   <div className="mt-4 border-t border-border pt-4">
-                    <p className="mb-3 text-caption text-tertiary">Что здесь не так?</p>
+                    <p className="mb-3 text-caption text-tertiary">
+                      Что здесь не так? <span className="text-tertiary/70">— можно выбрать несколько</span>
+                    </p>
                     <div className="grid grid-cols-2 gap-2">
                       {CRITIQUE_DEFECTS.map((d) => {
-                        const active = answer.defects[sel.id] === d.id;
+                        const active = (answer.defects[sel.id] ?? []).includes(d.id);
                         return (
                           <button
                             key={d.id}
                             type="button"
-                            onClick={() => setDefect(d.id)}
+                            onClick={() => toggleDefect(d.id)}
                             title={d.hint}
+                            aria-pressed={active}
                             className={[
-                              'rounded-lg border px-3 py-2 text-left text-footnote font-medium transition-fast',
+                              'flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-footnote font-medium transition-fast',
                               active ? 'border-brand bg-brand/10 text-brand' : 'border-border bg-surface text-primary hover:border-brand/40',
                             ].join(' ')}
                           >
+                            <span
+                              className={[
+                                'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-fast',
+                                active ? 'border-brand bg-brand text-on-brand' : 'border-border',
+                              ].join(' ')}
+                              aria-hidden
+                            >
+                              {active && <Check size={11} strokeWidth={3} />}
+                            </span>
                             {d.label}
                           </button>
                         );
@@ -330,10 +357,13 @@ export function ScreenCritiqueExercise({
             {diagnosedCount > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {zones
-                  .filter((z) => answer.roles[z.id] || answer.defects[z.id])
+                  .filter((z) => answer.roles[z.id] || (answer.defects[z.id]?.length ?? 0) > 0)
                   .map((z) => {
                     const role = roleById(answer.roles[z.id]);
-                    const defect = defectById(answer.defects[z.id]);
+                    const defects = (answer.defects[z.id] ?? [])
+                      .map((id) => defectById(id)?.label)
+                      .filter(Boolean)
+                      .join(', ');
                     const done = fixedSet.has(z.id);
                     return (
                       <button
@@ -346,7 +376,7 @@ export function ScreenCritiqueExercise({
                         <span className="font-medium text-primary">{z.label}</span>
                         <span className="text-tertiary">
                           {role ? role.label : '—'}
-                          {defect ? ` · ${defect.label}` : ''}
+                          {defects ? ` · ${defects}` : ''}
                         </span>
                       </button>
                     );
@@ -406,7 +436,11 @@ export function ScreenCritiqueExercise({
                   const ui = VERDICT_UI[worst];
                   const Icon = ui.icon;
                   const role = roleById(answer.roles[z.id]);
-                  const defect = defectById(answer.defects[z.id]);
+                  const pickedDefects = answer.defects[z.id] ?? [];
+                  const defectLabels = pickedDefects
+                    .map((id) => defectById(id)?.label)
+                    .filter(Boolean)
+                    .join(', ');
                   const correctRole = roleById(z.role)!;
                   const correctDefect = defectById(z.defect)!;
                   const fixDone = fixedSet.has(z.id);
@@ -437,11 +471,11 @@ export function ScreenCritiqueExercise({
                         </div>
                       )}
 
-                      {defect && vd.defect && (
+                      {defectLabels && vd.defect && (
                         <div className="mb-1">
                           <p className="text-caption text-tertiary">
                             <span className={['font-medium', VERDICT_UI[vd.defect].text].join(' ')}>{VERDICT_UI[vd.defect].label}</span>{' '}
-                            · дефект: <span className="text-secondary">{defect.label}</span>
+                            · {pickedDefects.length > 1 ? 'дефекты' : 'дефект'}: <span className="text-secondary">{defectLabels}</span>
                             {vd.defect !== 'right' && (
                               <>
                                 {' '}· на деле: <span className="text-secondary">{correctDefect.label}</span>

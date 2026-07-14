@@ -1,4 +1,5 @@
 import type { Lesson } from '@/lib/curriculum/types';
+import { premiumCardCritique } from '@/lib/curriculum/screenCritique';
 
 /**
  * UX Foundations — Nielsen's heuristics, part 1 of 4.
@@ -30,6 +31,7 @@ export const uxHeuristics: Lesson = {
     { kind: 'good', caption: 'Виден статус: «Сохранение…»', visual: 'status-good' },
   ],
   exercises: [
+    premiumCardCritique('ux-screen-critique-1'),
     {
       id: 'ux-fb-choose-1',
       type: 'choose',

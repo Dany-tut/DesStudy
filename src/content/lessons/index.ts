@@ -15,6 +15,7 @@ import { informationArchitecture } from './information-architecture';
 import { designTokens } from './design-tokens';
 import { componentsVariants } from './components-variants';
 import { navBars } from './nav-bars';
+import { motionEasing } from './motion-easing';
 import { forms } from './forms';
 import { formsValidation } from './forms-validation';
 import { formsStructure } from './forms-structure';
@@ -42,6 +43,7 @@ export const lessons: Record<string, Lesson> = {
   [gridsComposition.slug]: gridsComposition,
   [responsiveLayout.slug]: responsiveLayout,
   [navBars.slug]: navBars,
+  [motionEasing.slug]: motionEasing,
   [uxHeuristics.slug]: uxHeuristics,
   [uxHeuristicsControl.slug]: uxHeuristicsControl,
   [uxHeuristicsClarity.slug]: uxHeuristicsClarity,
@@ -81,6 +83,7 @@ export {
   designTokens,
   componentsVariants,
   navBars,
+  motionEasing,
   forms,
   formsValidation,
   formsStructure,

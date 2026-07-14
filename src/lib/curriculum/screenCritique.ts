@@ -61,6 +61,19 @@ export function gradeDefect(zone: CritiqueZone, picked: CritiqueDefectId): Verdi
   return 'wrong';
 }
 
+/**
+ * Grade a multi-select of defects for a zone: the learner may name several
+ * problems. We reward the best reading present — naming the true defect makes
+ * the zone "right" even alongside extra guesses; a defensible-but-not-primary
+ * pick is "debatable"; only an all-miss set is "wrong".
+ */
+export function gradeDefects(zone: CritiqueZone, picked: CritiqueDefectId[]): Verdict | undefined {
+  if (!picked || picked.length === 0) return undefined;
+  return picked
+    .map((id) => gradeDefect(zone, id))
+    .reduce((best, v) => (VERDICT_RANK[v] < VERDICT_RANK[best] ? v : best), 'wrong' as Verdict);
+}
+
 const VERDICT_RANK: Record<Verdict, number> = { right: 0, debatable: 1, wrong: 2 };
 /** The stronger warning of two verdicts (drives a zone's outline colour). */
 export function worseVerdict(a?: Verdict, b?: Verdict): Verdict | undefined {
@@ -80,8 +93,8 @@ export const correctFixId = (zone: CritiqueZone) => zone.fixes?.find((f) => f.co
 export interface CritiqueAnswer {
   /** zoneId → picked role. */
   roles: Record<string, CritiqueRoleId>;
-  /** zoneId → picked defect. */
-  defects: Record<string, CritiqueDefectId>;
+  /** zoneId → picked defects (multi-select). */
+  defects: Record<string, CritiqueDefectId[]>;
   /** zoneId → picked fix option id (reconstruction). */
   fixes: Record<string, string>;
   /** zoneId → optional free-text note (AI-coached). */

@@ -383,5 +383,21 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
           : `Исправлено ${solved} из ${total} — пройди по оставшимся нарушениям и выбери правильный вариант.`,
       };
     }
+    case 'screen-critique': {
+      // Self-contained player grades + records internally; this branch keeps the
+      // validator exhaustive and gives a sane deterministic verdict if ever
+      // called directly (e.g. from the admin publish gate).
+      const a = ((answer as CritiqueAnswer) ?? emptyCritiqueAnswer());
+      const correct = critiqueSolved(exercise, a);
+      const total = defectiveZones(exercise).length;
+      const rebuilt = rebuiltCount(exercise, a);
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : `Пересобрано ${rebuilt} из ${total} зон — разметь роли и выбери верные исправления.`,
+      };
+    }
   }
 }

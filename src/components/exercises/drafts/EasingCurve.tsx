@@ -17,7 +17,7 @@ const TOL = 0.12; // per-axis tolerance on control-point match
 
 type Pt = { x: number; y: number }; // 0..1 in easing space (y can overshoot a bit)
 
-type Target = { name: string; p1: Pt; p2: Pt; note: string };
+type Target = { name: string; p1: Pt; p2: Pt; note?: string };
 
 const TARGETS: Target[] = [
   { name: 'ease-out', p1: { x: 0, y: 0 }, p2: { x: 0.58, y: 1 }, note: 'быстрый старт, мягкая посадка — для входящих элементов' },
