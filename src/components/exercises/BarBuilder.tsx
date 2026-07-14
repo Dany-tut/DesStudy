@@ -379,15 +379,20 @@ function BarPreview({
     >
       <div
         className={[
-          'flex items-center gap-3 bg-elevated px-4',
-          floating ? 'rounded-full border border-border shadow-lg' : 'border-b border-border',
+          'flex items-center gap-3 bg-elevated',
+          // Floating pill: equal padding on every side so the leading logo and
+          // trailing CTA sit with a strict 1:1 inset (the tallest control — the
+          // CTA — drives the height, so its top/bottom gap equals left/right).
+          floating
+            ? `rounded-full border border-border shadow-lg ${mini ? 'p-2' : 'p-2.5'}`
+            : 'border-b border-border px-4',
         ].join(' ')}
-        style={{ height: mini ? 44 : 56 }}
+        style={floating ? undefined : { height: mini ? 44 : 56 }}
       >
         {parts.logo && (
           <span className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand text-on-brand">
-              <GraduationCap size={15} />
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand text-on-brand">
+              <GraduationCap size={16} />
             </span>
             {!mini && <span className="text-callout font-semibold text-primary">DesStudy</span>}
           </span>
@@ -431,7 +436,7 @@ function BarPreview({
         {parts.cta && (
           <button
             type="button"
-            className="rounded-full bg-brand px-4 py-2 text-footnote font-medium text-on-brand"
+            className="flex h-9 items-center rounded-full bg-brand px-4 text-footnote font-medium text-on-brand"
           >
             Начать
           </button>
@@ -439,11 +444,11 @@ function BarPreview({
         {parts.avatar && (
           <span className="flex items-center gap-2">
             {!mini && (
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-tertiary">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-tertiary">
                 <Bell size={15} />
               </span>
             )}
-            <span className="h-8 w-8 rounded-full bg-brand/30" />
+            <span className="h-9 w-9 rounded-full bg-brand/30" />
           </span>
         )}
       </div>
