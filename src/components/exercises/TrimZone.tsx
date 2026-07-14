@@ -34,7 +34,7 @@ export function TrimZone({
 
   return (
     <div>
-      <div className="rounded-lg border border-border bg-canvas p-6">
+      <div className="rounded-lg border border-border bg-canvas px-4 py-3">
         <div className="mx-auto w-fit">
           {/* Top extra-space band */}
           <div
@@ -47,8 +47,8 @@ export function TrimZone({
             className="flex items-center justify-center overflow-hidden rounded-md bg-brand px-6 text-on-brand"
             style={{
               // Optical box: shrinks vertically as we trim, clips on overshoot.
-              paddingTop: 12 - Math.min(12, overshoot),
-              paddingBottom: 12 - Math.min(12, overshoot),
+              paddingTop: 10 - Math.min(10, overshoot),
+              paddingBottom: 10 - Math.min(10, overshoot),
             }}
           >
             <span className="text-title3 font-semibold leading-none">{label}</span>
@@ -61,16 +61,16 @@ export function TrimZone({
           />
         </div>
 
-        <p className="mt-4 text-center text-caption text-tertiary">
+        <p className="mt-2 text-center text-caption text-tertiary">
           {band > 0
-            ? 'Розовые полосы — лишнее поле шрифта (trim zone)'
+            ? 'Розовые полосы — лишнее поле шрифта'
             : overshoot > 0
               ? 'Перебор — срезаются сами буквы'
-              : 'Поле срезано ровно — текст оптически по центру'}
+              : 'Поле срезано ровно — текст по центру'}
         </p>
       </div>
 
-      <div className="mt-5">
+      <div className="mt-3">
         <Slider
           value={value}
           min={0}
