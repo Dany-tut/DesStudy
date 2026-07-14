@@ -10,6 +10,11 @@ import { componentsVariants } from './components-variants';
 import { navBars } from './nav-bars';
 import { forms } from './forms';
 import { emptyStates } from './empty-states';
+import { microTypography } from './micro-typography';
+import { gridsComposition } from './grids-composition';
+import { figmaComponentsSlots } from './figma-components-slots';
+import { aiDesignTools } from './ai-design-tools';
+import { briefResearch } from './brief-research';
 
 /** Central registry — every built lesson, keyed by slug. */
 export const lessons: Record<string, Lesson> = {
@@ -17,13 +22,18 @@ export const lessons: Record<string, Lesson> = {
   [radiusScale.slug]: radiusScale,
   [typeHierarchy.slug]: typeHierarchy,
   [colorContrast.slug]: colorContrast,
+  [microTypography.slug]: microTypography,
+  [gridsComposition.slug]: gridsComposition,
+  [navBars.slug]: navBars,
   [uxHeuristics.slug]: uxHeuristics,
   [userFlows.slug]: userFlows,
   [designTokens.slug]: designTokens,
   [componentsVariants.slug]: componentsVariants,
-  [navBars.slug]: navBars,
+  [figmaComponentsSlots.slug]: figmaComponentsSlots,
+  [aiDesignTools.slug]: aiDesignTools,
   [forms.slug]: forms,
   [emptyStates.slug]: emptyStates,
+  [briefResearch.slug]: briefResearch,
 };
 
 export {
@@ -38,4 +48,9 @@ export {
   navBars,
   forms,
   emptyStates,
+  microTypography,
+  gridsComposition,
+  figmaComponentsSlots,
+  aiDesignTools,
+  briefResearch,
 };

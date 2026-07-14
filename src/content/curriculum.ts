@@ -10,6 +10,11 @@ import {
   navBars,
   forms,
   emptyStates,
+  microTypography,
+  gridsComposition,
+  figmaComponentsSlots,
+  aiDesignTools,
+  briefResearch,
 } from './lessons';
 import type { Lesson } from '@/lib/curriculum/types';
 
@@ -71,6 +76,8 @@ export const PATHS: LearningPath[] = [
       entry(radiusScale, { emoji: '⬜' }),
       entry(typeHierarchy, { emoji: '🔤', popular: true }),
       entry(colorContrast, { emoji: '🎨' }),
+      entry(microTypography, { emoji: '✍️' }),
+      entry(gridsComposition, { emoji: '🔲', popular: true }),
       entry(navBars, { emoji: '🧱' }),
     ],
   },
@@ -94,6 +101,17 @@ export const PATHS: LearningPath[] = [
     lessons: [
       entry(designTokens, { emoji: '🎛️' }),
       entry(componentsVariants, { emoji: '🧩' }),
+      entry(figmaComponentsSlots, { emoji: '🧬', popular: true }),
+      entry(aiDesignTools, { emoji: '🤖' }),
+    ],
+  },
+  {
+    id: 'design-process',
+    title: 'Design Process',
+    description: 'От брифа и исследования до концепции и вайрфреймов — как рождается проект.',
+    emoji: '🗺️',
+    lessons: [
+      entry(briefResearch, { emoji: '📋', popular: true }),
     ],
   },
 ];
