@@ -103,12 +103,6 @@ const INITIAL_FIXES: Record<DefectKey, string> = DEFECTS.reduce(
   {} as Record<DefectKey, string>,
 );
 
-/** The fully-correct selection — used to render the reference screen. */
-const SOLVED: Record<DefectKey, string> = DEFECTS.reduce(
-  (acc, d) => ({ ...acc, [d.key]: d.options.find((o) => o.correct)!.id }),
-  {} as Record<DefectKey, string>,
-);
-
 const CATEGORIES = ['Class', 'Exam', 'Lab', 'Assignment'];
 
 /** The phone mockup, rendered entirely from a fixes map. */
@@ -250,7 +244,6 @@ export function FixTheScreen() {
   const [active, setActive] = useState<DefectKey>(DEFECTS[0].key);
   // Wrong-pick feedback per defect (cleared when corrected).
   const [wrong, setWrong] = useState<Partial<Record<DefectKey, string>>>({});
-  const [showFinal, setShowFinal] = useState(false);
 
   const fixedCount = useMemo(
     () => DEFECTS.filter((d) => d.options.find((o) => o.id === fixes[d.key])?.correct).length,
@@ -271,7 +264,6 @@ export function FixTheScreen() {
   function reset() {
     setFixes(INITIAL_FIXES);
     setWrong({});
-    setShowFinal(false);
     setActive(DEFECTS[0].key);
   }
 
@@ -284,7 +276,8 @@ export function FixTheScreen() {
         <div>
           <h3 className="text-callout font-semibold text-primary">Почини экран</h3>
           <p className="mt-1 text-footnote text-secondary">
-            Слева — сломанный макет. Пройди по нарушениям и выбери правильное исправление. Справа — эталон.
+            Слева — как было (сломанный макет). Проходи по нарушениям и выбирай правильное
+            исправление — по центру «твой экран» меняется на глазах.
           </p>
         </div>
         <span
@@ -298,23 +291,17 @@ export function FixTheScreen() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr_1.1fr]">
-        {/* LEFT — broken (being fixed) */}
+        {/* LEFT — the original broken screen, frozen as the "before" reference. */}
         <div className="flex flex-col gap-2">
-          <span className="text-caption font-medium text-tertiary">
-            {showFinal ? 'До' : 'Твой экран'}
-          </span>
-          <PhonePreview
-            fixes={showFinal ? INITIAL_FIXES : fixes}
-            highlight={showFinal ? null : active}
-          />
+          <span className="text-caption font-medium text-tertiary">Было</span>
+          <PhonePreview fixes={INITIAL_FIXES} highlight={allFixed ? null : active} faded />
         </div>
 
-        {/* MIDDLE — reference / after */}
+        {/* MIDDLE — the learner's screen: starts identical (broken) and updates
+            live as each fix is applied. */}
         <div className="flex flex-col gap-2">
-          <span className="text-caption font-medium text-tertiary">
-            {showFinal ? 'После' : 'Эталон'}
-          </span>
-          <PhonePreview fixes={SOLVED} faded={!showFinal} />
+          <span className="text-caption font-medium text-tertiary">Твой экран</span>
+          <PhonePreview fixes={fixes} highlight={allFixed ? null : active} />
         </div>
 
         {/* RIGHT — defect list + options */}
@@ -398,16 +385,10 @@ export function FixTheScreen() {
             <div className="rounded-lg border border-success/40 bg-success/10 p-4">
               <p className="text-footnote font-semibold text-success">Все {DEFECTS.length} нарушений исправлены ✓</p>
               <p className="mt-1 text-caption text-secondary">
-                Сравни «до» и «после» — увидишь, как мелочи складываются в аккуратный экран.
+                Сравни «было» слева и «твой экран» — увидишь, как мелочи складываются в аккуратный
+                экран.
               </p>
               <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowFinal((v) => !v)}
-                  className="rounded-md bg-brand px-3 py-1.5 text-caption font-semibold text-on-brand"
-                >
-                  {showFinal ? 'Скрыть до/после' : 'Показать до/после'}
-                </button>
                 <button
                   type="button"
                   onClick={reset}
