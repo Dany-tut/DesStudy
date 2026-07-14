@@ -52,7 +52,7 @@ const config: Config = {
         surface: 'var(--bg-surface)',
         elevated: 'var(--bg-elevated)',
         muted: 'rgb(var(--bg-muted-rgb) / <alpha-value>)',
-        border: 'var(--border)',
+        border: 'rgb(var(--border-rgb) / <alpha-value>)',
         'border-strong': 'var(--border-strong)',
         hover: 'var(--bg-hover)',
         pressed: 'var(--bg-pressed)',

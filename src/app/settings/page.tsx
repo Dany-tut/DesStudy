@@ -42,10 +42,9 @@ export default function SettingsPage() {
       <div className="mt-10 flex flex-col gap-8" aria-busy={!ready}>
         {/* Appearance */}
         <Section icon={<Palette size={18} />} title="Оформление">
-          <Row label="Тема" hint="«Система» следует за настройкой ОС.">
+          <Row label="Тема" hint="Выберите оформление интерфейса.">
             <SegmentedControl<ThemePref>
               options={[
-                { value: 'system', label: 'Система' },
                 { value: 'light', label: 'Светлая' },
                 { value: 'dark', label: 'Тёмная' },
               ]}
@@ -93,7 +92,7 @@ function Section({
         <span className="text-brand">{icon}</span>
         {title}
       </div>
-      <div className="flex flex-col divide-y divide-border">{children}</div>
+      <div className="flex flex-col divide-y divide-border-strong">{children}</div>
     </section>
   );
 }

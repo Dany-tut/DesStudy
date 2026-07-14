@@ -8,7 +8,7 @@
  * the same values before React hydrates (see APPLY_SNIPPET).
  */
 
-export type ThemePref = 'system' | 'light' | 'dark';
+export type ThemePref = 'light' | 'dark';
 
 export interface Settings {
   theme: ThemePref;
@@ -17,7 +17,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  theme: 'system',
+  theme: 'light',
   reduceMotion: false,
   highContrast: false,
 };
@@ -29,7 +29,10 @@ export function loadSettings(): Settings {
   try {
     const raw = window.localStorage.getItem(SETTINGS_KEY);
     if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
+    const stored = { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
+    // Migrate the retired 'system' preference to an explicit theme.
+    if ((stored.theme as string) === 'system') stored.theme = DEFAULT_SETTINGS.theme;
+    return stored;
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -48,8 +51,7 @@ export function saveSettings(settings: Settings) {
 export function applySettings(settings: Settings) {
   if (typeof document === 'undefined') return;
   const el = document.documentElement;
-  if (settings.theme === 'system') delete el.dataset.theme;
-  else el.dataset.theme = settings.theme;
+  el.dataset.theme = settings.theme;
   if (settings.reduceMotion) el.dataset.motion = 'reduced';
   else delete el.dataset.motion;
   if (settings.highContrast) el.dataset.contrast = 'high';
@@ -61,4 +63,4 @@ export function applySettings(settings: Settings) {
  * with no flash of the wrong theme. Mirrors applySettings() but standalone —
  * it can't import at that point in the document lifecycle.
  */
-export const APPLY_SNIPPET = `(function(){try{var s=JSON.parse(localStorage.getItem('${SETTINGS_KEY}')||'{}');var e=document.documentElement;if(s.theme&&s.theme!=='system')e.dataset.theme=s.theme;if(s.reduceMotion)e.dataset.motion='reduced';if(s.highContrast)e.dataset.contrast='high';}catch(_){}})();`;
+export const APPLY_SNIPPET = `(function(){try{var s=JSON.parse(localStorage.getItem('${SETTINGS_KEY}')||'{}');var e=document.documentElement;e.dataset.theme=(s.theme==='dark'?'dark':'light');if(s.reduceMotion)e.dataset.motion='reduced';if(s.highContrast)e.dataset.contrast='high';}catch(_){}})();`;
