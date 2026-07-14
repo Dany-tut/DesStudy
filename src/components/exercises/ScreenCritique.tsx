@@ -138,6 +138,80 @@ function grade(region: Region, role: RoleId): Verdict {
   return 'wrong';
 }
 
+// ── Defect layer: on the intentionally-broken screen the learner also names
+// WHAT is wrong in each region, not just its role. ────────────────────────
+type DefectId = 'hierarchy' | 'radius' | 'contrast' | 'alignment' | 'consistency' | 'none';
+
+interface Defect {
+  id: DefectId;
+  label: string;
+  hint: string;
+}
+
+const DEFECTS: Defect[] = [
+  { id: 'hierarchy', label: 'Слабая иерархия', hint: 'главное не выделено — не читается, что важнее' },
+  { id: 'radius', label: 'Разнобой скруглений', hint: 'у соседних элементов разные радиусы' },
+  { id: 'contrast', label: 'Слабый контраст', hint: 'текст сливается с фоном, плохо читается' },
+  { id: 'alignment', label: 'Сбито выравнивание', hint: 'элементы не на одной линии / не по полям' },
+  { id: 'consistency', label: 'Рассогласованность', hint: 'однотипные блоки оформлены по-разному' },
+  { id: 'none', label: 'Здесь всё чисто', hint: 'в этой зоне нарушения нет' },
+];
+
+interface DefectTruth {
+  correct: DefectId;
+  debatable: DefectId[];
+  note: string;
+}
+
+/** Which defect was deliberately injected into each region (see CritiqueScreen). */
+const DEFECT_TRUTH: Record<Region, DefectTruth> = {
+  topbar: {
+    correct: 'alignment',
+    debatable: [],
+    note: 'Иконка настроек съехала вниз — сбита оптическая линия с «назад».',
+  },
+  header: {
+    correct: 'hierarchy',
+    debatable: ['alignment'],
+    note: 'Баланс — смысл экрана — сделан мелким и тусклым: акцент не читается. Он ещё и ушёл от правого поля, но первично сломана иерархия.',
+  },
+  chips: {
+    correct: 'radius',
+    debatable: [],
+    note: 'Карта почти прямоугольная рядом с «плюсом»-пилюлей — скругления вразнобой.',
+  },
+  actions: {
+    correct: 'radius',
+    debatable: ['alignment'],
+    note: 'Три плитки с разными скруглениями и неровным шагом — ряд не читается как система.',
+  },
+  promo: {
+    correct: 'contrast',
+    debatable: [],
+    note: 'Заголовок оффера почти сливается с фиолетовым фоном — контраст завален.',
+  },
+  bonuses: {
+    correct: 'consistency',
+    debatable: ['hierarchy'],
+    note: 'Две карточки оформлены по-разному (поля, радиусы, «5%» только на одной). Заголовок секции тоже слаб, но первично — рассогласованность плиток.',
+  },
+};
+
+function gradeDefect(region: Region, defect: DefectId): Verdict {
+  const t = DEFECT_TRUTH[region];
+  if (defect === t.correct) return 'right';
+  if (t.debatable.includes(defect)) return 'debatable';
+  return 'wrong';
+}
+
+const VERDICT_RANK: Record<Verdict, number> = { right: 0, debatable: 1, wrong: 2 };
+/** The stronger warning of two verdicts (used for the screen outline colour). */
+function worseVerdict(a?: Verdict, b?: Verdict): Verdict | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  return VERDICT_RANK[a] >= VERDICT_RANK[b] ? a : b;
+}
+
 const VERDICT_UI: Record<
   Verdict,
   { ring: string; label: string; icon: typeof Check; text: string; bg: string }
@@ -156,27 +230,42 @@ const FIX_UI: Record<FixReply['verdict'], { label: string; text: string }> = {
 
 export function ScreenCritique() {
   const [assignments, setAssignments] = useState<Assignments>({});
+  const [defectPicks, setDefectPicks] = useState<Partial<Record<Region, DefectId>>>({});
   const [fixes, setFixes] = useState<Fixes>({});
   const [selected, setSelected] = useState<Region | null>(null);
   const [checked, setChecked] = useState(false);
   const [fixReplies, setFixReplies] = useState<Partial<Record<Region, FixReply>>>({});
   const [fixLoading, setFixLoading] = useState(false);
 
+  /** Per-region verdicts on both dimensions + the stronger of the two. */
   const verdicts = useMemo(() => {
-    if (!checked) return {} as Record<Region, Verdict>;
-    const out = {} as Record<Region, Verdict>;
-    (Object.keys(assignments) as Region[]).forEach((r) => {
-      const role = assignments[r];
-      if (role) out[r] = grade(r, role);
+    if (!checked) return {} as Record<Region, { role?: Verdict; defect?: Verdict; worst?: Verdict }>;
+    const out = {} as Record<Region, { role?: Verdict; defect?: Verdict; worst?: Verdict }>;
+    const regions = new Set<Region>([
+      ...(Object.keys(assignments) as Region[]),
+      ...(Object.keys(defectPicks) as Region[]),
+    ]);
+    regions.forEach((r) => {
+      const role = assignments[r] ? grade(r, assignments[r]!) : undefined;
+      const defect = defectPicks[r] ? gradeDefect(r, defectPicks[r]!) : undefined;
+      out[r] = { role, defect, worst: worseVerdict(role, defect) };
     });
     return out;
-  }, [checked, assignments]);
+  }, [checked, assignments, defectPicks]);
 
-  const assignedCount = Object.keys(assignments).length;
+  const assignedCount = new Set<Region>([
+    ...(Object.keys(assignments) as Region[]),
+    ...(Object.keys(defectPicks) as Region[]),
+  ]).size;
 
   function assignRole(role: RoleId) {
     if (!selected) return;
     setAssignments((a) => ({ ...a, [selected]: role }));
+  }
+
+  function assignDefect(defect: DefectId) {
+    if (!selected) return;
+    setDefectPicks((d) => ({ ...d, [selected]: defect }));
   }
 
   async function check() {
@@ -220,6 +309,7 @@ export function ScreenCritique() {
 
   function reset() {
     setAssignments({});
+    setDefectPicks({});
     setFixes({});
     setSelected(null);
     setChecked(false);
@@ -228,7 +318,8 @@ export function ScreenCritique() {
   }
 
   const summary = useMemo(() => {
-    const vals = Object.values(verdicts);
+    // Count both dimensions (role + defect) so the tally reflects all judgements.
+    const vals = Object.values(verdicts).flatMap((v) => [v.role, v.defect].filter(Boolean) as Verdict[]);
     return {
       right: vals.filter((v) => v === 'right').length,
       debatable: vals.filter((v) => v === 'debatable').length,
@@ -239,10 +330,11 @@ export function ScreenCritique() {
   return (
     <div className="flex flex-col gap-6">
       <p className="max-w-[640px] text-footnote text-secondary">
-        Теперь диагноз ставишь ты. Кликни зону на экране и повесь на неё роль из палитры справа — что
-        это по смыслу: главный акцент, второстепенное, реклама или фон. Можно дописать, что бы ты
-        здесь поправил. Потом «Проверить»: дизайн субъективен, поэтому оценка в трёх цветах —
-        зелёный «верно», жёлтый «спорно, но защитимо», коралловый «прочитывается иначе».
+        Теперь диагноз ставишь ты. Экран нарочно с шероховатостями — сбитые отступы, разнобой
+        скруглений, слабый контраст. Кликни зону, повесь на неё роль из палитры справа (главный
+        акцент, второстепенное, реклама или фон) и допиши, что бы ты здесь поправил. Потом
+        «Проверить»: дизайн субъективен, поэтому оценка в трёх цветах — зелёный «верно», жёлтый
+        «спорно, но защитимо», коралловый «прочитывается иначе».
       </p>
 
       <div className="grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)]">
@@ -252,6 +344,7 @@ export function ScreenCritique() {
             selected={selected}
             onSelect={setSelected}
             assignments={assignments}
+            defectPicks={defectPicks}
             verdicts={verdicts}
             checked={checked}
           />
@@ -306,6 +399,32 @@ export function ScreenCritique() {
                       })}
                     </div>
 
+                    {/* Defect picker — what's WRONG in this region. */}
+                    <div className="mt-4 border-t border-border pt-4">
+                      <p className="mb-3 text-caption text-tertiary">Что здесь не так?</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {DEFECTS.map((d) => {
+                          const active = defectPicks[selected] === d.id;
+                          return (
+                            <button
+                              key={d.id}
+                              type="button"
+                              onClick={() => assignDefect(d.id)}
+                              title={d.hint}
+                              className={[
+                                'rounded-lg border px-3 py-2 text-left text-footnote font-medium transition-fast',
+                                active
+                                  ? 'border-brand bg-brand/10 text-brand'
+                                  : 'border-border bg-surface text-primary hover:border-brand/40',
+                              ].join(' ')}
+                            >
+                              {d.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     {/* Optional fix note */}
                     <div className="mt-4 border-t border-border pt-4">
                       <label className="mb-2 block text-caption text-tertiary">
@@ -328,17 +447,21 @@ export function ScreenCritique() {
                       <Tag size={18} />
                     </span>
                     <p className="text-footnote text-secondary">
-                      Кликни любую зону на экране слева, чтобы повесить на неё роль.
+                      Кликни любую зону на экране слева: назови её роль и дефект.
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* Assigned chips */}
+              {/* Assigned chips — role + defect per touched region */}
               {assignedCount > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {(Object.keys(assignments) as Region[]).map((r) => {
-                    const role = ROLES.find((x) => x.id === assignments[r])!;
+                  {([...new Set<Region>([
+                    ...(Object.keys(assignments) as Region[]),
+                    ...(Object.keys(defectPicks) as Region[]),
+                  ])] as Region[]).map((r) => {
+                    const role = ROLES.find((x) => x.id === assignments[r]);
+                    const defect = DEFECTS.find((x) => x.id === defectPicks[r]);
                     return (
                       <button
                         key={r}
@@ -347,7 +470,10 @@ export function ScreenCritique() {
                         className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-caption text-secondary transition-fast hover:border-brand/40"
                       >
                         <span className="font-medium text-primary">{REGION_TITLE[r]}</span>
-                        <span className="text-tertiary">→ {role.label}</span>
+                        <span className="text-tertiary">
+                          {role ? role.label : '—'}
+                          {defect ? ` · ${defect.label}` : ''}
+                        </span>
                       </button>
                     );
                   })}
@@ -392,40 +518,73 @@ export function ScreenCritique() {
               {/* Per-region verdicts */}
               <div className="flex flex-col gap-2">
                 {(Object.keys(verdicts) as Region[]).map((r) => {
-                  const v = verdicts[r];
-                  const ui = VERDICT_UI[v];
+                  const vd = verdicts[r];
+                  const worst = vd.worst ?? 'right';
+                  const ui = VERDICT_UI[worst];
                   const Icon = ui.icon;
-                  const role = ROLES.find((x) => x.id === assignments[r])!;
+                  const role = ROLES.find((x) => x.id === assignments[r]);
+                  const defect = DEFECTS.find((x) => x.id === defectPicks[r]);
                   const t = TRUTH[r];
+                  const dt = DEFECT_TRUTH[r];
                   const correctRole = ROLES.find((x) => x.id === t.correct)!;
+                  const correctDefect = DEFECTS.find((x) => x.id === dt.correct)!;
                   return (
                     <div
                       key={r}
                       className="rounded-xl border border-border bg-elevated p-4"
                       style={{ borderLeft: `3px solid ${ui.ring}` }}
                     >
-                      <div className="mb-1 flex items-center gap-2">
+                      <div className="mb-2 flex items-center gap-2">
                         <Icon size={15} className={ui.text} />
                         <span className="text-footnote font-semibold text-primary">
                           {REGION_TITLE[r]}
                         </span>
-                        <span className={['ml-auto text-caption font-medium', ui.text].join(' ')}>
-                          {ui.label}
-                        </span>
                       </div>
-                      <p className="text-caption text-tertiary">
-                        Твой выбор: <span className="text-secondary">{role.label}</span>
-                        {v !== 'right' && (
-                          <>
-                            {' '}
-                            · сильное прочтение:{' '}
-                            <span className="text-secondary">{correctRole.label}</span>
-                          </>
-                        )}
-                      </p>
-                      {v !== 'right' && (
-                        <p className="mt-1.5 text-footnote text-secondary">{t.note}</p>
+
+                      {/* Role dimension */}
+                      {role && vd.role && (
+                        <div className="mb-1.5">
+                          <p className="text-caption text-tertiary">
+                            <span className={['font-medium', VERDICT_UI[vd.role].text].join(' ')}>
+                              {VERDICT_UI[vd.role].label}
+                            </span>{' '}
+                            · роль: <span className="text-secondary">{role.label}</span>
+                            {vd.role !== 'right' && (
+                              <>
+                                {' '}
+                                · сильное прочтение:{' '}
+                                <span className="text-secondary">{correctRole.label}</span>
+                              </>
+                            )}
+                          </p>
+                          {vd.role !== 'right' && (
+                            <p className="mt-0.5 text-footnote text-secondary">{t.note}</p>
+                          )}
+                        </div>
                       )}
+
+                      {/* Defect dimension */}
+                      {defect && vd.defect && (
+                        <div className="mb-1">
+                          <p className="text-caption text-tertiary">
+                            <span className={['font-medium', VERDICT_UI[vd.defect].text].join(' ')}>
+                              {VERDICT_UI[vd.defect].label}
+                            </span>{' '}
+                            · дефект: <span className="text-secondary">{defect.label}</span>
+                            {vd.defect !== 'right' && (
+                              <>
+                                {' '}
+                                · на деле:{' '}
+                                <span className="text-secondary">{correctDefect.label}</span>
+                              </>
+                            )}
+                          </p>
+                          {vd.defect !== 'right' && (
+                            <p className="mt-0.5 text-footnote text-secondary">{dt.note}</p>
+                          )}
+                        </div>
+                      )}
+
                       {fixes[r]?.trim() && (
                         <div className="mt-2 rounded-lg border border-border bg-surface p-2.5">
                           <p className="text-caption text-tertiary">Твоя правка: «{fixes[r]}»</p>
@@ -483,24 +642,27 @@ function CritiqueScreen({
   selected,
   onSelect,
   assignments,
+  defectPicks,
   verdicts,
   checked,
 }: {
   selected: Region | null;
   onSelect: (r: Region) => void;
   assignments: Assignments;
-  verdicts: Record<Region, Verdict>;
+  defectPicks: Partial<Record<Region, DefectId>>;
+  verdicts: Record<Region, { role?: Verdict; defect?: Verdict; worst?: Verdict }>;
   checked: boolean;
 }) {
-  // Ring colour for a region: verdict colour after check, brand while selecting.
+  // Ring colour for a region: worst verdict after check, brand while selecting.
   const regionStyle = (r: Region): React.CSSProperties => {
-    if (checked && verdicts[r]) {
-      return { outline: `2px solid ${VERDICT_UI[verdicts[r]].ring}`, outlineOffset: 3, borderRadius: 'inherit' };
+    const wv = verdicts[r]?.worst;
+    if (checked && wv) {
+      return { outline: `2px solid ${VERDICT_UI[wv].ring}`, outlineOffset: 3, borderRadius: 'inherit' };
     }
     if (!checked && selected === r) {
       return { outline: `2px solid ${APP.brand}`, outlineOffset: 3, borderRadius: 'inherit' };
     }
-    if (!checked && assignments[r]) {
+    if (!checked && (assignments[r] || defectPicks[r])) {
       return { outline: `1.5px dashed ${APP.textDim}`, outlineOffset: 3, borderRadius: 'inherit' };
     }
     return {};
@@ -514,10 +676,11 @@ function CritiqueScreen({
 
   const handle = (r: Region) => (checked ? undefined : () => onSelect(r));
 
-  // Small corner badge showing the assigned role's verdict after check.
+  // Small corner badge showing the region's worst verdict after check.
   const Badge = ({ r }: { r: Region }) => {
-    if (!checked || !verdicts[r]) return null;
-    const ui = VERDICT_UI[verdicts[r]];
+    const wv = verdicts[r]?.worst;
+    if (!checked || !wv) return null;
+    const ui = VERDICT_UI[wv];
     const Icon = ui.icon;
     return (
       <span
@@ -534,16 +697,17 @@ function CritiqueScreen({
       className="relative w-[300px] shrink-0 overflow-visible rounded-[36px] p-4 shadow-lg"
       style={{ background: APP.bg, color: APP.text }}
     >
-      {/* Top bar */}
+      {/* Top bar — DEFECT: иконки не на одной оптической линии (настройки съехали вниз). */}
       <div className={cls('topbar')} style={regionStyle('topbar')} onClick={handle('topbar')}>
         <Badge r="topbar" />
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <ArrowLeft size={20} />
-          <Settings2 size={18} style={{ color: APP.textDim }} />
+          <Settings2 size={18} style={{ color: APP.textDim, marginTop: 7 }} />
         </div>
       </div>
 
-      {/* Card header */}
+      {/* Card header — DEFECT: баланс (главный смысл экрана) мелкий, тусклый и съехал
+          вниз — иерархия сломана, акцент не читается; вдобавок ушёл от правого поля. */}
       <div className={['mt-5', cls('header')].join(' ')} style={regionStyle('header')} onClick={handle('header')}>
         <Badge r="header" />
         <div className="flex items-start justify-between">
@@ -553,7 +717,9 @@ function CritiqueScreen({
             </p>
             <p className="text-[15px] font-semibold">Премиум карта</p>
           </div>
-          <p className="text-[15px] font-semibold tabular-nums">980 000 ₽</p>
+          <p className="mr-3 mt-3 text-[13px] font-normal tabular-nums" style={{ color: APP.textDim }}>
+            980 000 ₽
+          </p>
         </div>
       </div>
 
@@ -563,37 +729,39 @@ function CritiqueScreen({
         style={regionStyle('chips')}
         onClick={handle('chips')}
       >
+        {/* DEFECT: скругления вразнобой — карта почти прямоугольная, «плюс» — пилюля. */}
         <Badge r="chips" />
         <span
-          className="flex h-11 w-16 items-end rounded-xl p-2 text-[11px] font-medium"
+          className="flex h-11 w-16 items-end rounded-sm p-2 text-[11px] font-medium"
           style={{ background: `linear-gradient(135deg, ${APP.brand}, ${APP.brandSoft})` }}
         >
           3567
         </span>
         <span
-          className="flex h-11 w-11 items-center justify-center rounded-xl"
+          className="flex h-11 w-11 items-center justify-center rounded-full"
           style={{ background: APP.surface, color: APP.textDim }}
         >
           <Plus size={18} />
         </span>
       </div>
 
-      {/* Quick actions */}
+      {/* Quick actions — DEFECT: у трёх плиток разные скругления (скруглённая /
+          прямая / пилюля) и неравный шаг между ними — ряд не читается как система. */}
       <div
-        className={['mt-4 flex justify-between gap-2', cls('actions')].join(' ')}
+        className={['mt-4 flex justify-between', cls('actions')].join(' ')}
         style={regionStyle('actions')}
         onClick={handle('actions')}
       >
         <Badge r="actions" />
         {[
-          { icon: CreditCard, label: 'Оплатить' },
-          { icon: Plus, label: 'Пополнить' },
-          { icon: ArrowLeftRight, label: 'Перевести' },
-        ].map(({ icon: Icon, label }) => (
+          { icon: CreditCard, label: 'Оплатить', radius: 'rounded-2xl', ml: 0 },
+          { icon: Plus, label: 'Пополнить', radius: 'rounded-none', ml: 6 },
+          { icon: ArrowLeftRight, label: 'Перевести', radius: 'rounded-full', ml: 14 },
+        ].map(({ icon: Icon, label, radius, ml }) => (
           <div
             key={label}
-            className="flex flex-1 flex-col items-center gap-2 rounded-2xl py-3"
-            style={{ background: APP.surface }}
+            className={['flex flex-1 flex-col items-center gap-2 py-3', radius].join(' ')}
+            style={{ background: APP.surface, marginLeft: ml }}
           >
             <Icon size={18} style={{ color: APP.textDim }} />
             <span className="text-[11px]" style={{ color: APP.textDim }}>
@@ -603,9 +771,10 @@ function CritiqueScreen({
         ))}
       </div>
 
-      {/* Promo */}
+      {/* Promo — DEFECT: заголовок оффера почти нечитаем (слабый контраст текста
+          на фиолетовом) и прижат тесными полями — реклама не работает. */}
       <div
-        className={['mt-4 overflow-hidden rounded-2xl p-4', cls('promo')].join(' ')}
+        className={['mt-4 overflow-hidden rounded-2xl p-2', cls('promo')].join(' ')}
         style={{
           background: `linear-gradient(120deg, ${APP.brand}, ${APP.brandSoft})`,
           ...regionStyle('promo'),
@@ -613,34 +782,42 @@ function CritiqueScreen({
         onClick={handle('promo')}
       >
         <Badge r="promo" />
-        <p className="max-w-[70%] text-[15px] font-bold leading-tight">
+        <p
+          className="max-w-[70%] text-[15px] font-bold leading-tight"
+          style={{ color: 'rgba(255,255,255,0.42)' }}
+        >
           Откройте вклад с увеличенной ставкой до 18%
         </p>
       </div>
 
-      {/* Bonuses */}
-      <p className="relative z-10 mt-5 text-[13px] font-medium" style={{ color: APP.textDim }}>
+      {/* Bonuses — DEFECT: заголовок секции слишком мелкий и тусклый, не читается
+          как заголовок (сломана иерархия). */}
+      <p className="relative z-10 mt-3 text-[10px] font-normal" style={{ color: APP.textDim }}>
         Бонусы по карте
       </p>
+      {/* DEFECT: две карточки рассогласованы — разные поля и скругления, «5%» только
+          на одной; сетка не держит систему. */}
       <div
-        className={['mt-3 grid grid-cols-2 gap-3', cls('bonuses')].join(' ')}
+        className={['mt-3 grid grid-cols-2 gap-3 items-start', cls('bonuses')].join(' ')}
         style={regionStyle('bonuses')}
         onClick={handle('bonuses')}
       >
         <Badge r="bonuses" />
         {[
-          { icon: Utensils, text: 'Кэшбэк за бронирование ресторанов' },
-          { icon: Hotel, text: 'Кэшбэк за бронирование туров и отелей' },
-        ].map(({ icon: Icon, text }) => (
+          { icon: Utensils, text: 'Кэшбэк за бронирование ресторанов', pct: '5%', pad: 'p-3', radius: 'rounded-2xl' },
+          { icon: Hotel, text: 'Кэшбэк за бронирование туров и отелей', pct: '', pad: 'p-1.5', radius: 'rounded-md' },
+        ].map(({ icon: Icon, text, pct, pad, radius }) => (
           <div
             key={text}
-            className="flex flex-col items-center gap-3 rounded-2xl p-3 text-center"
+            className={['flex flex-col items-center gap-3 text-center', pad, radius].join(' ')}
             style={{ background: APP.surface }}
           >
             <span className="text-[11px] font-medium leading-tight">{text}</span>
-            <span className="text-[10px]" style={{ color: APP.textDim }}>
-              5%
-            </span>
+            {pct && (
+              <span className="text-[10px]" style={{ color: APP.textDim }}>
+                {pct}
+              </span>
+            )}
             <span
               className="flex h-9 w-9 items-center justify-center rounded-full"
               style={{ background: APP.accent }}

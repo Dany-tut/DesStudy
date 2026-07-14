@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   MousePointer2,
   Frame,
@@ -20,6 +20,13 @@ import {
   Globe,
   Code2,
   Pencil,
+  Files,
+  FileStack,
+  Layers,
+  Play,
+  Palette,
+  SlidersHorizontal,
+  PencilRuler,
   type LucideIcon,
 } from 'lucide-react';
 import { ExampleVisual } from './ExampleVisual';
@@ -32,6 +39,7 @@ import { ExampleVisual } from './ExampleVisual';
  */
 export function LectureVisual({ visual }: { visual: string }) {
   if (visual === 'figma-toolbar') return <Picker items={TOOLBAR} />;
+  if (visual === 'figma-canvas') return <Picker items={CANVAS_PANELS} />;
   if (visual === 'figma-modes') return <Picker items={MODES} />;
   if (visual === 'figma-interface') {
     return (
@@ -89,18 +97,15 @@ function Picker({ items }: { items: PickItem[] }) {
         })}
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={active.id}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
-          className="mt-3 rounded-lg bg-surface px-4 py-3 text-body text-secondary"
-        >
-          <span className="font-medium text-primary">{active.label}</span> — {active.detail}
-        </motion.div>
-      </AnimatePresence>
+      <motion.div
+        key={active.id}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
+        className="mt-3 rounded-lg bg-surface px-4 py-3 text-body text-secondary"
+      >
+        <span className="font-medium text-primary">{active.label}</span> — {active.detail}
+      </motion.div>
     </div>
   );
 }
@@ -143,6 +148,51 @@ const TOOLBAR: PickItem[] = [
     label: 'AI Tools',
     icon: Sparkles,
     detail: 'ИИ-помощники: переименовать слои, сгенерировать картинку, переписать текст, найти похожее.',
+  },
+];
+
+const CANVAS_PANELS: PickItem[] = [
+  {
+    id: 'file',
+    label: 'File / Assets',
+    icon: Files,
+    detail: 'две вкладки слева: сам файл и библиотека ассетов — компоненты и стили для переиспользования.',
+  },
+  {
+    id: 'pages',
+    label: 'Pages',
+    icon: FileStack,
+    detail: 'страницы внутри одного файла — между ними переключаешься, у каждой свой холст.',
+  },
+  {
+    id: 'layers',
+    label: 'Layers (слои)',
+    icon: Layers,
+    detail: 'дерево всех объектов на странице: фреймы, группы, текст, картинки — сверху вниз по порядку.',
+  },
+  {
+    id: 'design',
+    label: 'Design / Prototype',
+    icon: Play,
+    detail: 'переключатель сверху: Design — оформление, Prototype — связи и переходы между экранами.',
+  },
+  {
+    id: 'page-style',
+    label: 'Стиль Page',
+    icon: Palette,
+    detail: 'цвет фона самого холста (canvas) — на чём лежат твои макеты.',
+  },
+  {
+    id: 'props',
+    label: 'Свойства',
+    icon: SlidersHorizontal,
+    detail: 'правая панель: параметры выделенного объекта — размеры, отступы, цвета, типографика.',
+  },
+  {
+    id: 'toolbar',
+    label: 'Панель инструментов',
+    icon: PencilRuler,
+    detail: 'нижняя панель по центру — инструменты создания и работы с объектами (см. следующую секцию).',
   },
 ];
 
