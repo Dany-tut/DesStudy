@@ -12,8 +12,14 @@ import type {
   AlignAnswer,
   ContrastAnswer,
   ScaleRampAnswer,
+  EasingAnswer,
+  TapTargetAnswer,
 } from './types';
 import { FIX_DEFECTS, fixSolvedCount, type FixScreenAnswer } from './fixScreen';
+import { SPOT_ROUNDS } from './spotDiff';
+
+/** Per-axis tolerance when matching an easing curve's control points. */
+export const EASING_TOL = 0.12;
 
 /** Interaction states inspected in a `states` exercise (must match StatesLab). */
 export const STATE_KEYS = ['default', 'hover', 'active', 'focus', 'disabled'] as const;
@@ -314,6 +320,48 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
           : level < exercise.targetLevel
             ? 'Слишком «приземлённо» — подними карточку выше, тень должна стать заметнее.'
             : 'Перебор — карточка парит слишком высоко, тень разъехалась. Опусти на уровень ниже.',
+      };
+    }
+    case 'easing': {
+      const a = (answer ?? {}) as Partial<EasingAnswer>;
+      const t = exercise.target;
+      const near = (p: { x?: number; y?: number } | undefined, q: EasingAnswer['p1']) =>
+        p != null &&
+        typeof p.x === 'number' &&
+        typeof p.y === 'number' &&
+        Math.abs(p.x - q.x) <= EASING_TOL &&
+        Math.abs(p.y - q.y) <= EASING_TOL;
+      const correct = near(a.p1, t.p1) && near(a.p2, t.p2);
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : exercise.hint ??
+            `Подведи обе контрольные точки к кривой ${t.name} — следи за сплошной линией поверх пунктирной цели.`,
+      };
+    }
+    case 'spot-diff': {
+      const round = SPOT_ROUNDS[exercise.roundId];
+      const correct = round != null && Number(answer) === round.oddIndex;
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : exercise.hint ?? 'Не эта плитка — приглядись к радиусам, оттенкам, весу и полям.',
+      };
+    }
+    case 'tap-target': {
+      const a = (answer ?? {}) as Partial<TapTargetAnswer>;
+      const min = exercise.min ?? 44;
+      const correct = Number(a.w) >= min && Number(a.h) >= min;
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : exercise.hint ?? `Кнопка меньше ${min}×${min}px — потяни угол, пока обе стороны не дорастут до безопасной тап-цели.`,
       };
     }
     case 'fix-screen': {

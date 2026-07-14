@@ -31,6 +31,10 @@ import { StatesLab } from '@/components/exercises/drafts/StatesLab';
 import { SpotDiff } from '@/components/exercises/drafts/SpotDiff';
 import { TapTarget } from '@/components/exercises/drafts/TapTarget';
 import { EasingCurve } from '@/components/exercises/drafts/EasingCurve';
+import { FocusOrder } from '@/components/exercises/drafts/FocusOrder';
+import { ButtonHierarchy } from '@/components/exercises/drafts/ButtonHierarchy';
+import { BreakpointTuner } from '@/components/exercises/drafts/BreakpointTuner';
+import { GridColumns } from '@/components/exercises/drafts/GridColumns';
 import { FixTheScreen } from '@/components/exercises/FixTheScreen';
 import { ScreenWalkthrough } from '@/components/exercises/ScreenWalkthrough';
 import { ScreenCritique } from '@/components/exercises/ScreenCritique';
@@ -398,6 +402,22 @@ export default function DesignSystemPage() {
 
       <Section title="Easing-curve — собери кривую анимации («easing-curve»)">
         <EasingCurve />
+      </Section>
+
+      <Section title="Focus-order — обход по Tab в верном порядке («focus-order»)">
+        <FocusOrder />
+      </Section>
+
+      <Section title="Button-hierarchy — расставь акценты действий («button-hierarchy»)">
+        <ButtonHierarchy />
+      </Section>
+
+      <Section title="Breakpoint-tuner — поймай точку перехода раскладки («breakpoint-tuner»)">
+        <BreakpointTuner />
+      </Section>
+
+      <Section title="Grid-columns — собери сетку под цель («grid-columns»)">
+        <GridColumns />
       </Section>
 
       <div className="mb-8 mt-20 border-t border-border pt-10">

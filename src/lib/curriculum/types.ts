@@ -390,6 +390,132 @@ export interface ElevationExercise {
   explanation: string;
 }
 
+/**
+ * L2: drag the two Bézier control points to match a target easing curve
+ * (ease-in / ease-out / ease-in-out). A dot animates the chosen timing so the
+ * *feel* of the easing is visible, not just its shape. Correct when both control
+ * points land near the target. (Promoted from the draft "EasingCurve".)
+ */
+export interface EasingExercise {
+  id: string;
+  type: 'easing';
+  prompt: string;
+  /** Target easing: control points in easing-space (0..1, y may overshoot). */
+  target: { name: string; p1: EasingPoint; p2: EasingPoint };
+  hint?: string;
+  explanation: string;
+}
+
+export interface EasingPoint {
+  x: number;
+  y: number;
+}
+
+export interface EasingAnswer {
+  p1: EasingPoint;
+  p2: EasingPoint;
+}
+
+/**
+ * L1: spot the one UI tile that quietly breaks the system (radius, tint, weight,
+ * padding). `roundId` selects a preset break from `./spotDiff`. Correct when the
+ * odd tile is clicked. (Promoted from the draft "SpotDiff".)
+ */
+export interface SpotDiffExercise {
+  id: string;
+  type: 'spot-diff';
+  prompt: string;
+  /** Index into SPOT_ROUNDS (see lib/curriculum/spotDiff). */
+  roundId: number;
+  hint?: string;
+  explanation: string;
+}
+
+export type SpotDiffAnswer = number | null;
+
+/**
+ * L1: drag a button past the minimum touch target (HIG / WCAG 2.5.5, 44×44px).
+ * A translucent 44px fingertip disc makes «too small to tap» felt. Correct once
+ * both dimensions clear `min`. (Promoted from the draft "TapTarget".)
+ */
+export interface TapTargetExercise {
+  id: string;
+  type: 'tap-target';
+  prompt: string;
+  /** Minimum tap size in px each side must reach (default 44). */
+  min?: number;
+  hint?: string;
+  explanation: string;
+}
+
+export interface TapTargetAnswer {
+  w: number;
+  h: number;
+}
+
+/**
+ * L2: "screen-critique" — the learner diagnoses a real screen, then reconstructs
+ * it. HYBRID mechanic in two phases:
+ *   1. Diagnose — click each marked zone, assign its ROLE on the screen
+ *      (accent / secondary / promo / neutral / nav) and name its DEFECT.
+ *   2. Reconstruct — for every defective zone, pick the correct fix from a few
+ *      candidates; a right pick visibly repairs that zone, so the broken screen
+ *      morphs toward the good one.
+ * Graded deterministically (right / debatable / wrong — design is subjective).
+ * Phase 1 renders a built-in DOM `scene`; later scenes can point at uploaded
+ * before/after images. The AI only coaches free-text fixes, never decides.
+ */
+export type CritiqueRoleId = 'accent' | 'secondary' | 'promo' | 'neutral' | 'nav';
+export type CritiqueDefectId =
+  | 'hierarchy'
+  | 'radius'
+  | 'contrast'
+  | 'alignment'
+  | 'consistency'
+  | 'none';
+
+/** One reconstruction option for a zone's defect; exactly one is `correct`. */
+export interface CritiqueFixOption {
+  id: string;
+  label: string;
+  correct?: boolean;
+}
+
+export interface CritiqueZone {
+  id: string;
+  /** Human label shown when the zone is selected, e.g. "Чипы карты". */
+  label: string;
+  // ── Diagnosis: role ──
+  /** The strongest reading of this zone's role. */
+  role: CritiqueRoleId;
+  /** Defensible-but-not-only-right roles → yellow "спорно". */
+  debatableRoles?: CritiqueRoleId[];
+  /** Mentor note explaining the role (shown for a non-perfect pick). */
+  roleNote: string;
+  /** Design intent — ground truth the AI judges a free-text fix against. */
+  intent: string;
+  // ── Diagnosis: defect ──
+  /** The defect deliberately present here ('none' = clean zone). */
+  defect: CritiqueDefectId;
+  debatableDefects?: CritiqueDefectId[];
+  defectNote: string;
+  // ── Reconstruction ──
+  /** Candidate fixes (one `correct`). Omit for a clean zone. */
+  fixes?: CritiqueFixOption[];
+}
+
+export interface ScreenCritiqueExercise {
+  id: string;
+  type: 'screen-critique';
+  prompt: string;
+  /** Registry key of the built-in scene to render, e.g. 'premium-card'. */
+  scene: string;
+  /** Screen description passed to the AI for fix-coaching context. */
+  screenTitle: string;
+  zones: CritiqueZone[];
+  explanation: string;
+}
+
 export type Exercise =
   | ChooseExercise
   | TuneExercise
@@ -408,6 +534,10 @@ export type Exercise =
   | NestedRadiusExercise
   | ResizeFrameExercise
   | ElevationExercise
+  | EasingExercise
+  | SpotDiffExercise
+  | TapTargetExercise
+  | ScreenCritiqueExercise
   | FixScreenExercise;
 
 // ─────────────────────────────────────────────────────────────

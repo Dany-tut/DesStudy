@@ -14,13 +14,33 @@ const MIN = 44; // minimum tap target, px
 const FLOOR = 24;
 const CEIL = 96;
 
-export function TapTarget() {
-  const areaRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 30, h: 28 });
+type Size = { w: number; h: number };
 
-  const ok = size.w >= MIN && size.h >= MIN;
+/**
+ * Optional props promote this draft to a real exercise: when `onChange` is
+ * given the size is lifted to the player (controlled); with no props it runs
+ * self-contained in the gallery.
+ */
+export function TapTarget({
+  value,
+  min = MIN,
+  disabled,
+  onChange,
+}: {
+  value?: Size | null;
+  min?: number;
+  disabled?: boolean;
+  onChange?: (v: Size) => void;
+} = {}) {
+  const areaRef = useRef<HTMLDivElement>(null);
+  const [internal, setInternal] = useState<Size>({ w: 30, h: 28 });
+  const size = value ?? internal;
+  const setSize = (s: Size) => (onChange ? onChange(s) : setInternal(s));
+
+  const ok = size.w >= min && size.h >= min;
 
   function startDrag(e: React.PointerEvent) {
+    if (disabled) return;
     e.preventDefault();
     const origin = areaRef.current?.getBoundingClientRect();
     if (!origin) return;
@@ -60,10 +80,10 @@ export function TapTarget() {
       </div>
 
       <div ref={areaRef} className="relative flex h-56 items-center justify-center rounded-xl border border-border bg-canvas">
-        {/* 44px fingertip reference */}
+        {/* fingertip reference at the minimum tap size */}
         <span
           className="pointer-events-none absolute rounded-full border border-dashed border-tertiary/60 bg-tertiary/10"
-          style={{ width: MIN, height: MIN }}
+          style={{ width: min, height: min }}
         />
         {/* Resizable button */}
         <div
@@ -85,7 +105,7 @@ export function TapTarget() {
       </div>
 
       <p className="mt-4 text-caption tabular-nums text-tertiary">
-        {size.w}×{size.h}px {ok ? '· палец попадёт уверенно' : `· нужно ≥ ${MIN}×${MIN}px`}
+        {size.w}×{size.h}px {ok ? '· палец попадёт уверенно' : `· нужно ≥ ${min}×${min}px`}
       </p>
     </div>
   );
