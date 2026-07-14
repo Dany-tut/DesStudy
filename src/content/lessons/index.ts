@@ -15,6 +15,7 @@ import { gridsComposition } from './grids-composition';
 import { figmaComponentsSlots } from './figma-components-slots';
 import { aiDesignTools } from './ai-design-tools';
 import { briefResearch } from './brief-research';
+import { paletteElements } from './palette-elements';
 
 /** Central registry — every built lesson, keyed by slug. */
 export const lessons: Record<string, Lesson> = {
@@ -34,6 +35,7 @@ export const lessons: Record<string, Lesson> = {
   [forms.slug]: forms,
   [emptyStates.slug]: emptyStates,
   [briefResearch.slug]: briefResearch,
+  [paletteElements.slug]: paletteElements,
 };
 
 export {
@@ -53,4 +55,5 @@ export {
   figmaComponentsSlots,
   aiDesignTools,
   briefResearch,
+  paletteElements,
 };

@@ -15,6 +15,7 @@ import {
   figmaComponentsSlots,
   aiDesignTools,
   briefResearch,
+  paletteElements,
 } from './lessons';
 import type { Lesson } from '@/lib/curriculum/types';
 
@@ -112,6 +113,7 @@ export const PATHS: LearningPath[] = [
     emoji: '🗺️',
     lessons: [
       entry(briefResearch, { emoji: '📋', popular: true }),
+      entry(paletteElements, { emoji: '🎨' }),
     ],
   },
 ];
