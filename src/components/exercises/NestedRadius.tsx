@@ -42,7 +42,7 @@ export function NestedRadius({
           {/* Nested button */}
           <div
             className={[
-              'flex h-16 w-44 items-center justify-center text-callout font-semibold text-on-brand transition-fast',
+              'flex min-w-44 items-center justify-center px-7 py-4 text-callout font-semibold text-on-brand transition-fast',
               concentric ? 'bg-success' : 'bg-brand',
             ].join(' ')}
             style={{ borderRadius: value }}
