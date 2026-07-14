@@ -73,6 +73,122 @@ function fallback(input: MentorInput): MentorReply {
   };
 }
 
+// ─────────────────────────────────────────────────────────────
+// OBSERVATION COACHING — the "what do you see?" layer of a screen
+// walkthrough. There is no right/wrong answer: the learner describes a
+// screen in their own words and the mentor reflects back what they caught
+// and gently points to what they overlooked, before the breakdown is
+// revealed. This trains active observation, not recall.
+// ─────────────────────────────────────────────────────────────
+
+/** A thing a strong observation of the screen would notice. */
+export interface ObserveConcept {
+  id: string;
+  /** Human label of the concept (sent to the model as ground truth). */
+  label: string;
+  /** Keywords the offline fallback matches against the learner's text. */
+  keywords: string[];
+}
+
+export interface ObserveInput {
+  screenTitle: string;
+  concepts: ObserveConcept[];
+  /** The learner's free-text description of what they see. */
+  observation: string;
+}
+
+export interface ObserveReply {
+  /** Warm reflection of what the learner correctly noticed. */
+  caught: string;
+  /** A gentle pointer to something overlooked — guiding, not scolding. */
+  missed: string;
+  /** One-line nudge to look again or move on to the breakdown. */
+  nudge: string;
+  offline?: boolean;
+}
+
+const OBSERVE_SYSTEM = `You are the AI Mentor inside DesStudy, coaching a learner through the "what do you see?" step of analysing a UI screen.
+
+There is NO correct answer here — the learner is describing a real screen in their own words, before any breakdown. Your job is to sharpen their eye.
+
+You are given the screen, a list of things a strong observation would notice, and the learner's description.
+
+Rules:
+- First, warmly reflect what they genuinely caught — be specific, quote their wording where it helps.
+- Then point to ONE, at most two, important things they overlooked — as an invitation to look again, never as a scold, and never a full lecture.
+- Do not dump the whole list. Do not explain the design rationale yet — that is the next layers' job.
+- Be concise, calm, professional, encouraging. Never childish. No preamble.
+- Write in Russian.`;
+
+const OBSERVE_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    caught: { type: 'string' as const },
+    missed: { type: 'string' as const },
+    nudge: { type: 'string' as const },
+  },
+  required: ['caught', 'missed', 'nudge'],
+  additionalProperties: false,
+};
+
+/** Offline fallback: keyword-match the observation against the concepts. */
+function observeFallback(input: ObserveInput): ObserveReply {
+  const text = input.observation.toLowerCase();
+  const hit = (c: ObserveConcept) => c.keywords.some((k) => text.includes(k.toLowerCase()));
+  const caught = input.concepts.filter(hit);
+  const missed = input.concepts.filter((c) => !hit(c));
+
+  return {
+    caught: caught.length
+      ? `Ты заметил: ${caught.map((c) => c.label).join(', ')}. Хороший старт — взгляд цепляет главное.`
+      : 'Опиши конкретнее: что за продукт, что здесь крупнее всего, куда падает взгляд первым?',
+    missed: missed.length
+      ? `Присмотрись ещё: ${missed
+          .slice(0, 2)
+          .map((c) => c.label)
+          .join(', ')} — это тоже часть картины.`
+      : 'Ты назвал всё ключевое — глаз уже цепкий.',
+    nudge:
+      missed.length > 2
+        ? 'Пробегись по экрану сверху вниз ещё раз, потом открывай разбор.'
+        : 'Готов — переходи к следующему слою и сверься с разбором.',
+    offline: true,
+  };
+}
+
+export async function coachObservation(input: ObserveInput): Promise<ObserveReply> {
+  if (!process.env.ANTHROPIC_API_KEY) return observeFallback(input);
+
+  const client = new Anthropic();
+
+  const userPrompt = [
+    `Экран: ${input.screenTitle}`,
+    `Что замечает сильное наблюдение: ${input.concepts.map((c) => c.label).join('; ')}`,
+    '',
+    `Описание студента: ${input.observation}`,
+    '',
+    'Отрази, что он уловил, и мягко укажи на 1–2 упущенных момента. Разбор не раскрывай.',
+  ].join('\n');
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-opus-4-8',
+      max_tokens: 1024,
+      system: OBSERVE_SYSTEM,
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: OBSERVE_SCHEMA } },
+      messages: [{ role: 'user', content: userPrompt }],
+    });
+
+    const text = response.content.find((b) => b.type === 'text');
+    if (text && text.type === 'text') {
+      return { ...(JSON.parse(text.text) as Omit<ObserveReply, 'offline'>) };
+    }
+    return observeFallback(input);
+  } catch {
+    return observeFallback(input);
+  }
+}
+
 export async function coach(input: MentorInput): Promise<MentorReply> {
   if (!process.env.ANTHROPIC_API_KEY) return fallback(input);
 

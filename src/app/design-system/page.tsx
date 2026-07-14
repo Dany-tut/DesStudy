@@ -33,6 +33,7 @@ import { TapTarget } from '@/components/exercises/drafts/TapTarget';
 import { EasingCurve } from '@/components/exercises/drafts/EasingCurve';
 import { FixTheScreen } from '@/components/exercises/FixTheScreen';
 import { ScreenWalkthrough } from '@/components/exercises/ScreenWalkthrough';
+import { ScreenCritique } from '@/components/exercises/ScreenCritique';
 import type { BuildAnswer, BuildExercise, OrderExercise } from '@/lib/curriculum/types';
 
 /** Sample exercises used only to render the interactive surfaces in the showcase. */
@@ -381,6 +382,10 @@ export default function DesignSystemPage() {
 
       <Section title="Screen-walkthrough — послойный разбор экрана («screen-walkthrough»)">
         <ScreenWalkthrough />
+      </Section>
+
+      <Section title="Screen-critique — поставь диагноз сам («screen-critique»)">
+        <ScreenCritique />
       </Section>
 
       <Section title="Spot-diff — найди несогласованность («spot-diff»)">

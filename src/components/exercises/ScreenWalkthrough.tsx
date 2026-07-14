@@ -16,7 +16,10 @@ import {
   Palette,
   Squircle,
   PanelTop,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
+import type { ObserveConcept, ObserveReply } from '@/lib/ai/mentor';
 
 /**
  * Screen-walkthrough — a guided, layered breakdown of one real reference
@@ -125,6 +128,91 @@ const STEPS: Step[] = [
     regions: ['topbar'],
   },
 ];
+
+/** What a strong observation of this screen would notice — ground truth for
+ *  the mentor (and its offline keyword fallback). */
+const OBSERVE_CONCEPTS: ObserveConcept[] = [
+  { id: 'balance', label: 'баланс — главный акцент', keywords: ['баланс', '980', 'сумма', 'деньг', 'рубл', '₽'] },
+  { id: 'card', label: 'карта и её название', keywords: ['карт', 'премиум', '3567', 'банк'] },
+  { id: 'actions', label: 'быстрые действия', keywords: ['действ', 'оплат', 'пополн', 'перевес', 'кнопк'] },
+  { id: 'promo', label: 'промо-баннер вклада (реклама, не часть карты)', keywords: ['промо', 'вклад', 'ставк', 'реклам', '18', 'баннер'] },
+  { id: 'bonuses', label: 'бонусы и кэшбэк', keywords: ['бонус', 'кэшбэк', 'кешбэк', 'ресторан', 'отел', 'тур'] },
+];
+
+const SCREEN_TITLE = 'Экран банковской «Премиум карты» — баланс, действия, промо и бонусы';
+
+/** The "what do you see?" input + mentor reflection for the observation layer. */
+function ObservePanel() {
+  const [text, setText] = useState('');
+  const [reply, setReply] = useState<ObserveReply | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function submit() {
+    if (!text.trim() || loading) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/observe-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          screenTitle: SCREEN_TITLE,
+          concepts: OBSERVE_CONCEPTS,
+          observation: text,
+        }),
+      });
+      setReply((await res.json()) as ObserveReply);
+    } catch {
+      setReply({
+        caught: 'Не удалось связаться с ментором.',
+        missed: 'Проверь соединение и попробуй ещё раз.',
+        nudge: 'Можно продолжить разбор и без обратной связи.',
+        offline: true,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={3}
+        placeholder="Опиши экран своими словами: что за продукт, что здесь главное, куда падает взгляд первым?"
+        className="w-full resize-none rounded-lg border border-border bg-surface px-3 py-2.5 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
+      />
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!text.trim() || loading}
+          className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand transition-fast hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {loading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+          Показать ментору
+        </button>
+        {reply?.offline && (
+          <span className="text-caption text-tertiary">офлайн-режим</span>
+        )}
+      </div>
+
+      {reply && (
+        <div className="flex flex-col gap-3 rounded-lg border border-brand/30 bg-brand/5 p-4">
+          <div>
+            <p className="text-caption font-medium text-brand">Что ты уловил</p>
+            <p className="mt-0.5 text-footnote text-primary">{reply.caught}</p>
+          </div>
+          <div>
+            <p className="text-caption font-medium text-secondary">Присмотрись</p>
+            <p className="mt-0.5 text-footnote text-primary">{reply.missed}</p>
+          </div>
+          <p className="text-caption text-tertiary">{reply.nudge}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** The reference phone, rendered entirely in code so overlays land precisely. */
 function BankScreen({ step }: { step: Step }) {
@@ -359,6 +447,11 @@ export function ScreenWalkthrough() {
               </div>
             </div>
             <p className="text-body text-secondary">{step.body}</p>
+            {step.id === 'see' && (
+              <div className="mt-4 border-t border-border pt-4">
+                <ObservePanel />
+              </div>
+            )}
           </div>
 
           {/* Controls */}

@@ -301,12 +301,12 @@ function EdgeFadeRow({ children }: { children: React.ReactNode }) {
       </div>
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-surface to-transparent transition-opacity duration-200"
+        className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-surface via-surface/80 to-transparent transition-opacity duration-200"
         style={{ opacity: edges.start ? 1 : 0 }}
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-surface to-transparent transition-opacity duration-200"
+        className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-surface via-surface/80 to-transparent transition-opacity duration-200"
         style={{ opacity: edges.end ? 1 : 0 }}
       />
     </div>
