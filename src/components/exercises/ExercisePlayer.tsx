@@ -50,7 +50,7 @@ const DEFAULT_BAR: BarBuildAnswer = {
   placement: 'static',
   variant: 'full',
   parts: { logo: true, nav: true, search: false, cta: false, avatar: false },
-  navCenter: false,
+  navAlign: 'left',
 };
 
 /**

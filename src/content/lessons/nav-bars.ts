@@ -91,7 +91,7 @@ export const navBars: Lesson = {
         placement: 'static',
         variant: 'full',
         parts: { logo: true, nav: true, search: true, cta: false, avatar: false },
-        navCenter: false,
+        navAlign: 'left',
       },
       explanation:
         'Документации не нужно занимать высоту фиксированной шапкой — `static` уходит из вида при скролле, что нормально для длинного чтения. Полное меню + поиск помогают найти раздел, а CTA и профиль тут не по делу.',
@@ -106,7 +106,7 @@ export const navBars: Lesson = {
       placement: 'fixedTop',
       variant: 'burger',
       parts: { logo: true, nav: true, search: false, cta: false, avatar: true },
-      navCenter: false,
+      navAlign: 'left',
     },
     explanation:
       '`fixedTop` держит бренд и профиль на виду при любом скролле, а бургер прячет пункты меню, которым не хватило бы места в один ряд — ровно то сочетание, которое выбирают мобильные приложения с постоянно видимым профилем.',

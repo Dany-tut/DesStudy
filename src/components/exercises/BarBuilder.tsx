@@ -73,7 +73,7 @@ export function BarBuilder({
   disabled?: boolean;
   onChange: (next: BarBuildAnswer) => void;
 }) {
-  const { placement, variant, parts, navCenter } = value;
+  const { placement, variant, parts, navAlign } = value;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
@@ -114,7 +114,7 @@ export function BarBuilder({
   }, [placement, variant]);
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
+    <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
       {/* ── Controls ─────────────────────────────────────────── */}
       <fieldset disabled={disabled} className="flex flex-col gap-5 disabled:opacity-60">
         <div>
@@ -202,16 +202,17 @@ export function BarBuilder({
           <p className="mb-2 text-footnote font-medium text-secondary">Навигация</p>
           <div className="inline-flex rounded-lg bg-muted p-1">
             {[
-              { v: false, label: 'Слева' },
-              { v: true, label: 'По центру' },
+              { v: 'left' as const, label: 'Слева' },
+              { v: 'center' as const, label: 'По центру' },
+              { v: 'right' as const, label: 'Справа' },
             ].map(({ v, label }) => (
               <button
                 key={label}
                 type="button"
-                onClick={() => set({ navCenter: v })}
+                onClick={() => set({ navAlign: v })}
                 className={[
                   'rounded-md px-4 py-2 text-footnote font-medium transition-fast',
-                  navCenter === v ? 'bg-brand text-on-brand' : 'text-secondary hover:text-primary',
+                  navAlign === v ? 'bg-brand text-on-brand' : 'text-secondary hover:text-primary',
                 ].join(' ')}
               >
                 {label}
@@ -246,9 +247,13 @@ export function BarBuilder({
               isSidebar(placement) ? 'flex' : 'block',
             ].join(' ')}
           >
-            {placement === 'sidebarRight' && <PageContent placement={placement} />}
-            <BarPreview placement={placement} variant={variant} parts={parts} navCenter={navCenter} />
-            {placement !== 'sidebarRight' && <PageContent placement={placement} />}
+            {(placement === 'sidebarRight' || placement === 'floatBottom') && (
+              <PageContent placement={placement} />
+            )}
+            <BarPreview placement={placement} variant={variant} parts={parts} navAlign={navAlign} />
+            {placement !== 'sidebarRight' && placement !== 'floatBottom' && (
+              <PageContent placement={placement} />
+            )}
           </div>
         </div>
       </div>
@@ -284,12 +289,12 @@ function BarPreview({
   placement,
   variant,
   parts,
-  navCenter,
+  navAlign,
 }: {
   placement: BarPlacement;
   variant: BarVariant;
   parts: Record<BarPartKey, boolean>;
-  navCenter: boolean;
+  navAlign: 'left' | 'center' | 'right';
 }) {
   const sidebar = isSidebar(placement);
   const floating = placement === 'floatTop' || placement === 'floatBottom';
@@ -398,14 +403,18 @@ function BarPreview({
           </span>
         )}
 
+        {/* Right-aligned nav: a leading spacer pushes it (and the trailing
+            controls) to the right edge. */}
+        {parts.nav && navAlign === 'right' && <span className="flex-1" />}
+
         {parts.nav &&
           (variant === 'burger' ? (
             <>
-              {!navCenter && <span className="flex-1" />}
+              {navAlign === 'left' && <span className="flex-1" />}
               <span
                 className={[
                   'flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-secondary',
-                  navCenter ? 'mx-auto' : '',
+                  navAlign === 'center' ? 'mx-auto' : '',
                 ].join(' ')}
               >
                 <Menu size={16} />
@@ -413,9 +422,10 @@ function BarPreview({
             </>
           ) : (
             <nav
-              className={['flex items-center gap-4', navCenter ? 'flex-1 justify-center' : ''].join(
-                ' ',
-              )}
+              className={[
+                'flex items-center gap-4',
+                navAlign === 'center' ? 'flex-1 justify-center' : '',
+              ].join(' ')}
             >
               {['Главная', 'Курсы', 'О нас'].map((l) => (
                 <span key={l} className="text-footnote font-medium text-secondary">
@@ -425,7 +435,12 @@ function BarPreview({
             </nav>
           ))}
 
-        {!(parts.nav && (navCenter || variant === 'burger')) && <span className="flex-1" />}
+        {/* Trailing spacer: only when the trailing controls need pushing right —
+            i.e. no nav, or a left-aligned inline nav. Center/right/burger nav
+            already consume or push past the free space. */}
+        {(!parts.nav || (navAlign === 'left' && variant !== 'burger')) && (
+          <span className="flex-1" />
+        )}
 
         {parts.search && !mini && (
           <span className="flex items-center gap-2 rounded-full bg-muted px-3 py-2 text-caption text-tertiary">

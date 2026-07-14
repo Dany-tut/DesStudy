@@ -181,7 +181,7 @@ export interface BarBuildAnswer {
   placement: BarPlacement;
   variant: BarVariant;
   parts: Record<BarPartKey, boolean>;
-  navCenter: boolean;
+  navAlign: 'left' | 'center' | 'right';
 }
 
 /**
