@@ -28,6 +28,8 @@ import { ContrastTuner } from './drafts/ContrastTuner';
 import { ScaleRamp } from './drafts/ScaleRamp';
 import { TrimZone } from './TrimZone';
 import { NestedRadius } from './NestedRadius';
+import { FixTheScreen } from './FixTheScreen';
+import { FIX_INITIAL, fixSolvedCount, type FixScreenAnswer } from '@/lib/curriculum/fixScreen';
 import { Button } from '@/components/ui/Button';
 import { Slider } from '@/components/ui/Slider';
 import { ChoiceCard } from '@/components/ui/ChoiceCard';
@@ -45,6 +47,7 @@ type Answer =
   | ContrastAnswer
   | ScaleRampAnswer
   | HotspotAnswer
+  | FixScreenAnswer
   | string[]
   | null;
 
@@ -92,7 +95,9 @@ export function ExercisePlayer({
                   ? { base: 16, ratio: 1.25 }
                   : exercise.type === 'trim-zone' || exercise.type === 'nested-radius'
                     ? 0
-                    : null;
+                    : exercise.type === 'fix-screen'
+                      ? FIX_INITIAL
+                      : null;
   const [choice, setChoice] = useState<Answer>(initialChoice);
   const [outcome, setOutcome] = useState<ValidationOutcome | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -168,6 +173,10 @@ export function ExercisePlayer({
         return `срез ${value}px`;
       case 'nested-radius':
         return `внутренний радиус ${value}px`;
+      case 'fix-screen': {
+        const solved = fixSolvedCount(value as FixScreenAnswer);
+        return `исправлено ${solved} из 6 нарушений`;
+      }
     }
   }
 
@@ -429,6 +438,14 @@ export function ExercisePlayer({
             value={typeof choice === 'number' ? choice : 0}
             disabled={solved}
             onChange={(v) => setChoice(v)}
+          />
+        );
+      case 'fix-screen':
+        return (
+          <FixTheScreen
+            value={(choice as FixScreenAnswer) ?? FIX_INITIAL}
+            disabled={solved}
+            onChange={(next) => setChoice(next)}
           />
         );
       default: {

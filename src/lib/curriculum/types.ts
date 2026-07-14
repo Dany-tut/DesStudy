@@ -288,6 +288,19 @@ export interface ScaleRampAnswer {
 }
 
 /**
+ * L1: repair a deliberately broken mobile mockup by picking the correct fix for
+ * each flagged defect (radius, iconography, active state, brand token, spacing,
+ * CTA). The defect spec lives in `./fixScreen`; correct once every defect is
+ * fixed. (Promoted from the draft "FixTheScreen".)
+ */
+export interface FixScreenExercise {
+  id: string;
+  type: 'fix-screen';
+  prompt: string;
+  explanation: string;
+}
+
+/**
  * L1: trim the invisible extra font space (trim zone) around a text label so its
  * optical padding becomes symmetric — the direct-manipulation version of
  * `text-box-trim`. Correct once the trim reaches the target within tolerance.
@@ -338,7 +351,8 @@ export type Exercise =
   | ContrastTuneExercise
   | ScaleRampExercise
   | TrimZoneExercise
-  | NestedRadiusExercise;
+  | NestedRadiusExercise
+  | FixScreenExercise;
 
 // ─────────────────────────────────────────────────────────────
 // LESSON — follows PRD Chapter 5 lesson structure.

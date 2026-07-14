@@ -13,6 +13,7 @@ import type {
   ContrastAnswer,
   ScaleRampAnswer,
 } from './types';
+import { FIX_DEFECTS, fixSolvedCount, type FixScreenAnswer } from './fixScreen';
 
 /** Interaction states inspected in a `states` exercise (must match StatesLab). */
 export const STATE_KEYS = ['default', 'hover', 'active', 'focus', 'disabled'] as const;
@@ -287,6 +288,18 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
           : inner > target
             ? 'Внутренний радиус великоват — дуги не совпадут. Вспомни: внутренний = внешний − отступ.'
             : 'Внутренний радиус маловат — угол кнопки острее угла карточки.',
+      };
+    }
+    case 'fix-screen': {
+      const solved = fixSolvedCount(answer as Partial<FixScreenAnswer>);
+      const total = FIX_DEFECTS.length;
+      const correct = solved === total;
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : `Исправлено ${solved} из ${total} — пройди по оставшимся нарушениям и выбери правильный вариант.`,
       };
     }
   }

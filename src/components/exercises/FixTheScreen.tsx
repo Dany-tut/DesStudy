@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   Check,
   ChevronDown,
@@ -13,95 +13,25 @@ import {
   MessageCircle,
   GraduationCap,
 } from 'lucide-react';
+import {
+  FIX_DEFECTS,
+  FIX_INITIAL,
+  fixSolvedCount,
+  type DefectKey,
+  type FixDefect,
+  type FixOption,
+  type FixScreenAnswer,
+} from '@/lib/curriculum/fixScreen';
 
 /**
  * Fix-the-screen — the learner repairs a deliberately broken mobile mockup by
- * picking the correct fix for each flagged defect. A reference "how it should
- * look" screen sits alongside the whole time. The preview is rendered purely
- * from `fixes` state, so every defect maps to one deterministic correct choice.
+ * picking the correct fix for each flagged defect. Left is the frozen "before";
+ * the middle "your screen" starts identically broken and updates live as each
+ * fix is applied. Dual-mode: no `onChange` → standalone showcase; pass
+ * `value`/`onChange` to drive it as a graded exercise (reports the per-defect
+ * selection up, correct once every defect is fixed). The defect spec lives in
+ * `@/lib/curriculum/fixScreen`, shared with the deterministic validator.
  */
-
-type DefectKey = 'radius' | 'chevron' | 'navActive' | 'pillColor' | 'gap' | 'cta';
-
-interface Option {
-  id: string;
-  label: string;
-  correct?: boolean;
-  /** Shown when this wrong option is picked — gentle, specific nudge. */
-  feedback?: string;
-}
-
-interface Defect {
-  key: DefectKey;
-  title: string;
-  hint: string;
-  options: Option[];
-}
-
-const DEFECTS: Defect[] = [
-  {
-    key: 'radius',
-    title: 'Скругление карточек и полей',
-    hint: 'Углы почти прямые — макет выглядит резко и дёшево.',
-    options: [
-      { id: 'sm', label: 'rounded-sm · 4px' },
-      { id: 'md', label: 'rounded-lg · 8px', feedback: 'Уже лучше, но в этом макете карточки заметно круглее.' },
-      { id: 'xl', label: 'rounded-2xl · 16px', correct: true },
-    ],
-  },
-  {
-    key: 'chevron',
-    title: 'Иконка в дропдауне',
-    hint: 'Стоит стрелка «вправо» — она читается как переход, а не как раскрытие списка.',
-    options: [
-      { id: 'right', label: 'ChevronRight  ›' },
-      { id: 'down', label: 'ChevronDown  ⌄', correct: true },
-    ],
-  },
-  {
-    key: 'navActive',
-    title: 'Активный таб в нав-баре',
-    hint: 'Ни один пункт не выделен — непонятно, где ты находишься.',
-    options: [
-      { id: 'none', label: 'Без выделения' },
-      { id: 'all', label: 'Подсветить все', feedback: 'Тогда «активно» всё сразу — сигнал теряется.' },
-      { id: 'home', label: 'Выделить Home', correct: true },
-    ],
-  },
-  {
-    key: 'pillColor',
-    title: 'Цвет чипов категорий',
-    hint: 'Чипы залиты произвольным серым вместо токена бренда.',
-    options: [
-      { id: 'gray', label: 'Случайный #9AA0A6' },
-      { id: 'brand', label: 'bg-brand / токен', correct: true },
-    ],
-  },
-  {
-    key: 'gap',
-    title: 'Отступы между блоками',
-    hint: 'Поля слиплись — нет единого ритма вертикали (auto-layout gap).',
-    options: [
-      { id: 'tight', label: 'gap 4px, вразнобой' },
-      { id: 'even', label: 'gap 16px, единый', correct: true },
-    ],
-  },
-  {
-    key: 'cta',
-    title: 'Главная кнопка',
-    hint: 'Кнопка узкая и прижата влево — не выглядит как основное действие.',
-    options: [
-      { id: 'inline', label: 'По контенту, слева' },
-      { id: 'full', label: 'Full-width, снизу', correct: true },
-    ],
-  },
-];
-
-/** Starting (broken) selection — the first, wrong option of each defect. */
-const INITIAL_FIXES: Record<DefectKey, string> = DEFECTS.reduce(
-  (acc, d) => ({ ...acc, [d.key]: d.options[0].id }),
-  {} as Record<DefectKey, string>,
-);
 
 const CATEGORIES = ['Class', 'Exam', 'Lab', 'Assignment'];
 
@@ -111,7 +41,7 @@ function PhonePreview({
   highlight,
   faded = false,
 }: {
-  fixes: Record<DefectKey, string>;
+  fixes: FixScreenAnswer;
   highlight?: DefectKey | null;
   faded?: boolean;
 }) {
@@ -223,8 +153,7 @@ function PhonePreview({
           { icon: MessageCircle, key: 'chat' },
         ].map(({ icon: Icon, key }) => {
           const active =
-            fixes.navActive === 'all' ||
-            (fixes.navActive === 'home' && key === 'home');
+            fixes.navActive === 'all' || (fixes.navActive === 'home' && key === 'home');
           return (
             <Icon
               key={key}
@@ -239,54 +168,62 @@ function PhonePreview({
   );
 }
 
-export function FixTheScreen() {
-  const [fixes, setFixes] = useState<Record<DefectKey, string>>(INITIAL_FIXES);
-  const [active, setActive] = useState<DefectKey>(DEFECTS[0].key);
+export function FixTheScreen({
+  value,
+  disabled = false,
+  onChange,
+}: {
+  value?: FixScreenAnswer;
+  disabled?: boolean;
+  onChange?: (next: FixScreenAnswer) => void;
+} = {}) {
+  const controlled = onChange !== undefined;
+  const [internalFixes, setInternalFixes] = useState<FixScreenAnswer>(FIX_INITIAL);
+  const fixes = controlled ? (value ?? FIX_INITIAL) : internalFixes;
+
+  const [active, setActive] = useState<DefectKey>(FIX_DEFECTS[0].key);
   // Wrong-pick feedback per defect (cleared when corrected).
   const [wrong, setWrong] = useState<Partial<Record<DefectKey, string>>>({});
 
-  const fixedCount = useMemo(
-    () => DEFECTS.filter((d) => d.options.find((o) => o.id === fixes[d.key])?.correct).length,
-    [fixes],
-  );
-  const allFixed = fixedCount === DEFECTS.length;
+  const fixedCount = fixSolvedCount(fixes);
+  const allFixed = fixedCount === FIX_DEFECTS.length;
 
-  function choose(defect: Defect, option: Option) {
-    setFixes((prev) => ({ ...prev, [defect.key]: option.id }));
+  function choose(defect: FixDefect, option: FixOption) {
+    if (disabled) return;
+    const next = { ...fixes, [defect.key]: option.id };
+    if (controlled) onChange!(next);
+    else setInternalFixes(next);
     setWrong((prev) => {
-      const next = { ...prev };
-      if (option.correct) delete next[defect.key];
-      else next[defect.key] = option.feedback ?? 'Не то — сверься с эталоном справа.';
-      return next;
+      const draft = { ...prev };
+      if (option.correct) delete draft[defect.key];
+      else draft[defect.key] = option.feedback ?? 'Не то — сверься с эталоном «Было» слева.';
+      return draft;
     });
   }
 
   function reset() {
-    setFixes(INITIAL_FIXES);
+    setInternalFixes(FIX_INITIAL);
     setWrong({});
-    setActive(DEFECTS[0].key);
+    setActive(FIX_DEFECTS[0].key);
   }
 
-  const activeDefect = DEFECTS.find((d) => d.key === active)!;
+  const activeDefect = FIX_DEFECTS.find((d) => d.key === active)!;
 
   return (
-    <div className="flex flex-col gap-6 rounded-xl border border-border bg-surface p-5 sm:rounded-2xl lg:rounded-3xl">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-callout font-semibold text-primary">Почини экран</h3>
-          <p className="mt-1 text-footnote text-secondary">
-            Слева — как было (сломанный макет). Проходи по нарушениям и выбирай правильное
-            исправление — по центру «твой экран» меняется на глазах.
-          </p>
-        </div>
+    <div className="flex flex-col gap-6">
+      {/* Progress counter */}
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-footnote text-secondary">
+          Слева — как было (сломанный макет). Проходи по нарушениям и выбирай правильное
+          исправление — по центру «твой экран» меняется на глазах.
+        </p>
         <span
           className={[
             'shrink-0 rounded-full px-3 py-1 text-caption font-semibold tabular-nums',
             allFixed ? 'bg-success/15 text-success' : 'bg-muted text-tertiary',
           ].join(' ')}
         >
-          {fixedCount}/{DEFECTS.length}
+          {fixedCount}/{FIX_DEFECTS.length}
         </span>
       </div>
 
@@ -294,7 +231,7 @@ export function FixTheScreen() {
         {/* LEFT — the original broken screen, frozen as the "before" reference. */}
         <div className="flex flex-col gap-2">
           <span className="text-caption font-medium text-tertiary">Было</span>
-          <PhonePreview fixes={INITIAL_FIXES} highlight={allFixed ? null : active} faded />
+          <PhonePreview fixes={FIX_INITIAL} highlight={allFixed ? null : active} faded />
         </div>
 
         {/* MIDDLE — the learner's screen: starts identical (broken) and updates
@@ -310,13 +247,13 @@ export function FixTheScreen() {
           <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
             <div
               className={['h-full rounded-full transition-base', allFixed ? 'bg-success' : 'bg-brand'].join(' ')}
-              style={{ width: `${(fixedCount / DEFECTS.length) * 100}%` }}
+              style={{ width: `${(fixedCount / FIX_DEFECTS.length) * 100}%` }}
             />
           </div>
 
           {/* Defect tabs */}
           <div className="flex flex-col gap-1.5">
-            {DEFECTS.map((d) => {
+            {FIX_DEFECTS.map((d) => {
               const done = d.options.find((o) => o.id === fixes[d.key])?.correct;
               const on = active === d.key;
               return (
@@ -358,9 +295,10 @@ export function FixTheScreen() {
                     <button
                       key={o.id}
                       type="button"
+                      disabled={disabled}
                       onClick={() => choose(activeDefect, o)}
                       className={[
-                        'flex items-center justify-between rounded-md border px-3 py-2 text-footnote transition-fast',
+                        'flex items-center justify-between rounded-md border px-3 py-2 text-footnote transition-fast disabled:cursor-not-allowed',
                         isCorrectPick
                           ? 'border-success bg-success/10 text-success'
                           : picked
@@ -380,10 +318,13 @@ export function FixTheScreen() {
             </div>
           )}
 
-          {/* Solved state */}
-          {allFixed && (
+          {/* Solved state — standalone showcase only; when graded, the
+              ExercisePlayer owns the success panel and retry. */}
+          {allFixed && !controlled && (
             <div className="rounded-lg border border-success/40 bg-success/10 p-4">
-              <p className="text-footnote font-semibold text-success">Все {DEFECTS.length} нарушений исправлены ✓</p>
+              <p className="text-footnote font-semibold text-success">
+                Все {FIX_DEFECTS.length} нарушений исправлены ✓
+              </p>
               <p className="mt-1 text-caption text-secondary">
                 Сравни «было» слева и «твой экран» — увидишь, как мелочи складываются в аккуратный
                 экран.

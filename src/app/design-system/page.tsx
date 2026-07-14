@@ -28,7 +28,7 @@ import { Hotspot } from '@/components/exercises/drafts/Hotspot';
 import { TrimZone } from '@/components/exercises/TrimZone';
 import { NestedRadius } from '@/components/exercises/NestedRadius';
 import { StatesLab } from '@/components/exercises/drafts/StatesLab';
-import { FixTheScreen } from '@/components/exercises/drafts/FixTheScreen';
+import { FixTheScreen } from '@/components/exercises/FixTheScreen';
 import type { BuildAnswer, BuildExercise, OrderExercise } from '@/lib/curriculum/types';
 
 /** Sample exercises used only to render the interactive surfaces in the showcase. */
