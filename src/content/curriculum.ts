@@ -8,6 +8,8 @@ import {
   designTokens,
   componentsVariants,
   navBars,
+  forms,
+  emptyStates,
 } from './lessons';
 import type { Lesson } from '@/lib/curriculum/types';
 
@@ -80,6 +82,8 @@ export const PATHS: LearningPath[] = [
     lessons: [
       entry(uxHeuristics, { emoji: '🔍', popular: true }),
       entry(userFlows, { emoji: '🧭' }),
+      entry(forms, { emoji: '📝' }),
+      entry(emptyStates, { emoji: '🗂️' }),
     ],
   },
   {

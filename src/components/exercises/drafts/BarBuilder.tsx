@@ -86,9 +86,9 @@ export function BarBuilder() {
   });
   const [navCenter, setNavCenter] = useState(false);
   const [autoplay, setAutoplay] = useState(true);
-  // Placement rail: a row of icon squares. The active one widens in place to
-  // reveal its label; its neighbours stay put and get pushed aside. Clicking the
-  // active square again collapses it back to an icon. Width is CSS-animated.
+  // Placement rail: a single row of icon squares. Clicking one morphs it out to
+  // fill the whole row (icon + label) while the rest collapse away; clicking the
+  // expanded one again morphs the others back in. All widths are CSS-animated.
   const [railOpen, setRailOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -192,43 +192,55 @@ export function BarBuilder() {
       <div className="flex flex-col gap-5">
         <div>
           <p className="mb-2 text-footnote font-medium text-secondary">Как бар сидит на странице</p>
-          <div className="flex w-fit gap-1.5">
-            {PLACEMENTS.map(({ key, label, icon: Icon, hint }) => {
+          <div className="flex w-full overflow-hidden">
+            {PLACEMENTS.map(({ key, label, icon: Icon, hint }, i) => {
               const active = placement === key;
-              const expanded = active && railOpen;
+              const expanded = railOpen && active; // fills the whole row
+              const hidden = railOpen && !active; // morphed away
               return (
                 <button
                   key={key}
                   type="button"
                   aria-label={label}
                   onClick={() => {
-                    if (active) setRailOpen((o) => !o);
-                    else {
+                    if (railOpen) {
+                      if (active) setRailOpen(false);
+                      else setPlacement(key);
+                    } else {
                       setPlacement(key);
                       setRailOpen(true);
                     }
                   }}
+                  style={{
+                    flex: expanded ? '1 1 0%' : hidden ? '0 0 0px' : '0 0 2.75rem',
+                    marginLeft: i === 0 || hidden ? 0 : '0.375rem',
+                    opacity: hidden ? 0 : 1,
+                    borderWidth: hidden ? 0 : 1,
+                    transitionProperty: 'flex-basis, flex-grow, margin, opacity',
+                    transitionDuration: '320ms',
+                    transitionTimingFunction: 'cubic-bezier(0.22,1,0.36,1)',
+                  }}
                   className={[
-                    'flex h-11 items-center rounded-xl border transition-fast',
+                    'flex h-11 items-center overflow-hidden rounded-xl border text-left',
+                    expanded ? 'justify-start px-3' : 'justify-center',
                     active
                       ? 'border-brand bg-brand/10 text-brand'
                       : 'border-border bg-surface text-tertiary hover:bg-hover hover:text-primary',
                   ].join(' ')}
                 >
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center">
-                    <Icon size={17} />
-                  </span>
-                  {/* Label reveals by animating the grid column from 0fr → 1fr */}
+                  <Icon size={17} className="shrink-0" />
                   <span
-                    className="grid transition-all duration-300 ease-out"
-                    style={{ gridTemplateColumns: expanded ? '1fr' : '0fr' }}
+                    className="flex min-w-0 flex-col overflow-hidden whitespace-nowrap transition-all duration-300"
+                    style={{
+                      maxWidth: expanded ? '12rem' : 0,
+                      marginLeft: expanded ? '0.625rem' : 0,
+                      opacity: expanded ? 1 : 0,
+                    }}
                   >
-                    <span className="flex min-w-0 flex-col justify-center overflow-hidden whitespace-nowrap pr-3 text-left">
-                      <span className="truncate text-callout font-medium leading-tight text-primary">
-                        {label}
-                      </span>
-                      <span className="truncate text-caption leading-tight text-tertiary">{hint}</span>
+                    <span className="truncate text-footnote font-medium leading-tight text-primary">
+                      {label}
                     </span>
+                    <span className="truncate text-caption leading-tight text-tertiary">{hint}</span>
                   </span>
                 </button>
               );

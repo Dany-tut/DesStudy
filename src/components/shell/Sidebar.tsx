@@ -24,7 +24,7 @@ const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Дашборд', icon: LayoutDashboard },
   { href: '/library', label: 'Библиотека', icon: Library, soon: true },
   { href: '/mentor', label: 'AI-ментор', icon: Sparkles, soon: true },
-  { href: '/achievements', label: 'Достижения', icon: Trophy, soon: true },
+  { href: '/achievements', label: 'Достижения', icon: Trophy },
   { href: '/design-system', label: 'Дизайн-система', icon: Palette },
 ];
 

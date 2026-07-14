@@ -207,6 +207,55 @@ export function ExampleVisual({ visual }: { visual: string }) {
       </Card>
     );
   }
+  // Forms — placeholder-as-label + generic top error vs persistent label + inline error.
+  if (visual === 'form-bad') {
+    return (
+      <Card>
+        <div className="mb-3 rounded-lg bg-danger/10 px-3 py-2 text-caption text-danger">
+          Ошибка заполнения формы
+        </div>
+        <div className="flex h-10 items-center rounded-lg border border-border-strong bg-canvas px-3 text-footnote text-tertiary">
+          Email
+        </div>
+      </Card>
+    );
+  }
+  if (visual === 'form-good') {
+    return (
+      <Card>
+        <label className="mb-1 block text-caption font-medium text-secondary">Email</label>
+        <div className="flex h-10 items-center rounded-lg border border-danger bg-canvas px-3 text-footnote text-primary">
+          you@example
+        </div>
+        <p className="mt-1 text-caption text-danger">Email должен содержать @</p>
+      </Card>
+    );
+  }
+
+  // Empty states — silent "no data" vs explained empty state with a CTA.
+  if (visual === 'empty-bad') {
+    return (
+      <Card>
+        <p className="py-6 text-center text-body text-tertiary">Нет данных</p>
+      </Card>
+    );
+  }
+  if (visual === 'empty-good') {
+    return (
+      <Card>
+        <div className="flex flex-col items-center py-4 text-center">
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-xl">
+            📁
+          </span>
+          <p className="text-callout font-medium text-primary">Пока нет проектов</p>
+          <p className="mt-1 text-footnote text-tertiary">Создай первый, чтобы начать</p>
+          <span className="mt-4 inline-flex rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand">
+            Создать проект
+          </span>
+        </div>
+      </Card>
+    );
+  }
   return null;
 }
 

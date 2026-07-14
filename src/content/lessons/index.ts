@@ -8,6 +8,8 @@ import { userFlows } from './user-flows';
 import { designTokens } from './design-tokens';
 import { componentsVariants } from './components-variants';
 import { navBars } from './nav-bars';
+import { forms } from './forms';
+import { emptyStates } from './empty-states';
 
 /** Central registry — every built lesson, keyed by slug. */
 export const lessons: Record<string, Lesson> = {
@@ -20,6 +22,8 @@ export const lessons: Record<string, Lesson> = {
   [designTokens.slug]: designTokens,
   [componentsVariants.slug]: componentsVariants,
   [navBars.slug]: navBars,
+  [forms.slug]: forms,
+  [emptyStates.slug]: emptyStates,
 };
 
 export {
@@ -32,4 +36,6 @@ export {
   designTokens,
   componentsVariants,
   navBars,
+  forms,
+  emptyStates,
 };

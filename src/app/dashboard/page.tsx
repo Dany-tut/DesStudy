@@ -1,9 +1,21 @@
 import Link from 'next/link';
-import { Flame, Zap, TrendingUp, TrendingDown, BookOpen, ArrowRight } from 'lucide-react';
+import {
+  Flame,
+  Zap,
+  TrendingUp,
+  TrendingDown,
+  BookOpen,
+  ArrowRight,
+  CheckCircle2,
+  XCircle,
+} from 'lucide-react';
 import { getLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
+import { PATHS } from '@/content/curriculum';
 
 export const dynamic = 'force-dynamic';
+
+const ALL_LESSONS = PATHS.flatMap((p) => p.lessons);
 
 export default async function DashboardPage() {
   const learner = await getLearner();
@@ -15,14 +27,19 @@ export default async function DashboardPage() {
         <p className="mt-3 text-body text-secondary">
           Пройди первое упражнение, и здесь появится твой прогресс.
         </p>
-        <StartLink />
+        <StartLink slug={ALL_LESSONS[0]?.slug} />
       </main>
     );
   }
 
-  const [skills, lessons] = await Promise.all([
+  const [skills, lessons, attempts] = await Promise.all([
     prisma.skillStat.findMany({ where: { learnerId: learner.id } }),
     prisma.lessonProgress.findMany({ where: { learnerId: learner.id } }),
+    prisma.attempt.findMany({
+      where: { learnerId: learner.id },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+    }),
   ]);
 
   // Accuracy = solved / totalTries. Lower = weaker skill (PRD §7).
@@ -31,6 +48,11 @@ export default async function DashboardPage() {
     .sort((a, b) => a.acc - b.acc);
   const weak = ranked.slice(0, 3);
   const strong = [...ranked].reverse().slice(0, 3);
+
+  const completedSlugs = new Set(lessons.filter((l) => l.completed).map((l) => l.lessonSlug));
+  const nextLesson = ALL_LESSONS.find((l) => !completedSlugs.has(l.slug));
+  const startSlug = nextLesson?.slug ?? ALL_LESSONS[ALL_LESSONS.length - 1]?.slug;
+  const allDone = !nextLesson && ALL_LESSONS.length > 0;
 
   return (
     <main className="mx-auto max-w-[1200px] px-8 py-16">
@@ -95,9 +117,52 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <StartLink />
+      {/* Activity feed */}
+      {attempts.length > 0 && (
+        <>
+          <h2 className="mb-4 mt-12 text-title3 font-semibold text-primary">Недавняя активность</h2>
+          <ul className="space-y-2">
+            {attempts.map((a) => (
+              <li
+                key={a.id}
+                className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3"
+              >
+                {a.correct ? (
+                  <CheckCircle2 size={16} className="shrink-0 text-success" />
+                ) : (
+                  <XCircle size={16} className="shrink-0 text-danger" />
+                )}
+                <span className="flex-1 text-body text-primary">
+                  {lessonTitle(a.lessonSlug)}
+                  <span className="ml-2 text-footnote text-tertiary">{a.skill}</span>
+                </span>
+                <span className="text-footnote tabular-nums text-tertiary">
+                  {formatWhen(a.createdAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <StartLink slug={startSlug} done={allDone} />
     </main>
   );
+}
+
+function lessonTitle(slug: string): string {
+  return ALL_LESSONS.find((l) => l.slug === slug)?.title ?? slug;
+}
+
+function formatWhen(date: Date): string {
+  const diffMs = Date.now() - new Date(date).getTime();
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return 'сейчас';
+  if (mins < 60) return `${mins} мин назад`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} ч назад`;
+  const days = Math.round(hours / 24);
+  return `${days} дн назад`;
 }
 
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
@@ -140,13 +205,15 @@ function SkillList({
   );
 }
 
-function StartLink() {
+function StartLink({ slug, done }: { slug?: string; done?: boolean }) {
+  if (!slug) return null;
   return (
     <Link
-      href="/learn/spacing-8pt-grid"
+      href={`/learn/${slug}`}
       className="mt-10 inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-3 text-callout font-medium text-on-brand transition-base hover:bg-brand-hover"
     >
-      Продолжить обучение <ArrowRight size={16} />
+      {done ? 'Вся программа пройдена — повторить урок' : 'Продолжить обучение'}{' '}
+      <ArrowRight size={16} />
     </Link>
   );
 }

@@ -1,9 +1,9 @@
-import { Search, Flame } from 'lucide-react';
+import { Flame } from 'lucide-react';
 import { getLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
 import { PATHS, type LessonEntry } from '@/content/curriculum';
-import { LessonCard } from '@/components/learn/LessonCard';
 import { blocksToLesson } from '@/lib/admin/blocksToLesson';
+import { LearnBrowser, type LearnGroup } from '@/components/learn/LearnBrowser';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,9 +46,35 @@ export default async function LearnPage() {
   const bySlug = new Map(progress.map((p) => [p.lessonSlug, p]));
   const authoredLessons = await getAuthoredEntries();
 
+  const withProgress = (entry: LessonEntry) => {
+    const p = bySlug.get(entry.slug);
+    return {
+      entry,
+      progressPct: p ? Math.round((p.solvedCount / Math.max(p.totalCount, 1)) * 100) : 0,
+      completed: p?.completed,
+    };
+  };
+
+  const groups: LearnGroup[] = PATHS.map((path) => ({
+    id: path.id,
+    title: path.title,
+    description: path.description,
+    emoji: path.emoji,
+    lessons: path.lessons.map(withProgress),
+  }));
+
+  if (authoredLessons.length > 0) {
+    groups.push({
+      id: 'authored',
+      title: 'От преподавателя',
+      description: 'Уроки, собранные в конструкторе — рядом с основной программой.',
+      emoji: '📚',
+      lessons: authoredLessons.map(withProgress),
+    });
+  }
+
   return (
     <main className="mx-auto max-w-[1200px] px-8 py-10">
-      {/* Header — Kodree-style: title + search + streak */}
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-title1 font-bold text-primary">Обучение</h1>
@@ -56,70 +82,13 @@ export default async function LearnPage() {
             Пути от нуля до профессионала — теория, практика, mastery.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-footnote text-tertiary">
-            <Search size={15} />
-            <span>Поиск урока…</span>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-medium text-primary">
-            <Flame size={15} className="text-warning" />
-            {learner?.streak ?? 0} дн.
-          </div>
+        <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-medium text-primary">
+          <Flame size={15} className="text-warning" />
+          {learner?.streak ?? 0} дн.
         </div>
       </div>
 
-      {/* Paths → grids of cards */}
-      <div className="space-y-10">
-        {PATHS.map((path) => (
-          <section key={path.id}>
-            <div className="mb-4 flex items-center gap-3">
-              <span className="text-xl">{path.emoji}</span>
-              <div>
-                <h2 className="text-title3 font-semibold text-primary">{path.title}</h2>
-                <p className="text-caption text-tertiary">{path.description}</p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              {path.lessons.map((l) => {
-                const p = bySlug.get(l.slug);
-                const pct = p ? Math.round((p.solvedCount / Math.max(p.totalCount, 1)) * 100) : 0;
-                return (
-                  <LessonCard
-                    key={l.slug}
-                    lesson={l}
-                    progressPct={pct}
-                    completed={p?.completed}
-                  />
-                );
-              })}
-            </div>
-          </section>
-        ))}
-
-        {authoredLessons.length > 0 && (
-          <section>
-            <div className="mb-4 flex items-center gap-3">
-              <span className="text-xl">📚</span>
-              <div>
-                <h2 className="text-title3 font-semibold text-primary">От преподавателя</h2>
-                <p className="text-caption text-tertiary">
-                  Уроки, собранные в конструкторе — рядом с основной программой.
-                </p>
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {authoredLessons.map((l) => {
-                const p = bySlug.get(l.slug);
-                const pct = p ? Math.round((p.solvedCount / Math.max(p.totalCount, 1)) * 100) : 0;
-                return (
-                  <LessonCard key={l.slug} lesson={l} progressPct={pct} completed={p?.completed} />
-                );
-              })}
-            </div>
-          </section>
-        )}
-      </div>
+      <LearnBrowser groups={groups} />
     </main>
   );
 }
