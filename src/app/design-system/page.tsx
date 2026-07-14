@@ -374,7 +374,7 @@ export default function DesignSystemPage() {
 
       <Section title="Tune · radius — тяни за угол (тип «tune», visual «radius»)">
         <div className="max-w-[420px]">
-          <RadiusDragTune value={rad} min={0} max={28} onChange={setRad} />
+          <RadiusDragTune value={rad} min={0} max={60} onChange={setRad} />
         </div>
       </Section>
 

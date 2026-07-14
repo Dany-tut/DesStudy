@@ -3,7 +3,27 @@
  * The validator decides correctness from data alone — the AI Mentor never
  * decides whether an answer is right, it only explains the validator's verdict.
  */
-import type { Exercise, ValidationOutcome, BuildAnswer } from './types';
+import type {
+  Exercise,
+  ValidationOutcome,
+  BuildAnswer,
+  BarBuildAnswer,
+  BarPartKey,
+} from './types';
+
+const PLACEMENT_LABEL: Record<BarBuildAnswer['placement'], string> = {
+  static: 'статичный',
+  fixedTop: 'фиксированный сверху',
+  floatTop: 'плавающий сверху',
+  floatBottom: 'плавающий снизу',
+  sidebarLeft: 'боковой слева',
+  sidebarRight: 'боковой справа',
+};
+const VARIANT_LABEL: Record<BarBuildAnswer['variant'], string> = {
+  full: 'полный',
+  burger: 'бургер',
+  mini: 'мини',
+};
 
 /** Shared with the FigmaLinkSubmit UI so validation and live-feedback never drift apart. */
 export const FIGMA_URL_PATTERN = /^https:\/\/(www\.)?figma\.com\/(file|design|proto)\/[a-zA-Z0-9]+/;
@@ -86,6 +106,46 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
         explanation: exercise.explanation,
         hint: submitted ? undefined : 'Прикрепи файл, прежде чем отправлять на проверку.',
       };
+    }
+    case 'bar-build': {
+      const a = (answer ?? {}) as Partial<BarBuildAnswer>;
+      const t = exercise.target;
+      const placementOk = a.placement === t.placement;
+      const variantOk = a.variant === t.variant;
+      const navOk = a.navCenter === t.navCenter;
+      const partsOk =
+        !!a.parts &&
+        (Object.keys(t.parts) as BarPartKey[]).every((k) => a.parts?.[k] === t.parts[k]);
+      const correct = placementOk && variantOk && navOk && partsOk;
+
+      let hint: string | undefined;
+      if (!correct) {
+        // Surface the most structural mismatch first: placement → variant →
+        // parts → nav alignment.
+        if (!placementOk) hint = `Бар должен быть «${PLACEMENT_LABEL[t.placement]}».`;
+        else if (!variantOk) hint = `Нужен вид «${VARIANT_LABEL[t.variant]}».`;
+        else if (!partsOk) {
+          const missing = (Object.keys(t.parts) as BarPartKey[]).filter(
+            (k) => t.parts[k] && !a.parts?.[k],
+          );
+          const extra = (Object.keys(t.parts) as BarPartKey[]).filter(
+            (k) => !t.parts[k] && a.parts?.[k],
+          );
+          const labels: Record<BarPartKey, string> = {
+            logo: 'логотип',
+            nav: 'навигация',
+            search: 'поиск',
+            cta: 'кнопка CTA',
+            avatar: 'профиль',
+          };
+          const parts: string[] = [];
+          if (missing.length) parts.push(`не хватает: ${missing.map((k) => labels[k]).join(', ')}`);
+          if (extra.length) parts.push(`лишнее: ${extra.map((k) => labels[k]).join(', ')}`);
+          hint = parts.join('; ') + '.';
+        } else if (!navOk)
+          hint = t.navCenter ? 'Навигацию поставь по центру.' : 'Навигацию выровняй слева.';
+      }
+      return { correct, explanation: exercise.explanation, hint };
     }
     case 'order': {
       const order = Array.isArray(answer) ? (answer as string[]) : [];

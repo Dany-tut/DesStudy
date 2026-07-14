@@ -66,7 +66,7 @@ export function Stepper({
   return (
     <div>
       {label && <p className="mb-1.5 text-footnote text-secondary">{label}</p>}
-      <div className="flex items-center gap-1 rounded-full border border-border bg-canvas p-1">
+      <div className="inline-flex items-center gap-1 rounded-full border border-border bg-canvas p-1">
         <StepperButton icon={Minus} onClick={() => onChange(clamp(value - step))} disabled={disabled || atMin} label={decLabel} shape="round" />
         <div className="w-16 select-none text-center text-callout font-semibold tabular-nums text-primary">
           {value}

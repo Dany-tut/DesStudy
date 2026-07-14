@@ -18,6 +18,82 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
  */
 const THUMB = 24; // px — must match .ui-slider thumb width
 
+/*
+ * Single-path value bubble (pill + downward iOS-style tail as ONE contour), so
+ * the tail never reads as a detached diamond — geometry ported from the
+ * teachstream "Tooltip (iOS)" component: shoulders leave the pill edge along the
+ * tangent (control points sit on the base line) → rounded "ears", no seam.
+ * We only need the tail-on-bottom ("points down at the thumb") case.
+ */
+const TIP_R = 12; // pill corner radius
+const TIP_TH = 6; // tail height (how far it juts out)
+const TIP_HB = 9.939; // half-width of the tail base
+const TIP_CO = 3.865; // control near the base (rounded shoulder, tangent to edge)
+const TIP_CI = 4.418; // control near the tip
+const f3 = (v: number) => Number(v.toFixed(3));
+
+/** Rounded pill W×H with a tail grown out of the bottom edge, centered. */
+function bubblePathTop(W: number, H: number): string {
+  const cx = W / 2;
+  // The tail needs 2R+2HB of straight edge; on a narrow pill, shrink R/tail to
+  // fit (never grow) so the shoulders don't spill past the rounded corners.
+  const sc = Math.min(1, W / (2 * TIP_R + 2 * TIP_HB));
+  const r = TIP_R * sc;
+  const hb = TIP_HB * sc;
+  const co = TIP_CO * sc;
+  const ci = TIP_CI * sc;
+  const th = TIP_TH;
+  return [
+    `M${f3(r)} 0`,
+    `H${f3(W - r)}`, `Q${f3(W)} 0 ${f3(W)} ${f3(r)}`,
+    `V${f3(H - r)}`, `Q${f3(W)} ${f3(H)} ${f3(W - r)} ${f3(H)}`,
+    `H${f3(cx + hb)}`,
+    `C${f3(cx + co)} ${f3(H)} ${f3(cx + ci)} ${f3(H + th)} ${f3(cx)} ${f3(H + th)}`,
+    `C${f3(cx - ci)} ${f3(H + th)} ${f3(cx - co)} ${f3(H)} ${f3(cx - hb)} ${f3(H)}`,
+    `H${f3(r)}`, `Q0 ${f3(H)} 0 ${f3(H - r)}`,
+    `V${f3(r)}`, `Q0 0 ${f3(r)} 0`, 'Z',
+  ].join(' ');
+}
+
+/**
+ * The value chip: text measured, then a single SVG path drawn behind it as the
+ * whole silhouette. One shape — pill and tail share the same fill, no overlap.
+ */
+function ValueBubble({ text }: { text: string }) {
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const [dims, setDims] = useState({ w: 0, h: 0 });
+
+  useLayoutEffect(() => {
+    const el = labelRef.current;
+    if (el) setDims({ w: el.offsetWidth, h: el.offsetHeight });
+  }, [text]);
+
+  const { w: W, h: H } = dims;
+  const d = W > 0 && H > 0 ? bubblePathTop(W, H) : '';
+
+  return (
+    <span className="relative inline-block">
+      {d && (
+        <svg
+          width={W}
+          height={H + TIP_TH}
+          viewBox={`0 0 ${W} ${H + TIP_TH}`}
+          className="absolute left-0 top-0 overflow-visible drop-shadow-lg"
+          aria-hidden
+        >
+          <path d={d} fill="rgb(var(--brand-rgb))" />
+        </svg>
+      )}
+      <span
+        ref={labelRef}
+        className="relative block whitespace-nowrap px-3 py-1 text-callout font-semibold tabular-nums text-on-brand"
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export function Slider({
   value,
   min,
@@ -137,13 +213,11 @@ export function Slider({
       <div ref={trackRef} className="relative">
         <div
           ref={bubbleRef}
-          className="pointer-events-none absolute z-10 origin-bottom rounded-lg bg-brand/80 px-3 py-1 text-callout font-semibold tabular-nums text-on-brand shadow-lg backdrop-blur-sm will-change-transform"
+          className="pointer-events-none absolute z-10 origin-bottom will-change-transform"
           style={{ left: centerX, bottom: 'calc(100% + 10px)' }}
           aria-hidden
         >
-          {Math.round(live)}
-          {unit}
-          <span className="absolute left-1/2 top-full h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 rounded-[2px] bg-brand/80" />
+          <ValueBubble text={`${Math.round(live)}${unit}`} />
         </div>
         <input
           type="range"

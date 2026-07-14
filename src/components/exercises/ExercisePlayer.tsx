@@ -3,10 +3,16 @@
 import { useState } from 'react';
 import { Check, X, RotateCcw, Lightbulb, Sparkles, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Exercise, ValidationOutcome, BuildAnswer } from '@/lib/curriculum/types';
+import type {
+  Exercise,
+  ValidationOutcome,
+  BuildAnswer,
+  BarBuildAnswer,
+} from '@/lib/curriculum/types';
 import { validate } from '@/lib/curriculum/validate';
 import type { MentorReply } from '@/lib/ai/mentor';
 import { AutoLayoutCanvas } from './AutoLayoutCanvas';
+import { BarBuilder } from './BarBuilder';
 import { OrderCanvas } from './OrderCanvas';
 import { FigmaLinkSubmit } from './FigmaLinkSubmit';
 import { FileUploadZone } from './FileUploadZone';
@@ -18,7 +24,14 @@ import { TilePicker } from '@/components/ui/TilePicker';
 import { SwatchPicker } from '@/components/ui/SwatchPicker';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 
-type Answer = string | number | BuildAnswer | string[] | null;
+type Answer = string | number | BuildAnswer | BarBuildAnswer | string[] | null;
+
+const DEFAULT_BAR: BarBuildAnswer = {
+  placement: 'static',
+  variant: 'full',
+  parts: { logo: true, nav: true, search: false, cta: false, avatar: false },
+  navCenter: false,
+};
 
 /**
  * Plays a single exercise: capture answer → validate deterministically →
@@ -45,7 +58,9 @@ export function ExercisePlayer({
       ? { gap: exercise.min, padding: exercise.min }
       : exercise.type === 'order'
         ? exercise.items.map((i) => i.id)
-        : null;
+        : exercise.type === 'bar-build'
+          ? DEFAULT_BAR
+          : null;
   const [choice, setChoice] = useState<Answer>(initialChoice);
   const [outcome, setOutcome] = useState<ValidationOutcome | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -74,6 +89,23 @@ export function ExercisePlayer({
         return 'прикреплённый файл';
       case 'tune':
         return `${value}${exercise.unitLabel}`;
+      case 'bar-build': {
+        const v = value as BarBuildAnswer;
+        const placementRu: Record<BarBuildAnswer['placement'], string> = {
+          static: 'статичный',
+          fixedTop: 'фиксированный',
+          floatTop: 'плавающий сверху',
+          floatBottom: 'плавающий снизу',
+          sidebarLeft: 'боковой слева',
+          sidebarRight: 'боковой справа',
+        };
+        const variantRu: Record<BarBuildAnswer['variant'], string> = {
+          full: 'полный',
+          burger: 'бургер',
+          mini: 'мини',
+        };
+        return `${placementRu[v.placement]}, ${variantRu[v.variant]}`;
+      }
     }
   }
 
@@ -233,6 +265,15 @@ export function ExercisePlayer({
             value={(choice as string[]) ?? exercise.items.map((i) => i.id)}
             disabled={solved}
             onChange={(order) => setChoice(order)}
+          />
+        );
+      case 'bar-build':
+        return (
+          <BarBuilder
+            exercise={exercise}
+            value={(choice as BarBuildAnswer) ?? DEFAULT_BAR}
+            disabled={solved}
+            onChange={(next) => setChoice(next)}
           />
         );
       case 'figma-link':

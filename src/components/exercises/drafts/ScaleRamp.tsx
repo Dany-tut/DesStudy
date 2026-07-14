@@ -91,17 +91,17 @@ export function ScaleRamp() {
             const size = Math.round(base * Math.pow(ratio, step.n));
             return (
               <div key={step.key} className="flex items-baseline gap-3">
-                <span className="w-14 shrink-0 text-caption tabular-nums text-tertiary">
+                <span className="w-16 shrink-0 text-caption text-tertiary">
                   {step.label}
+                </span>
+                <span className="w-12 shrink-0 text-right text-footnote tabular-nums text-secondary">
+                  {size}px
                 </span>
                 <span
                   className="min-w-0 truncate font-semibold leading-tight text-primary transition-base"
                   style={{ fontSize: `${size}px` }}
                 >
                   Заголовок
-                </span>
-                <span className="ml-auto shrink-0 text-footnote tabular-nums text-tertiary">
-                  {size}px
                 </span>
               </div>
             );

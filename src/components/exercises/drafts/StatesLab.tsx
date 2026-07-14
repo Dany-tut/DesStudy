@@ -124,7 +124,7 @@ export function StatesLab() {
           </div>
 
           {/* Force-preview pills */}
-          <div className="flex flex-wrap gap-2 rounded-full border border-border bg-elevated p-1">
+          <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-elevated p-1">
             {STATES.map((s) => {
               const on = forced === s.key;
               return (

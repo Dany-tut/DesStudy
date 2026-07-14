@@ -151,13 +151,47 @@ export interface FileUploadExercise {
   explanation: string;
 }
 
+/**
+ * L1: assemble a navigation/top bar like a constructor. The learner picks how
+ * the bar sits on the page, its compact variant, which parts are in it, and how
+ * the nav aligns — then it's validated deterministically against a target
+ * config. The live preview is a real scrollable page so positioning is felt.
+ */
+export interface BarBuildExercise {
+  id: string;
+  type: 'bar-build';
+  prompt: string;
+  /** Target config the learner must reproduce. */
+  target: BarBuildAnswer;
+  explanation: string;
+}
+
+export type BarPlacement =
+  | 'static'
+  | 'fixedTop'
+  | 'floatTop'
+  | 'floatBottom'
+  | 'sidebarLeft'
+  | 'sidebarRight';
+export type BarVariant = 'full' | 'burger' | 'mini';
+export type BarPartKey = 'logo' | 'nav' | 'search' | 'cta' | 'avatar';
+
+/** The learner's assembled bar for a bar-build exercise. */
+export interface BarBuildAnswer {
+  placement: BarPlacement;
+  variant: BarVariant;
+  parts: Record<BarPartKey, boolean>;
+  navCenter: boolean;
+}
+
 export type Exercise =
   | ChooseExercise
   | TuneExercise
   | BuildExercise
   | OrderExercise
   | FigmaLinkExercise
-  | FileUploadExercise;
+  | FileUploadExercise
+  | BarBuildExercise;
 
 // ─────────────────────────────────────────────────────────────
 // LESSON — follows PRD Chapter 5 lesson structure.

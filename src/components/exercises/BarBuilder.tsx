@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   GraduationCap,
   Search,
@@ -17,28 +17,24 @@ import {
   Minimize2,
   Play,
 } from 'lucide-react';
+import type {
+  BarBuildExercise,
+  BarBuildAnswer,
+  BarPlacement,
+  BarVariant,
+  BarPartKey,
+} from '@/lib/curriculum/types';
 
 /**
- * DRAFT — exercise type "bar-builder".
- * The learner assembles a top/nav bar like a constructor: toggle parts in/out,
- * choose how it sits on the page, pick a compact variant, and align the nav.
- * The preview is a real scrollable page so the positioning behaviour is felt,
- * not just described — and selecting a mode *plays* a scripted scroll so you
- * see how that mode behaves (static fades away, fixed/floating stays pinned).
+ * Production control for the `bar-build` exercise. The learner assembles a
+ * nav/top bar like a constructor: how it sits on the page, its compact variant,
+ * which parts are in it, and how the nav aligns. Selecting a placement *plays*
+ * a scripted scroll so the behaviour is felt. Controlled: parent owns the
+ * answer via value/onChange; validation lives in the deterministic engine.
  */
 
-type Placement =
-  | 'static'
-  | 'fixedTop'
-  | 'floatTop'
-  | 'floatBottom'
-  | 'sidebarLeft'
-  | 'sidebarRight';
-type Variant = 'full' | 'burger' | 'mini';
-type PartKey = 'logo' | 'nav' | 'search' | 'cta' | 'avatar';
-
 const PLACEMENTS: {
-  key: Placement;
+  key: BarPlacement;
   label: string;
   icon: typeof Pin;
   hint: string;
@@ -51,13 +47,13 @@ const PLACEMENTS: {
   { key: 'sidebarRight', label: 'Боковой справа', icon: PanelRight, hint: 'вертикальный список' },
 ];
 
-const VARIANTS: { key: Variant; label: string; icon: typeof Menu; hint: string }[] = [
-  { key: 'full', label: 'Полный', icon: Layers, hint: 'всё раскрыто' },
-  { key: 'burger', label: 'Бургер', icon: Menu, hint: 'меню под иконку' },
-  { key: 'mini', label: 'Мини', icon: Minimize2, hint: 'свёрнутый, компактный' },
+const VARIANTS: { key: BarVariant; label: string; icon: typeof Menu }[] = [
+  { key: 'full', label: 'Полный', icon: Layers },
+  { key: 'burger', label: 'Бургер', icon: Menu },
+  { key: 'mini', label: 'Мини', icon: Minimize2 },
 ];
 
-const PARTS: { key: PartKey; label: string }[] = [
+const PARTS: { key: BarPartKey; label: string }[] = [
   { key: 'logo', label: 'Логотип' },
   { key: 'nav', label: 'Навигация' },
   { key: 'search', label: 'Поиск' },
@@ -65,82 +61,25 @@ const PARTS: { key: PartKey; label: string }[] = [
   { key: 'avatar', label: 'Профиль' },
 ];
 
-const TARGET = {
-  placement: 'floatTop' as Placement,
-  variant: 'full' as Variant,
-  parts: { logo: true, nav: true, search: false, cta: true, avatar: false },
-  navCenter: true,
-};
+const isSidebar = (p: BarPlacement) => p === 'sidebarLeft' || p === 'sidebarRight';
 
-const isSidebar = (p: Placement) => p === 'sidebarLeft' || p === 'sidebarRight';
-
-export function BarBuilder() {
-  const [placement, setPlacement] = useState<Placement>('static');
-  const [variant, setVariant] = useState<Variant>('full');
-  const [parts, setParts] = useState<Record<PartKey, boolean>>({
-    logo: true,
-    nav: true,
-    search: false,
-    cta: false,
-    avatar: false,
-  });
-  const [navCenter, setNavCenter] = useState(false);
-  const [autoplay, setAutoplay] = useState(true);
+export function BarBuilder({
+  value,
+  disabled = false,
+  onChange,
+}: {
+  exercise?: BarBuildExercise;
+  value: BarBuildAnswer;
+  disabled?: boolean;
+  onChange: (next: BarBuildAnswer) => void;
+}) {
+  const { placement, variant, parts, navCenter } = value;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
 
-  // Floating overlay scrollbar — painted on top of the content so the bar can
-  // reach the full width (no reserved native gutter). Thumb tracks scroll and
-  // can be dragged.
-  const [thumb, setThumb] = useState({ top: 0, height: 0, show: false });
-  const dragRef = useRef<{ startY: number; startScroll: number } | null>(null);
-
-  const syncThumb = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const { scrollHeight, clientHeight, scrollTop } = el;
-    if (scrollHeight <= clientHeight + 1) {
-      setThumb((t) => (t.show ? { ...t, show: false } : t));
-      return;
-    }
-    const height = Math.max(28, (clientHeight / scrollHeight) * clientHeight);
-    const top = (scrollTop / (scrollHeight - clientHeight)) * (clientHeight - height);
-    setThumb({ top, height, show: true });
-  };
-
-  useEffect(() => {
-    syncThumb();
-    const el = scrollRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(syncThumb);
-    ro.observe(el);
-    return () => ro.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placement, variant, parts, navCenter]);
-
-  const onThumbDown = (e: React.PointerEvent) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    (e.target as Element).setPointerCapture(e.pointerId);
-    dragRef.current = { startY: e.clientY, startScroll: el.scrollTop };
-  };
-  const onThumbMove = (e: React.PointerEvent) => {
-    const el = scrollRef.current;
-    const drag = dragRef.current;
-    if (!el || !drag) return;
-    const { scrollHeight, clientHeight } = el;
-    const trackable = clientHeight - thumb.height;
-    if (trackable <= 0) return;
-    const dy = e.clientY - drag.startY;
-    el.scrollTop = drag.startScroll + (dy / trackable) * (scrollHeight - clientHeight);
-  };
-  const onThumbUp = (e: React.PointerEvent) => {
-    dragRef.current = null;
-    (e.target as Element).releasePointerCapture(e.pointerId);
-  };
-
-  const togglePart = (k: PartKey) => setParts((p) => ({ ...p, [k]: !p[k] }));
+  const set = (patch: Partial<BarBuildAnswer>) => onChange({ ...value, ...patch });
+  const togglePart = (k: BarPartKey) => set({ parts: { ...parts, [k]: !parts[k] } });
 
   // Scripted scroll: glide down and back so the mode's behaviour is visible —
   // a static bar scrolls away under the top fade, fixed/floating stay put.
@@ -157,7 +96,6 @@ export function BarBuilder() {
 
     const step = (now: number) => {
       const t = Math.min(1, (now - start) / duration);
-      // Down for the first half, back up for the second — a there-and-back glide.
       const phase = t < 0.5 ? ease(t * 2) : ease((1 - t) * 2);
       el.scrollTop = phase * target;
       if (t < 1) rafRef.current = requestAnimationFrame(step);
@@ -166,26 +104,19 @@ export function BarBuilder() {
     rafRef.current = requestAnimationFrame(step);
   };
 
-  // Play on every mode change when autoplay is on. Sidebars don't scroll away,
-  // but the glide still shows content moving past a pinned rail.
+  // Play whenever the placement/variant changes.
   useEffect(() => {
-    if (autoplay) playDemo();
+    playDemo();
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placement, variant]);
 
-  const solved =
-    placement === TARGET.placement &&
-    variant === TARGET.variant &&
-    navCenter === TARGET.navCenter &&
-    (Object.keys(parts) as PartKey[]).every((k) => parts[k] === TARGET.parts[k]);
-
   return (
     <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
       {/* ── Controls ─────────────────────────────────────────── */}
-      <div className="flex flex-col gap-5">
+      <fieldset disabled={disabled} className="flex flex-col gap-5 disabled:opacity-60">
         <div>
           <p className="mb-2 text-footnote font-medium text-secondary">Как бар сидит на странице</p>
           <div className="flex flex-col gap-2">
@@ -195,7 +126,7 @@ export function BarBuilder() {
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setPlacement(key)}
+                  onClick={() => set({ placement: key })}
                   className={[
                     'flex items-center gap-3 rounded-xl border px-3 py-3 text-left transition-fast',
                     active
@@ -229,7 +160,7 @@ export function BarBuilder() {
               <button
                 key={key}
                 type="button"
-                onClick={() => setVariant(key)}
+                onClick={() => set({ variant: key })}
                 className={[
                   'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-footnote font-medium transition-fast',
                   variant === key ? 'bg-brand text-on-brand' : 'text-secondary hover:text-primary',
@@ -277,7 +208,7 @@ export function BarBuilder() {
               <button
                 key={label}
                 type="button"
-                onClick={() => setNavCenter(v)}
+                onClick={() => set({ navCenter: v })}
                 className={[
                   'rounded-md px-4 py-2 text-footnote font-medium transition-fast',
                   navCenter === v ? 'bg-brand text-on-brand' : 'text-secondary hover:text-primary',
@@ -289,91 +220,44 @@ export function BarBuilder() {
           </div>
         </div>
 
-        {/* Replay + autoplay toggle */}
-        <div className="flex items-center gap-2">
+        <div>
           <button
             type="button"
             onClick={playDemo}
             className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-medium text-primary transition-fast hover:bg-hover"
           >
             <Play size={14} />
-            Проиграть
-          </button>
-          <button
-            type="button"
-            onClick={() => setAutoplay((a) => !a)}
-            className={[
-              'flex items-center gap-2 rounded-lg px-3 py-2 text-footnote font-medium transition-fast',
-              autoplay
-                ? 'bg-brand/10 text-brand'
-                : 'border border-border bg-surface text-secondary hover:text-primary',
-            ].join(' ')}
-          >
-            {autoplay ? <Check size={14} /> : <Plus size={14} />}
-            Автопроигрыш
+            Проиграть режим
           </button>
         </div>
-
-        <div
-          className={[
-            'flex items-center gap-2 rounded-lg px-3 py-3 text-footnote transition-base',
-            solved ? 'bg-success/10 text-success' : 'bg-muted text-tertiary',
-          ].join(' ')}
-        >
-          {solved ? <Check size={16} /> : <Layers size={16} />}
-          {solved
-            ? 'Собрано верно — плавающий бар сверху, полный вид, лого + навигация по центру + CTA.'
-            : 'Цель: плавающий бар сверху, полный вид, логотип + навигация по центру + кнопка CTA.'}
-        </div>
-      </div>
+      </fieldset>
 
       {/* ── Live preview (scrollable page) ───────────────────── */}
       <div className="overflow-hidden rounded-xl border border-border bg-canvas">
         <div className="relative h-[360px]">
-          {/* Top fade so a static bar visibly dissolves as it scrolls under. */}
           {placement === 'static' && (
             <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-12 bg-gradient-to-b from-canvas to-transparent" />
           )}
 
           <div
             ref={scrollRef}
-            onScroll={syncThumb}
             className={[
-              'hide-native-scroll h-full overflow-y-auto overscroll-contain',
+              'h-full overflow-y-auto overscroll-contain',
               isSidebar(placement) ? 'flex' : 'block',
             ].join(' ')}
           >
             {placement === 'sidebarRight' && <PageContent placement={placement} />}
-
-            <BarPreview
-              placement={placement}
-              variant={variant}
-              parts={parts}
-              navCenter={navCenter}
-            />
-
+            <BarPreview placement={placement} variant={variant} parts={parts} navCenter={navCenter} />
             {placement !== 'sidebarRight' && <PageContent placement={placement} />}
           </div>
-
-          {/* Floating overlay scrollbar — always painted above the bar */}
-          {thumb.show && (
-            <div
-              onPointerDown={onThumbDown}
-              onPointerMove={onThumbMove}
-              onPointerUp={onThumbUp}
-              className="absolute right-1 z-20 w-1.5 cursor-grab rounded-full bg-border-strong transition-colors hover:bg-tertiary active:cursor-grabbing"
-              style={{ top: thumb.top, height: thumb.height }}
-            />
-          )}
         </div>
       </div>
     </div>
   );
 }
 
-function PageContent({ placement }: { placement: Placement }) {
-  const padTop =
-    placement === 'fixedTop' || placement === 'floatTop' ? 84 : isSidebar(placement) ? 16 : 16;
+function PageContent({ placement }: { placement: BarPlacement }) {
+  const padTop = placement === 'fixedTop' || placement === 'floatTop' ? 84 : 16;
   const padBottom = placement === 'floatBottom' ? 84 : 16;
 
   return (
@@ -402,9 +286,9 @@ function BarPreview({
   parts,
   navCenter,
 }: {
-  placement: Placement;
-  variant: Variant;
-  parts: Record<PartKey, boolean>;
+  placement: BarPlacement;
+  variant: BarVariant;
+  parts: Record<BarPartKey, boolean>;
   navCenter: boolean;
 }) {
   const sidebar = isSidebar(placement);
@@ -412,7 +296,6 @@ function BarPreview({
   const sticky = placement === 'fixedTop' || floating;
   const mini = variant === 'mini';
 
-  // Vertical rail — the sidebar layout renders parts stacked and pinned.
   if (sidebar) {
     return (
       <div
@@ -480,7 +363,6 @@ function BarPreview({
     );
   }
 
-  // Horizontal bar — static / fixed / floating (top or bottom).
   const wrapStyle: React.CSSProperties = sticky
     ? {
         position: 'sticky',
@@ -498,9 +380,7 @@ function BarPreview({
       <div
         className={[
           'flex items-center gap-3 bg-elevated px-4',
-          floating
-            ? 'rounded-full border border-border shadow-lg'
-            : 'border-b border-border',
+          floating ? 'rounded-full border border-border shadow-lg' : 'border-b border-border',
         ].join(' ')}
         style={{ height: mini ? 44 : 56 }}
       >
@@ -528,10 +408,9 @@ function BarPreview({
             </>
           ) : (
             <nav
-              className={[
-                'flex items-center gap-4',
-                navCenter ? 'flex-1 justify-center' : '',
-              ].join(' ')}
+              className={['flex items-center gap-4', navCenter ? 'flex-1 justify-center' : ''].join(
+                ' ',
+              )}
             >
               {['Главная', 'Курсы', 'О нас'].map((l) => (
                 <span key={l} className="text-footnote font-medium text-secondary">
@@ -541,7 +420,6 @@ function BarPreview({
             </nav>
           ))}
 
-        {/* Spacer pushes trailing items right when nav isn't centered */}
         {!(parts.nav && (navCenter || variant === 'burger')) && <span className="flex-1" />}
 
         {parts.search && !mini && (

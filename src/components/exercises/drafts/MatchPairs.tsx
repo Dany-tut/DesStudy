@@ -106,20 +106,26 @@ export function MatchPairs() {
       <div ref={boardRef} className="relative flex gap-4">
         {/* Connector lines between matched pairs */}
         <svg className="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible">
-          {lines.map((ln) => (
-            <line
-              key={ln.id}
-              x1={ln.x1}
-              y1={ln.y1}
-              x2={ln.x2}
-              y2={ln.y2}
-              className="text-success"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              style={{ animation: 'matchpairs-draw 0.3s ease' }}
-            />
-          ))}
+          {lines.map((ln) => {
+            // Gently curved connector: control points pulled ~45% toward the
+            // midpoint horizontally so the line eases off each endpoint instead
+            // of being dead straight.
+            const dx = (ln.x2 - ln.x1) * 0.45;
+            const c1x = ln.x1 + dx;
+            const c2x = ln.x2 - dx;
+            return (
+              <path
+                key={ln.id}
+                d={`M ${ln.x1} ${ln.y1} C ${c1x} ${ln.y1}, ${c2x} ${ln.y2}, ${ln.x2} ${ln.y2}`}
+                className="text-success"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                style={{ animation: 'matchpairs-draw 0.3s ease' }}
+              />
+            );
+          })}
           {lines.map((ln) => (
             <g key={`${ln.id}-dots`} className="text-success">
               <circle cx={ln.x1} cy={ln.y1} r={3} fill="currentColor" />
