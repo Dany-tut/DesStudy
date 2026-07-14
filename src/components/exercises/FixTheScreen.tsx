@@ -5,6 +5,8 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
+  Plus,
   ArrowLeft,
   Calendar,
   Clock,
@@ -46,10 +48,28 @@ function PhonePreview({
   faded?: boolean;
 }) {
   const cardRadius =
-    fixes.radius === 'xl' ? 'rounded-2xl' : fixes.radius === 'md' ? 'rounded-lg' : 'rounded-[4px]';
-  const blockGap = fixes.gap === 'even' ? 'gap-4' : 'gap-1';
-  const pillOn = fixes.pillColor === 'brand';
+    fixes.radius === 'xl'
+      ? 'rounded-2xl'
+      : fixes.radius === 'md'
+        ? 'rounded-lg'
+        : fixes.radius === 'full'
+          ? 'rounded-full'
+          : 'rounded-[4px]';
+  const blockGap =
+    fixes.gap === 'even'
+      ? 'gap-4'
+      : fixes.gap === 'loose'
+        ? 'gap-8'
+        : fixes.gap === 'zero'
+          ? 'gap-0'
+          : 'gap-1';
+  const pillMode = fixes.pillColor; // 'brand' | 'gray' | 'rainbow' | 'red'
   const ctaFull = fixes.cta === 'full';
+  const ctaCenter = fixes.cta === 'center';
+  const ctaRight = fixes.cta === 'right';
+
+  // Distinct hue per chip for the "rainbow" distractor — deliberately noisy.
+  const RAINBOW = ['#E5484D', '#F5A623', '#30A46C', '#0091FF'];
 
   const ring = (key: DefectKey) =>
     highlight === key ? 'ring-2 ring-brand ring-offset-2 ring-offset-surface' : '';
@@ -75,13 +95,24 @@ function PhonePreview({
               key={c}
               className={[
                 'rounded-full px-3 py-1 text-caption font-semibold transition-fast',
-                pillOn
+                pillMode === 'brand'
                   ? i % 2 === 0
                     ? 'bg-brand text-on-brand'
                     : 'bg-brand/15 text-brand'
                   : 'text-white',
               ].join(' ')}
-              style={pillOn ? undefined : { backgroundColor: '#9AA0A6' }}
+              style={
+                pillMode === 'brand'
+                  ? undefined
+                  : {
+                      backgroundColor:
+                        pillMode === 'rainbow'
+                          ? RAINBOW[i % RAINBOW.length]
+                          : pillMode === 'red'
+                            ? '#E5484D'
+                            : '#9AA0A6',
+                    }
+              }
             >
               {c}
             </span>
@@ -100,6 +131,10 @@ function PhonePreview({
           <span className="text-footnote text-secondary">Biology</span>
           {fixes.chevron === 'down' ? (
             <ChevronDown size={16} className="text-tertiary" />
+          ) : fixes.chevron === 'up' ? (
+            <ChevronUp size={16} className="text-tertiary" />
+          ) : fixes.chevron === 'plus' ? (
+            <Plus size={16} className="text-tertiary" />
           ) : (
             <ChevronRight size={16} className="text-tertiary" />
           )}
@@ -126,7 +161,19 @@ function PhonePreview({
       </div>
 
       {/* CTA */}
-      <div className={['mt-4', ctaFull ? '' : 'flex justify-start', ring('cta')].join(' ')}>
+      <div
+        className={[
+          'mt-4',
+          ctaFull
+            ? ''
+            : ctaCenter
+              ? 'flex justify-center'
+              : ctaRight
+                ? 'flex justify-end'
+                : 'flex justify-start',
+          ring('cta'),
+        ].join(' ')}
+      >
         <button
           type="button"
           className={[
@@ -152,8 +199,7 @@ function PhonePreview({
           { icon: GraduationCap, key: 'class' },
           { icon: MessageCircle, key: 'chat' },
         ].map(({ icon: Icon, key }) => {
-          const active =
-            fixes.navActive === 'all' || (fixes.navActive === 'home' && key === 'home');
+          const active = fixes.navActive === 'all' || fixes.navActive === key;
           return (
             <Icon
               key={key}
@@ -182,8 +228,10 @@ export function FixTheScreen({
   const fixes = controlled ? (value ?? FIX_INITIAL) : internalFixes;
 
   const [active, setActive] = useState<DefectKey>(FIX_DEFECTS[0].key);
-  // Wrong-pick feedback per defect (cleared when corrected).
-  const [wrong, setWrong] = useState<Partial<Record<DefectKey, string>>>({});
+  // Defects the learner has actively picked on. Correct/wrong styling shows
+  // only after a real click — never on the broken initial value, so the answer
+  // is never pre-revealed.
+  const [touched, setTouched] = useState<Set<DefectKey>>(() => new Set());
 
   const fixedCount = fixSolvedCount(fixes);
   const allFixed = fixedCount === FIX_DEFECTS.length;
@@ -193,21 +241,18 @@ export function FixTheScreen({
     const next = { ...fixes, [defect.key]: option.id };
     if (controlled) onChange!(next);
     else setInternalFixes(next);
-    setWrong((prev) => {
-      const draft = { ...prev };
-      if (option.correct) delete draft[defect.key];
-      else draft[defect.key] = option.feedback ?? 'Не то — сверься с эталоном «Было» слева.';
-      return draft;
-    });
+    setTouched((prev) => new Set(prev).add(defect.key));
   }
 
   function reset() {
     setInternalFixes(FIX_INITIAL);
-    setWrong({});
+    setTouched(new Set());
     setActive(FIX_DEFECTS[0].key);
   }
 
   const activeDefect = FIX_DEFECTS.find((d) => d.key === active)!;
+  const activePicked = activeDefect.options.find((o) => o.id === fixes[activeDefect.key]);
+  const showWrong = touched.has(activeDefect.key) && activePicked && !activePicked.correct;
 
   return (
     <div className="flex flex-col gap-6">
@@ -289,7 +334,8 @@ export function FixTheScreen({
               <p className="mt-1 text-caption text-secondary">{activeDefect.hint}</p>
               <div className="mt-3 flex flex-col gap-2">
                 {activeDefect.options.map((o) => {
-                  const picked = fixes[activeDefect.key] === o.id;
+                  const seen = touched.has(activeDefect.key);
+                  const picked = seen && fixes[activeDefect.key] === o.id;
                   const isCorrectPick = picked && o.correct;
                   return (
                     <button
@@ -312,8 +358,10 @@ export function FixTheScreen({
                   );
                 })}
               </div>
-              {wrong[activeDefect.key] && (
-                <p className="mt-2 text-caption text-danger">{wrong[activeDefect.key]}</p>
+              {showWrong && (
+                <p className="mt-2 text-caption text-danger">
+                  {activePicked?.feedback ?? 'Не то — сверься с эталоном «Было» слева.'}
+                </p>
               )}
             </div>
           )}

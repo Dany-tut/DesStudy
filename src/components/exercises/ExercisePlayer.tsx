@@ -28,6 +28,8 @@ import { ContrastTuner } from './drafts/ContrastTuner';
 import { ScaleRamp } from './drafts/ScaleRamp';
 import { TrimZone } from './TrimZone';
 import { NestedRadius } from './NestedRadius';
+import { ResizeFrame } from './ResizeFrame';
+import { Elevation } from './Elevation';
 import { FixTheScreen } from './FixTheScreen';
 import { FIX_INITIAL, fixSolvedCount, type FixScreenAnswer } from '@/lib/curriculum/fixScreen';
 import { Button } from '@/components/ui/Button';
@@ -95,9 +97,13 @@ export function ExercisePlayer({
                   ? { base: 16, ratio: 1.25 }
                   : exercise.type === 'trim-zone' || exercise.type === 'nested-radius'
                     ? 0
-                    : exercise.type === 'fix-screen'
-                      ? FIX_INITIAL
-                      : null;
+                    : exercise.type === 'resize-frame'
+                      ? exercise.minWidth
+                      : exercise.type === 'elevation'
+                        ? 0
+                        : exercise.type === 'fix-screen'
+                          ? FIX_INITIAL
+                          : null;
   const [choice, setChoice] = useState<Answer>(initialChoice);
   const [outcome, setOutcome] = useState<ValidationOutcome | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -173,6 +179,10 @@ export function ExercisePlayer({
         return `срез ${value}px`;
       case 'nested-radius':
         return `внутренний радиус ${value}px`;
+      case 'resize-frame':
+        return `ширина ${Math.round(value as number)}px`;
+      case 'elevation':
+        return `уровень ${value}`;
       case 'fix-screen': {
         const solved = fixSolvedCount(value as FixScreenAnswer);
         return `исправлено ${solved} из 6 нарушений`;
@@ -435,6 +445,30 @@ export function ExercisePlayer({
             outerRadius={exercise.outerRadius}
             padding={exercise.padding}
             maxRadius={exercise.maxRadius}
+            value={typeof choice === 'number' ? choice : 0}
+            disabled={solved}
+            onChange={(v) => setChoice(v)}
+          />
+        );
+      case 'resize-frame':
+        return (
+          <ResizeFrame
+            minWidth={exercise.minWidth}
+            maxWidth={exercise.maxWidth}
+            targetWidth={exercise.targetWidth}
+            tolerance={exercise.tolerance}
+            breakpoints={exercise.breakpoints}
+            value={typeof choice === 'number' ? choice : exercise.minWidth}
+            disabled={solved}
+            onChange={(v) => setChoice(v)}
+          />
+        );
+      case 'elevation':
+        return (
+          <Elevation
+            maxLevel={exercise.maxLevel}
+            targetLevel={exercise.targetLevel}
+            label={exercise.label}
             value={typeof choice === 'number' ? choice : 0}
             disabled={solved}
             onChange={(v) => setChoice(v)}

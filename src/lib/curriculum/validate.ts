@@ -290,6 +290,32 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
             : 'Внутренний радиус маловат — угол кнопки острее угла карточки.',
       };
     }
+    case 'resize-frame': {
+      const width = Number(answer);
+      const correct = Math.abs(width - exercise.targetWidth) <= exercise.tolerance;
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : width < exercise.targetWidth
+            ? `Сейчас ${Math.round(width)}px — уже цели ${exercise.targetWidth}px. Потяни рамку шире.`
+            : `Сейчас ${Math.round(width)}px — шире цели ${exercise.targetWidth}px. Сузь рамку.`,
+      };
+    }
+    case 'elevation': {
+      const level = Number(answer);
+      const correct = level === exercise.targetLevel;
+      return {
+        correct,
+        explanation: exercise.explanation,
+        hint: correct
+          ? undefined
+          : level < exercise.targetLevel
+            ? 'Слишком «приземлённо» — подними карточку выше, тень должна стать заметнее.'
+            : 'Перебор — карточка парит слишком высоко, тень разъехалась. Опусти на уровень ниже.',
+      };
+    }
     case 'fix-screen': {
       const solved = fixSolvedCount(answer as Partial<FixScreenAnswer>);
       const total = FIX_DEFECTS.length;

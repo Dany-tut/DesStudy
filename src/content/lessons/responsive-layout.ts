@@ -11,7 +11,7 @@ export const responsiveLayout: Lesson = {
   pathTitle: 'UI Foundations',
   skill: 'responsive',
   difficulty: 'medium',
-  estimatedMinutes: 12,
+  estimatedMinutes: 14,
   objectives: [
     'Задавать разные типографические шкалы для mobile и desktop',
     'Понимать брейкпоинты и перекомпоновку, а не простое масштабирование',
@@ -81,6 +81,23 @@ export const responsiveLayout: Lesson = {
       correctOptionId: 'a',
       explanation:
         'Брейкпоинты ставят там, где контент перестаёт нормально помещаться. Привязка к конкретным устройствам устаревает; привязка к поведению вёрстки — устойчива.',
+    },
+    {
+      id: 'rl-resize-1',
+      type: 'resize-frame',
+      prompt:
+        'Потяни рамку и найди планшетную ширину — 768px. Заметь, как на этой точке галерея перестраивается с одной колонки на две.',
+      minWidth: 320,
+      maxWidth: 1200,
+      targetWidth: 768,
+      tolerance: 24,
+      breakpoints: [
+        { at: 0, columns: 1, label: 'Мобайл' },
+        { at: 600, columns: 2, label: 'Планшет' },
+        { at: 960, columns: 3, label: 'Десктоп' },
+      ],
+      explanation:
+        'Брейкпоинт — это ширина, на которой раскладка перестраивается. Около 768px одна колонка становится тесной для карточек, и сетка разворачивается в две. Точку ставят там, где контент «просит» перекомпоновки, а не под конкретную модель планшета.',
     },
     {
       id: 'rl-choose-4',

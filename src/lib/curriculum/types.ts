@@ -336,6 +336,60 @@ export interface NestedRadiusExercise {
   explanation: string;
 }
 
+/**
+ * L1: drag the frame's right handle to a target breakpoint width. As the frame
+ * narrows/widens, the demo content reflows (3-col → 2-col → 1-col), so the
+ * learner *feels* where the layout should break. Correct when the width lands on
+ * the target breakpoint within tolerance.
+ */
+export interface ResizeFrameExercise {
+  id: string;
+  type: 'resize-frame';
+  prompt: string;
+  /** Draggable width bounds, in px. */
+  minWidth: number;
+  maxWidth: number;
+  /** Width the learner must reach, in px. */
+  targetWidth: number;
+  /** Acceptable ± tolerance around the target, in px. */
+  tolerance: number;
+  /**
+   * Breakpoints at which the preview reflows, low → high width. Each `at` is the
+   * min width (px) at which `columns` applies. The lowest band applies below the
+   * first `at`.
+   */
+  breakpoints: ResizeBreakpoint[];
+  explanation: string;
+}
+
+export interface ResizeBreakpoint {
+  /** Min width (px) at which this band starts. */
+  at: number;
+  /** Column count the demo grid uses in this band. */
+  columns: number;
+  /** Short label shown when this band is active, e.g. "Планшет". */
+  label: string;
+}
+
+/**
+ * L1: lift a card to the requested elevation level. Dragging the card up raises
+ * it through the elevation token scale (0 = flat … N = highest); the shadow's
+ * y-offset, blur, and opacity all derive from the level. Correct when the level
+ * matches the target — teaches elevation as a discrete token, not a free shadow.
+ */
+export interface ElevationExercise {
+  id: string;
+  type: 'elevation';
+  prompt: string;
+  /** Highest selectable level (scale is 0..maxLevel). */
+  maxLevel: number;
+  /** The elevation level the learner must reach. */
+  targetLevel: number;
+  /** What sits on the card, purely for context, e.g. "Модальное окно". */
+  label: string;
+  explanation: string;
+}
+
 export type Exercise =
   | ChooseExercise
   | TuneExercise
@@ -352,6 +406,8 @@ export type Exercise =
   | ScaleRampExercise
   | TrimZoneExercise
   | NestedRadiusExercise
+  | ResizeFrameExercise
+  | ElevationExercise
   | FixScreenExercise;
 
 // ─────────────────────────────────────────────────────────────
