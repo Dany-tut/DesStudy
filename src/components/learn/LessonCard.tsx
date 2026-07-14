@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ListChecks, BarChart3, Clock, Lock, Check, Flame } from 'lucide-react';
+import { ListChecks, BarChart3, Clock, Lock, Check, Flame, BookOpen } from 'lucide-react';
 import { LEVEL_LABEL, type LessonEntry } from '@/content/curriculum';
 
 /** Russian plural for "задача": 1 задача, 2–4 задачи, 5+ задач. */
@@ -49,7 +49,15 @@ export function LessonCard({
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-tertiary">
         <span className="inline-flex items-center gap-1">
-          <ListChecks size={13} /> {tasksLabel(lesson.tasks)}
+          {lesson.kind === 'lecture' ? (
+            <>
+              <BookOpen size={13} /> Лекция
+            </>
+          ) : (
+            <>
+              <ListChecks size={13} /> {tasksLabel(lesson.tasks)}
+            </>
+          )}
         </span>
         <span className="inline-flex items-center gap-1">
           <BarChart3 size={13} /> {LEVEL_LABEL[lesson.level]}

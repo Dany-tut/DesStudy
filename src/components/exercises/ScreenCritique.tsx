@@ -14,7 +14,10 @@ import {
   X,
   RotateCcw,
   Tag,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
+import type { FixReply } from '@/lib/ai/mentor';
 
 /**
  * Screen-critique — the INVERSE of screen-walkthrough. Instead of the mentor
@@ -64,6 +67,8 @@ interface Truth {
   debatable: RoleId[];
   /** what a mentor says for a debatable pick, and why the correct one is stronger. */
   note: string;
+  /** design intent of the region — ground truth the mentor judges a fix against. */
+  intent: string;
 }
 
 const TRUTH: Record<Region, Truth> = {
@@ -71,33 +76,48 @@ const TRUTH: Record<Region, Truth> = {
     correct: 'nav',
     debatable: ['neutral'],
     note: 'Топ-бар и правда почти нейтрален — но у него есть работа: вход назад и настройки. Это навигация, а не просто фон.',
+    intent:
+      'Минимальный топ-бар: назад слева, настройки справа, между ними воздух. Намеренно тихий, чтобы не конкурировать с балансом за внимание — только обрамляет экран и даёт выход.',
   },
   header: {
     correct: 'accent',
     debatable: [],
     note: 'Баланс 980 000 ₽ — то, ради чего открывают экран. Это главный акцент, спорить тут почти не с чем.',
+    intent:
+      'Шапка карты с балансом — смысловой центр экрана. Заголовок слева, баланс прижат вправо по одной линии. Баланс намеренно крупный и контрастный — это первое, что должен увидеть глаз.',
   },
   chips: {
     correct: 'secondary',
     debatable: ['neutral'],
     note: 'Чипы карты — второстепенное: они нужны, но не тянут взгляд. Назвать их «нейтральным фоном» можно, но у них есть смысл (номер, добавить).',
+    intent:
+      'Чипы карты: последние цифры и кнопка добавить. Второстепенный, но осмысленный ряд — меньший радиус и размер, чем у плиток действий, чтобы не спорить с ними за вес.',
   },
   actions: {
     correct: 'secondary',
     debatable: ['neutral'],
     note: 'Быстрые действия — важное второстепенное. Как «нейтральный фон» их видеть можно (серые плитки), но по функции это ядро сценария.',
+    intent:
+      'Три плитки быстрых действий делят ширину на равные колонки (space-between), иконки и подписи центрированы. Нейтральные поверхности — важные по функции, но визуально спокойные, чтобы не перебивать баланс.',
   },
   promo: {
     correct: 'promo',
     debatable: ['accent'],
     note: 'Промо-вклад — реклама, живёт отдельно от карты. Назвать его «главным акцентом» защитимо — он яркий и продаёт — но это НЕ то, ради чего пришёл пользователь.',
+    intent:
+      'Промо-вклад — рекламный блок в фирменном фиолетовом. Живёт отдельно от карты. Яркий намеренно (продаёт), но по иерархии ниже баланса — пользователь пришёл не за ним.',
   },
   bonuses: {
     correct: 'secondary',
     debatable: ['promo'],
     note: 'Бонусы — второстепенная выгода по карте. Близко к «рекламе», но это свойство продукта, а не отдельный баннер.',
+    intent:
+      'Бонусы по карте — две плитки кэшбэка с оранжевым акцентом-иконкой. Второстепенная выгода продукта: единственный тёплый цвет на экране цепляет глаз, но блок стоит внизу, после главного.',
   },
 };
+
+const SCREEN_TITLE =
+  'Экран банковской «Премиум карты» — баланс, действия, промо и бонусы';
 
 const REGION_TITLE: Record<Region, string> = {
   topbar: 'Топ-бар',
@@ -127,11 +147,20 @@ const VERDICT_UI: Record<
   wrong: { ring: '#F85149', label: 'Мимо', icon: X, text: 'text-[#F85149]', bg: 'bg-[#F85149]/10' },
 };
 
+/** Mentor verdict on a free-text fix → same green/yellow/red language. */
+const FIX_UI: Record<FixReply['verdict'], { label: string; text: string }> = {
+  improves: { label: 'Улучшает', text: 'text-[#3FB950]' },
+  subjective: { label: 'Дело вкуса', text: 'text-[#E3B341]' },
+  breaks: { label: 'Сломала бы', text: 'text-[#F85149]' },
+};
+
 export function ScreenCritique() {
   const [assignments, setAssignments] = useState<Assignments>({});
   const [fixes, setFixes] = useState<Fixes>({});
   const [selected, setSelected] = useState<Region | null>(null);
   const [checked, setChecked] = useState(false);
+  const [fixReplies, setFixReplies] = useState<Partial<Record<Region, FixReply>>>({});
+  const [fixLoading, setFixLoading] = useState(false);
 
   const verdicts = useMemo(() => {
     if (!checked) return {} as Record<Region, Verdict>;
@@ -150,11 +179,52 @@ export function ScreenCritique() {
     setAssignments((a) => ({ ...a, [selected]: role }));
   }
 
+  async function check() {
+    setChecked(true);
+    // Send every non-empty fix note to the mentor for a 3-state verdict.
+    const pending = (Object.keys(fixes) as Region[]).filter((r) => fixes[r]?.trim());
+    if (pending.length === 0) return;
+    setFixLoading(true);
+    try {
+      const results = await Promise.all(
+        pending.map(async (r) => {
+          try {
+            const res = await fetch('/api/critique-fix', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                screenTitle: SCREEN_TITLE,
+                region: REGION_TITLE[r],
+                intent: TRUTH[r].intent,
+                fix: fixes[r],
+              }),
+            });
+            return [r, (await res.json()) as FixReply] as const;
+          } catch {
+            return [
+              r,
+              {
+                verdict: 'subjective',
+                comment: 'Не удалось связаться с ментором — оцени правку сам по разбору роли.',
+                offline: true,
+              } as FixReply,
+            ] as const;
+          }
+        }),
+      );
+      setFixReplies(Object.fromEntries(results));
+    } finally {
+      setFixLoading(false);
+    }
+  }
+
   function reset() {
     setAssignments({});
     setFixes({});
     setSelected(null);
     setChecked(false);
+    setFixReplies({});
+    setFixLoading(false);
   }
 
   const summary = useMemo(() => {
@@ -290,7 +360,7 @@ export function ScreenCritique() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setChecked(true)}
+                  onClick={check}
                   disabled={assignedCount === 0}
                   className="rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand transition-fast hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -357,9 +427,35 @@ export function ScreenCritique() {
                         <p className="mt-1.5 text-footnote text-secondary">{t.note}</p>
                       )}
                       {fixes[r]?.trim() && (
-                        <p className="mt-1.5 text-caption text-tertiary">
-                          Твоя правка: «{fixes[r]}»
-                        </p>
+                        <div className="mt-2 rounded-lg border border-border bg-surface p-2.5">
+                          <p className="text-caption text-tertiary">Твоя правка: «{fixes[r]}»</p>
+                          {fixLoading && !fixReplies[r] ? (
+                            <p className="mt-1.5 flex items-center gap-1.5 text-caption text-tertiary">
+                              <Loader2 size={12} className="animate-spin" />
+                              Ментор оценивает правку…
+                            </p>
+                          ) : (
+                            fixReplies[r] && (
+                              <div className="mt-1.5">
+                                <span
+                                  className={[
+                                    'inline-flex items-center gap-1 text-caption font-medium',
+                                    FIX_UI[fixReplies[r]!.verdict].text,
+                                  ].join(' ')}
+                                >
+                                  <Sparkles size={12} />
+                                  {FIX_UI[fixReplies[r]!.verdict].label}
+                                  {fixReplies[r]!.offline && (
+                                    <span className="text-tertiary">· офлайн</span>
+                                  )}
+                                </span>
+                                <p className="mt-0.5 text-footnote text-secondary">
+                                  {fixReplies[r]!.comment}
+                                </p>
+                              </div>
+                            )
+                          )}
+                        </div>
                       )}
                     </div>
                   );

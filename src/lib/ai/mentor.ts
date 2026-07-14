@@ -189,6 +189,95 @@ export async function coachObservation(input: ObserveInput): Promise<ObserveRepl
   }
 }
 
+// ── Fix critique ────────────────────────────────────────────────────────────
+// Judges a learner's free-text "what I'd change here" against the region's
+// actual design intent. Design is subjective, so the verdict is 3-state and
+// maps to the same green/yellow/red the UI already uses for role tagging.
+
+export interface FixInput {
+  screenTitle: string;
+  /** Human title of the region the fix targets, e.g. "Промо-вклад". */
+  region: string;
+  /** Why the region is designed the way it is — ground truth for the mentor. */
+  intent: string;
+  /** The learner's proposed change, free text. */
+  fix: string;
+}
+
+export interface FixReply {
+  /** improves → green, subjective → yellow, breaks → red. */
+  verdict: 'improves' | 'subjective' | 'breaks';
+  /** One short mentor line explaining the verdict. */
+  comment: string;
+  offline?: boolean;
+}
+
+const FIX_SYSTEM = `You are the AI Mentor inside DesStudy, judging a learner's proposed change to one region of a UI screen.
+
+Design is subjective — there is rarely one right answer. You are given the region, its actual design intent (ground truth), and the learner's proposed fix.
+
+Classify the fix into exactly one verdict:
+- "improves": the change genuinely sharpens the design or fixes a real weakness.
+- "subjective": a defensible matter of taste — neither clearly better nor worse; it wouldn't break anything.
+- "breaks": the change would harm hierarchy, consistency, or usability, or misreads the intent.
+
+Then write ONE short comment (max ~2 sentences) explaining the verdict — warm, specific, professional, never scolding, never a lecture. If the fix is empty or vague, lean "subjective" and ask for a concrete change.
+
+Write in Russian. No preamble.`;
+
+const FIX_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    verdict: { type: 'string' as const, enum: ['improves', 'subjective', 'breaks'] },
+    comment: { type: 'string' as const },
+  },
+  required: ['verdict', 'comment'],
+  additionalProperties: false,
+};
+
+function fixFallback(): FixReply {
+  return {
+    verdict: 'subjective',
+    comment:
+      'Ментор офлайн — формулировку правки не проверить. Сверься с разбором роли и реши сам, улучшает ли она экран.',
+    offline: true,
+  };
+}
+
+export async function coachFix(input: FixInput): Promise<FixReply> {
+  if (!process.env.ANTHROPIC_API_KEY) return fixFallback();
+
+  const client = new Anthropic();
+
+  const userPrompt = [
+    `Экран: ${input.screenTitle}`,
+    `Зона: ${input.region}`,
+    `Замысел зоны (истина): ${input.intent}`,
+    '',
+    `Правка студента: ${input.fix}`,
+    '',
+    'Оцени правку: улучшает / дело вкуса / сломала бы — и коротко объясни.',
+  ].join('\n');
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-opus-4-8',
+      max_tokens: 1024,
+      system: FIX_SYSTEM,
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: FIX_SCHEMA } },
+      messages: [{ role: 'user', content: userPrompt }],
+    });
+
+    const text = response.content.find((b) => b.type === 'text');
+    if (text && text.type === 'text') {
+      return { ...(JSON.parse(text.text) as Omit<FixReply, 'offline'>) };
+    }
+    return fixFallback();
+  } catch {
+    return fixFallback();
+  }
+}
+
 export async function coach(input: MentorInput): Promise<MentorReply> {
   if (!process.env.ANTHROPIC_API_KEY) return fallback(input);
 

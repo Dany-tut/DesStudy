@@ -421,6 +421,22 @@ export interface LessonExample {
   visual: string;
 }
 
+/**
+ * A slide-like section of a general lecture — reads like one of the deck's
+ * cards: a heading, a few paragraphs, an optional row of pill "chips", and an
+ * optional example visual. Used only by lectures (`kind: 'lecture'`), where the
+ * point is to *see* design ideas rather than drill a single micro-skill.
+ */
+export interface LectureSection {
+  heading: string;
+  /** Paragraphs — support the same **bold** markup as `theory`. */
+  body?: string[];
+  /** Optional pill/tag row (the rounded chips on the slides). */
+  chips?: string[];
+  /** Optional example visual (component key, same registry as examples). */
+  visual?: string;
+}
+
 export interface LessonVideo {
   url: string;
   caption: string;
@@ -434,17 +450,26 @@ export interface Lesson {
   pathTitle: string;
   /** Skill key for weak/strong-skill analytics, e.g. "spacing". */
   skill: string;
+  /**
+   * 'lesson' (default) — a skill drill: theory + exercises + mastery challenge.
+   * 'lecture' — a general, conceptual reading (slide-like `sections`); exercises
+   * and the mastery challenge are optional, so it can be a pure read.
+   */
+  kind?: 'lesson' | 'lecture';
   difficulty: Difficulty;
   estimatedMinutes: number;
   objectives: string[];
   prerequisites: string[];
   /** Short, interactive theory — kept minimal by design. */
   theory: string[];
+  /** Slide-like sections — the body of a `kind: 'lecture'` reading. */
+  sections?: LectureSection[];
   /** Optional short video(s) — embedded alongside theory. */
   videos?: LessonVideo[];
   examples: LessonExample[];
   exercises: Exercise[];
-  masteryChallenge: Exercise;
+  /** Optional — lectures may end without a graded challenge. */
+  masteryChallenge?: Exercise;
 }
 
 // ─────────────────────────────────────────────────────────────

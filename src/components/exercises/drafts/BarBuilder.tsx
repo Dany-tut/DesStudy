@@ -129,6 +129,16 @@ export function BarBuilder() {
   const chipRailRef = useRef<HTMLDivElement>(null);
   const chipDrag = useRef({ x: 0, scroll: 0, moved: false, active: false });
 
+  // Edge-aware fades: left appears once scrolled away from the start, right
+  // hides at the end — so a fade always signals "there's more this way".
+  const [chipEdges, setChipEdges] = useState({ start: false, end: false });
+  const syncChipEdges = () => {
+    const el = chipRailRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setChipEdges({ start: el.scrollLeft > 1, end: el.scrollLeft < max - 1 });
+  };
+
   useEffect(() => {
     const el = chipRailRef.current;
     if (!el) return;
@@ -140,7 +150,14 @@ export function BarBuilder() {
       e.preventDefault();
     };
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+    syncChipEdges();
+    const ro = new ResizeObserver(syncChipEdges);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      ro.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onChipPointerDown = (e: React.PointerEvent) => {
@@ -355,6 +372,7 @@ export function BarBuilder() {
               onPointerMove={onChipPointerMove}
               onPointerUp={onChipPointerUp}
               onPointerCancel={onChipPointerUp}
+              onScroll={syncChipEdges}
               className="hide-native-scroll flex cursor-grab touch-pan-x select-none gap-2 overflow-x-auto overscroll-x-contain pb-1 active:cursor-grabbing"
             >
               {PARTS.map(({ key, label }) => {
@@ -380,7 +398,14 @@ export function BarBuilder() {
                 );
               })}
             </div>
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-canvas to-transparent" />
+            <div
+              className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-canvas via-canvas/80 to-transparent transition-opacity duration-200"
+              style={{ opacity: chipEdges.start ? 1 : 0 }}
+            />
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-canvas via-canvas/80 to-transparent transition-opacity duration-200"
+              style={{ opacity: chipEdges.end ? 1 : 0 }}
+            />
           </div>
         </div>
 

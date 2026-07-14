@@ -1,4 +1,5 @@
 import {
+  designThinkingIntro,
   spacing8pt,
   radiusScale,
   typeHierarchy,
@@ -49,6 +50,8 @@ export interface LessonEntry {
   emoji: string;
   popular?: boolean;
   status: 'available' | 'soon';
+  /** 'lecture' cards show a "Лекция" chip instead of a task count. */
+  kind?: 'lesson' | 'lecture';
 }
 
 export interface LearningPath {
@@ -64,7 +67,9 @@ function entry(lesson: Lesson, extra: { emoji: string; popular?: boolean }): Les
     slug: lesson.slug,
     title: lesson.title,
     minutes: lesson.estimatedMinutes,
-    tasks: lesson.exercises.length + 1, // exercises + mastery challenge
+    // exercises + mastery challenge (if any)
+    tasks: lesson.exercises.length + (lesson.masteryChallenge ? 1 : 0),
+    kind: lesson.kind ?? 'lesson',
     level:
       lesson.difficulty === 'hard'
         ? 'advanced'
@@ -84,6 +89,7 @@ export const PATHS: LearningPath[] = [
     description: 'Сетки, отступы, иерархия, типографика — база визуального дизайна.',
     emoji: '📐',
     lessons: [
+      entry(designThinkingIntro, { emoji: '🎓' }),
       entry(spacing8pt, { emoji: '📏', popular: true }),
       entry(radiusScale, { emoji: '⬜' }),
       entry(typeHierarchy, { emoji: '🔤', popular: true }),
