@@ -20,12 +20,15 @@ export function RadarChart({
   rings = 4,
   animate = true,
   showLabels = true,
+  color,
 }: {
   axes: RadarAxis[];
   size?: number;
   rings?: number;
   animate?: boolean;
   showLabels?: boolean;
+  /** Accent colour for the data polygon + vertices. Falls back to the brand token. */
+  color?: string;
 }) {
   const cx = size / 2;
   const cy = size / 2;
@@ -87,7 +90,10 @@ export function RadarChart({
       {/* data polygon */}
       <motion.polygon
         points={dataPoly}
-        className="fill-brand/15 stroke-brand"
+        className={color ? undefined : 'fill-brand/15 stroke-brand'}
+        fill={color ?? undefined}
+        fillOpacity={color ? 0.15 : undefined}
+        stroke={color ?? undefined}
         strokeWidth={2.5}
         strokeLinejoin="round"
         initial={animate ? { opacity: 0, scale: 0.6 } : false}
@@ -102,7 +108,8 @@ export function RadarChart({
           cx={p.x}
           cy={p.y}
           r={4}
-          className="fill-brand"
+          className={color ? undefined : 'fill-brand'}
+          fill={color ?? undefined}
           initial={animate ? { opacity: 0 } : false}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.25 + i * 0.04 }}
@@ -122,7 +129,7 @@ export function RadarChart({
               y={p.y}
               textAnchor={anchor}
               dominantBaseline="middle"
-              className="fill-secondary text-[10px] font-medium"
+              className="fill-secondary text-[12px] font-medium"
             >
               {a.label}
             </text>

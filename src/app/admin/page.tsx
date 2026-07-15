@@ -1,34 +1,41 @@
-import Link from 'next/link';
+import { Users, GraduationCap, ClipboardCheck, BookOpen } from 'lucide-react';
 import { prisma } from '@/lib/db';
-import { requireTeacher } from '@/lib/auth';
-import { CreateLessonForm } from '@/components/admin/CreateLessonForm';
-import { LessonRow } from '@/components/admin/LessonRow';
+import { requireBoss } from '@/lib/auth';
 import { InvitesPanel, type InviteRow } from '@/components/admin/InvitesPanel';
-import { SignOutButton } from '@/components/auth/SignOutButton';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Admin / staff home. Real auth now (middleware guards /admin, this page
- * resolves the typed user). Lesson authoring is shown to all staff; the
- * teacher-invite panel is BOSS-only. A dedicated /teacher cabinet comes later.
+ * Boss admin hub. BOSS-only (the nav link is hidden from teachers and this page
+ * hard-gates with requireBoss). School-wide overview: headline counts, the
+ * teacher roster, and the teacher-invite panel. Lesson authoring lives in the
+ * teacher cabinet (/teacher) and the per-lesson builder (/admin/lessons/[id]).
  */
 export default async function AdminPage() {
-  const user = await requireTeacher();
-  const isBoss = user.role === 'BOSS';
+  await requireBoss();
 
-  const [rows, invites] = await Promise.all([
-    prisma.authoredLesson.findMany({
-      orderBy: { updatedAt: 'desc' },
-      include: { _count: { select: { blocks: true } } },
-    }),
-    isBoss
-      ? prisma.invite.findMany({
-          orderBy: { createdAt: 'desc' },
-          include: { usedBy: { select: { email: true } } },
-        })
-      : Promise.resolve([]),
-  ]);
+  const [teacherCount, learnerCount, assessmentCount, lessonCount, teachers, invites] =
+    await Promise.all([
+      prisma.user.count({ where: { role: 'TEACHER' } }),
+      prisma.learner.count(),
+      prisma.assessment.count(),
+      prisma.authoredLesson.count(),
+      prisma.user.findMany({
+        orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          createdAt: true,
+          _count: { select: { learners: true } },
+        },
+      }),
+      prisma.invite.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: { usedBy: { select: { email: true } } },
+      }),
+    ]);
 
   const inviteRows: InviteRow[] = invites.map((i) => ({
     id: i.id,
@@ -40,64 +47,84 @@ export default async function AdminPage() {
     createdAt: i.createdAt.toISOString(),
   }));
 
+  const stats = [
+    { icon: Users, label: 'Преподаватели', value: teacherCount },
+    { icon: GraduationCap, label: 'Ученики', value: learnerCount },
+    { icon: ClipboardCheck, label: 'Тестов сдано', value: assessmentCount },
+    { icon: BookOpen, label: 'Уроков создано', value: lessonCount },
+  ];
+
   return (
     <main className="mx-auto max-w-[1200px] px-8 py-12">
-      <div className="mb-8 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-title1 font-bold text-primary">
-            {isBoss ? 'Админка' : 'Кабинет преподавателя'}
-          </h1>
-          <p className="mt-1 text-footnote text-secondary">
-            Собери урок из блоков — теория, видео, задания — и опубликуй его для учеников.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <span className="rounded-full border border-border px-3 py-1 text-caption text-secondary">
-            {user.name || user.email} · {isBoss ? 'админ' : 'препод'}
-          </span>
-          <Link
-            href="/admin/results"
-            className="rounded-lg border border-border bg-surface px-4 py-2.5 text-footnote font-medium text-primary transition-base hover:border-brand"
-          >
-            Результаты теста на грейд →
-          </Link>
-          <SignOutButton />
-        </div>
+      <div className="mb-8">
+        <h1 className="text-title1 font-bold text-primary">Админка</h1>
+        <p className="mt-1 text-footnote text-secondary">
+          Обзор по всей школе: преподаватели, ученики и приглашения.
+        </p>
       </div>
 
-      {isBoss && (
-        <div className="mb-10">
-          <InvitesPanel initial={inviteRows} />
-        </div>
-      )}
-
-      <div className="mt-8">
-        <CreateLessonForm />
-      </div>
-
-      <div className="mt-10 space-y-2">
-        {rows.length === 0 && (
-          <p className="text-body text-tertiary">Пока нет ни одного урока — начни выше.</p>
-        )}
-        {rows.map((r) => (
-          <LessonRow
-            key={r.id}
-            id={r.id}
-            slug={r.slug}
-            title={r.title}
-            published={r.published}
-            blockCount={r._count.blocks}
-          />
+      {/* KPI tiles */}
+      <div className="mb-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {stats.map(({ icon: Icon, label, value }) => (
+          <div key={label} className="rounded-2xl border border-border bg-surface p-5">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
+              <Icon size={18} />
+            </div>
+            <div className="text-title1 font-bold tabular-nums text-primary">{value}</div>
+            <div className="mt-0.5 text-footnote text-secondary">{label}</div>
+          </div>
         ))}
       </div>
 
-      <p className="mt-10 text-caption text-tertiary">
-        Опубликованные уроки появляются на{' '}
-        <Link href="/learn" className="text-brand hover:underline">
-          /learn
-        </Link>{' '}
-        рядом со статичными.
-      </p>
+      {/* Teacher roster */}
+      <section className="mb-10">
+        <h2 className="mb-3 flex items-center gap-2 text-callout font-semibold text-primary">
+          <Users size={18} className="text-secondary" />
+          Преподаватели
+        </h2>
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+          {teachers.length === 0 ? (
+            <p className="px-5 py-6 text-body text-tertiary">Пока нет ни одного аккаунта.</p>
+          ) : (
+            teachers.map((tch, i) => (
+              <div
+                key={tch.id}
+                className={`flex items-center gap-4 px-5 py-4 ${
+                  i > 0 ? 'border-t border-border' : ''
+                }`}
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-footnote font-semibold text-secondary">
+                  {(tch.name || tch.email).slice(0, 1).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-body font-medium text-primary">
+                    {tch.name || tch.email}
+                  </div>
+                  <div className="truncate text-caption text-tertiary">{tch.email}</div>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-caption font-medium ${
+                    tch.role === 'BOSS'
+                      ? 'bg-brand/10 text-brand'
+                      : 'bg-muted text-secondary'
+                  }`}
+                >
+                  {tch.role === 'BOSS' ? 'админ' : 'препод'}
+                </span>
+                <span className="shrink-0 text-footnote tabular-nums text-secondary">
+                  {tch._count.learners} уч.
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* Teacher invites */}
+      <section>
+        <h2 className="mb-3 text-callout font-semibold text-primary">Приглашения</h2>
+        <InvitesPanel initial={inviteRows} />
+      </section>
     </main>
   );
 }

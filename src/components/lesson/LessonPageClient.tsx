@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Clock, Target, Trophy, CheckCircle2, BookOpen, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -11,6 +11,16 @@ import { LectureVisual } from '@/components/examples/LectureVisual';
 import { ExercisePlayer } from '@/components/exercises/ExercisePlayer';
 import { VideoEmbed } from '@/components/lesson/VideoEmbed';
 import { ConfettiBurst } from '@/components/lesson/ConfettiBurst';
+import { AchievementReveal } from '@/components/achievements/AchievementReveal';
+import type { GemTone } from '@/components/achievements/CrystalGem';
+
+/** Deterministically pick a crystal tone from the lesson so the reveal feels themed. */
+const GEM_TONES: GemTone[] = ['sapphire', 'ember', 'amethyst', 'emerald', 'gold'];
+function toneFor(seed: string): GemTone {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return GEM_TONES[Math.abs(h) % GEM_TONES.length];
+}
 
 /**
  * All the interactive bits of the lesson page (progress state, ExercisePlayer
@@ -45,6 +55,17 @@ export function LessonPageClient({
   const progress = Math.round((numer / denom) * 100);
   const done = numer === denom;
 
+  // Crystal-reveal overlay: fire once, the moment the lesson flips to complete.
+  const gemTone = useMemo(() => toneFor(lesson.slug), [lesson.slug]);
+  const [reveal, setReveal] = useState(false);
+  const [revealShown, setRevealShown] = useState(false);
+  useEffect(() => {
+    if (done && !revealShown) {
+      setReveal(true);
+      setRevealShown(true);
+    }
+  }, [done, revealShown]);
+
   async function markRead() {
     if (solved.has(READ_EXERCISE_ID) || reading) return;
     setReading(true);
@@ -69,6 +90,15 @@ export function LessonPageClient({
 
   return (
     <main className="mx-auto max-w-[1200px] px-8 py-12">
+      <AchievementReveal
+        open={reveal}
+        tone={gemTone}
+        label={tr('exercises.lesson.achievementUnlocked')}
+        title={lesson.title}
+        hint={tr('exercises.lesson.tapToContinue')}
+        onDone={() => setReveal(false)}
+      />
+
       {/* Sticky progress */}
       <div className="glass sticky top-4 z-sticky mb-10 flex items-center gap-4 rounded-full px-5 py-3">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">

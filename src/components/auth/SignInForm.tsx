@@ -36,8 +36,10 @@ export function SignInForm() {
         setError(ERRORS[data.error] ?? ERRORS.default);
         return;
       }
-      // Full navigation so middleware re-reads the fresh cookie.
-      window.location.href = next || '/admin';
+      // Full navigation so middleware re-reads the fresh cookie. Learners land
+      // in their own area; staff keep the admin/teacher cabinet.
+      const fallback = data.kind === 'learner' ? '/student' : '/admin';
+      window.location.href = next || fallback;
     } catch {
       setError(ERRORS.default);
     } finally {
@@ -47,38 +49,36 @@ export function SignInForm() {
 
   return (
     <form onSubmit={submit} className="mt-8 flex flex-col gap-4">
-      <label className="flex flex-col gap-1.5">
-        <span className="text-caption text-tertiary">Email</span>
+      <input
+        type="email"
+        autoComplete="email"
+        required
+        placeholder="Email"
+        aria-label="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="rounded-lg border border-border bg-surface px-3 py-2.5 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
+      />
+      <div className="relative">
         <input
-          type="email"
-          autoComplete="email"
+          type={showPassword ? 'text' : 'password'}
+          autoComplete="current-password"
           required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="rounded-lg border border-border bg-surface px-3 py-2.5 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
+          placeholder="Пароль"
+          aria-label="Пароль"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 pr-10 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
         />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-caption text-tertiary">Пароль</span>
-        <div className="relative">
-          <input
-            type={showPassword ? 'text' : 'password'}
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 pr-10 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-tertiary transition-fast hover:text-primary"
-          >
-            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
-        </div>
-      </label>
+        <button
+          type="button"
+          onClick={() => setShowPassword((v) => !v)}
+          aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-tertiary transition-fast hover:text-primary"
+        >
+          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
 
       {error && <p className="text-caption text-[#F85149]">{error}</p>}
 

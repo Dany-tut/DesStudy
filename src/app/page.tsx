@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { ArrowRight, Zap, Flame, PlayCircle, Clock, Lock, Check } from 'lucide-react';
-import { getLearner } from '@/lib/learner';
+import { getSessionLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
 import { getPaths, availableLessons } from '@/content/curriculum';
 import { getT } from '@/lib/i18n/server';
@@ -10,10 +11,13 @@ export const dynamic = 'force-dynamic';
 export default async function HomePage() {
   const { t, tp, locale } = await getT();
   const PATHS = getPaths(locale);
-  const learner = await getLearner();
-  const progress = learner
-    ? await prisma.lessonProgress.findMany({ where: { learnerId: learner.id } })
-    : [];
+
+  // Home is the signed-in student's dashboard. Anonymous visitors (leads) get
+  // the public landing instead — the course itself is login-only.
+  const learner = await getSessionLearner();
+  if (!learner) redirect('/landing');
+
+  const progress = await prisma.lessonProgress.findMany({ where: { learnerId: learner.id } });
   const progressBySlug = new Map(progress.map((p) => [p.lessonSlug, p]));
 
   // Pick the first available, not-yet-completed lesson to "continue".

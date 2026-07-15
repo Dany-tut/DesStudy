@@ -89,6 +89,7 @@ const PATH_DEFS: PathDef[] = [
       { slug: 'figma-intro', emoji: '🖌️' },
       { slug: 'spacing-8pt-grid', emoji: '📏', popular: true },
       { slug: 'radius-scale', emoji: '⬜' },
+      { slug: 'padding-radius', emoji: '📦' },
       { slug: 'type-hierarchy', emoji: '🔤', popular: true },
       { slug: 'color-contrast', emoji: '🎨' },
       { slug: 'micro-typography', emoji: '✍️' },

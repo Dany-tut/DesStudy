@@ -20,7 +20,12 @@ export function SegmentedControl<T extends string>({
   disabled?: boolean;
   onChange: (value: T) => void;
 }) {
-  const activeIndex = Math.max(0, options.findIndex((o) => o.value === value));
+  // −1 until the learner actually picks a segment. We must NOT clamp this to 0:
+  // the sliding highlight and the white `text-on-brand` label are driven from
+  // the *same* selection, so a clamp would park the purple pill under the first
+  // segment while its label stayed dark (unselected) — a black-on-brand mislabel.
+  const activeIndex = options.findIndex((o) => o.value === value);
+  const hasValue = activeIndex >= 0;
 
   const listRef = useRef<HTMLDivElement>(null);
   const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -30,7 +35,10 @@ export function SegmentedControl<T extends string>({
     const measure = () => {
       const btn = btnRefs.current[activeIndex];
       const parent = listRef.current;
-      if (!btn || !parent) return;
+      if (!btn || !parent) {
+        setRect(null); // nothing selected yet — hide the highlight entirely
+        return;
+      }
       setRect({ left: btn.offsetLeft, width: btn.offsetWidth });
     };
     measure();
@@ -40,7 +48,7 @@ export function SegmentedControl<T extends string>({
   }, [activeIndex, options.length]);
 
   return (
-    <div ref={listRef} className="relative inline-flex rounded-lg bg-muted p-1">
+    <div ref={listRef} className="relative inline-flex overflow-hidden rounded-lg bg-muted p-1">
       {rect && (
         <motion.div
           className="absolute inset-y-1 rounded-md bg-brand shadow-sm"

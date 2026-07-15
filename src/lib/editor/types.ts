@@ -24,6 +24,11 @@ export interface LayerProps {
   fontWeight?: string;
   /** Text colour (fill of a text node). */
   color?: string;
+  /** Layer opacity 0–1 (from `opacity`/`fill-opacity`), when explicitly set. */
+  opacity?: number;
+  /** Auto-layout flow inferred from children geometry — how the group arranges
+   *  its immediate children. `none` = free/absolute (a plain group). */
+  layout?: 'row' | 'column' | 'grid' | 'none';
   /** Numeric bounding box when statically known (rect/image). Absolute
    *  positioning for highlights is computed at render time via the DOM, so this
    *  is best-effort metadata, not the source of truth for geometry. */

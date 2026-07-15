@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/admin/auth';
+import { getSessionUser } from '@/lib/auth';
 import { parseLessonMeta, isValidSlug, ValidationError } from '@/lib/admin/schema';
 
 export const runtime = 'nodejs';
@@ -27,6 +28,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
+  // Guard passed → a session exists; use it to stamp lesson ownership.
+  const author = await getSessionUser();
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -61,6 +64,7 @@ export async function POST(req: NextRequest) {
         estimatedMinutes: meta.estimatedMinutes,
         objectives: JSON.stringify(meta.objectives),
         prerequisites: JSON.stringify(meta.prerequisites),
+        authorId: author?.id,
       },
     });
     return NextResponse.json({ id: lesson.id }, { status: 201 });

@@ -130,6 +130,7 @@ export function CrystalGem({
         xmlns="http://www.w3.org/2000/svg"
         className="gem-lift"
         style={{
+          overflow: 'visible',
           transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
           transition: 'transform 0.25s cubic-bezier(0.2,0.7,0.3,1)',
           transformStyle: 'preserve-3d',

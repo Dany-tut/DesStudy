@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { GraduationCap, Plus, Check } from 'lucide-react';
+import { GraduationCap, Plus, Check, Sparkles } from 'lucide-react';
 import { RadarChart } from '@/components/assessment/RadarChart';
 import { DotBar } from '@/components/assessment/ResultScreen';
 import { CATEGORIES, SKILL_BY_ID, type SkillLevel } from '@/lib/assessment/taxonomy';
@@ -15,6 +15,14 @@ export interface CourseOption {
   title: string;
 }
 
+/** The learner's pricing-screen "оставить заявку" lead, if any. */
+export interface ApplicationInfo {
+  plan: string;
+  planLabel: string;
+  status: string;
+  at: string;
+}
+
 /** One learner's latest assessment for the teacher: mini radar, per-category
  *  grades, top growth points, and course attachment. */
 export function LearnerResultCard({
@@ -25,6 +33,7 @@ export function LearnerResultCard({
   takenAt,
   courses,
   enrolledCourseIds,
+  application,
 }: {
   learnerId: string;
   name: string | null;
@@ -33,6 +42,7 @@ export function LearnerResultCard({
   takenAt: string;
   courses: CourseOption[];
   enrolledCourseIds: string[];
+  application?: ApplicationInfo | null;
 }) {
   const [enrolled, setEnrolled] = useState<Set<string>>(new Set(enrolledCourseIds));
   const [busy, setBusy] = useState<string | null>(null);
@@ -73,6 +83,14 @@ export function LearnerResultCard({
               <p className="mt-0.5 text-caption tabular-nums text-tertiary">
                 вилка {SALARY_BANDS[grade as Grade].min}–{SALARY_BANDS[grade as Grade].max}к ₽
               </p>
+            )}
+            {application && (
+              <span
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-3 py-1 text-caption font-medium text-brand"
+                title={`Заявка на «${application.planLabel}» · ${application.at}`}
+              >
+                <Sparkles size={12} /> Заявка: {application.planLabel}
+              </span>
             )}
           </div>
           <RadarChart

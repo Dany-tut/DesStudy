@@ -25,6 +25,34 @@ export function ExampleVisual({ visual }: { visual: string }) {
     );
   }
 
+  // Padding — text jammed against a rounded edge vs comfortably inset.
+  if (visual === 'padding-bad') {
+    return (
+      <Card>
+        <div
+          className="bg-elevated"
+          style={{ borderRadius: 16, padding: '10px 2px', border: '1px solid var(--border, #e5e7eb)' }}
+        >
+          <p className="text-footnote text-secondary">Текст стоит на самой линии скругления</p>
+        </div>
+        <p className="mt-3 text-caption text-tertiary">padding 2px &lt; radius 16px — угол «съедает» текст</p>
+      </Card>
+    );
+  }
+  if (visual === 'padding-good') {
+    return (
+      <Card>
+        <div
+          className="bg-elevated"
+          style={{ borderRadius: 16, padding: '10px 16px', border: '1px solid var(--border, #e5e7eb)' }}
+        >
+          <p className="text-footnote text-primary">Текст отступил от скругления</p>
+        </div>
+        <p className="mt-3 text-caption text-tertiary">padding 16px ≥ radius 16px — воздух по краю</p>
+      </Card>
+    );
+  }
+
   // Radius — inconsistent vs consistent corner scale.
   if (visual === 'radius-bad') {
     return (

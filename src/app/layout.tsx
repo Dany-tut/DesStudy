@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import './globals.css';
 import { Sidebar } from '@/components/shell/Sidebar';
+import { TopHeader } from '@/components/shell/TopHeader';
 import { APPLY_SNIPPET } from '@/lib/settings';
 import { getLocale } from '@/lib/i18n/server';
 import { I18nProvider } from '@/lib/i18n/client';
-import { isRegisteredLearner } from '@/lib/learner';
+import { getSessionLearner } from '@/lib/learner';
+import { getSessionUser } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title: 'DesStudy — Interactive Design Learning OS',
@@ -17,7 +20,38 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [locale, registered] = await Promise.all([getLocale(), isRegisteredLearner()]);
+  const pathname = (await headers()).get('x-pathname') ?? '';
+
+  // Focused, single-purpose flows render bare — no app chrome at all. A student
+  // sitting a test or a visitor claiming an invite should see only that screen,
+  // never the staff/learner navigation (which also wrongly leaked in when a
+  // signed-in curator opened a public test link).
+  const BARE_PREFIXES = ['/signin', '/test', '/join', '/invite', '/assessment'];
+  const isBare = BARE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+  const [locale, staffUser, learner] = await Promise.all([
+    getLocale(),
+    getSessionUser(),
+    getSessionLearner(),
+  ]);
+
+  const staff = staffUser
+    ? {
+        name: staffUser.name || staffUser.email,
+        role: staffUser.role,
+        roleLabel: staffUser.role === 'BOSS' ? 'админ' : 'препод',
+      }
+    : null;
+
+  // A signed-in student (learner session) gets the full app Sidebar; staff and
+  // anonymous visitors get the header shell instead.
+  const isStudent = !staff && !!learner;
+
+  // Identity shown in the sidebar's user menu.
+  const learnerUser = {
+    name: learner?.name || learner?.email || 'Ученик',
+    subtitle: learner?.email ?? undefined,
+  };
 
   return (
     <html lang={locale} suppressHydrationWarning>
@@ -26,15 +60,21 @@ export default async function RootLayout({
       </head>
       <body>
         <I18nProvider initialLocale={locale}>
-          {/* Guests (not yet enrolled by a teacher) see the marketing shell with
-              no app sidebar — just their content full-width. */}
-          {registered ? (
+          {isBare ? (
+            // Focused flows (test / sign-in / invite) — content only, no chrome.
+            children
+          ) : isStudent ? (
+            // Signed-in students get the app Sidebar.
             <div className="flex min-h-screen flex-col md:flex-row">
-              <Sidebar />
+              <Sidebar user={learnerUser} />
               <div className="min-w-0 flex-1 pb-28 md:pb-0">{children}</div>
             </div>
           ) : (
-            <div className="min-h-screen">{children}</div>
+            // Staff and anonymous visitors get the header shell, full-width.
+            <div className="min-h-screen">
+              <TopHeader staff={staff} />
+              {children}
+            </div>
           )}
         </I18nProvider>
       </body>

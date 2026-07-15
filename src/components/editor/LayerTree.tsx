@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ChevronRight,
   Square,
@@ -9,6 +9,9 @@ import {
   Image as ImageIcon,
   PenTool,
   Target,
+  Columns3,
+  Rows3,
+  LayoutGrid,
 } from 'lucide-react';
 import type { Layer, LayerType } from '@/lib/editor/types';
 
@@ -20,11 +23,31 @@ const TYPE_ICON: Record<LayerType, typeof Square> = {
   vector: PenTool,
 };
 
+/** Frames pick their glyph from the inferred auto-layout flow, so a row-, column-
+ *  or grid-arranged group reads like it does in Figma; a free group keeps the
+ *  plain frame glyph. */
+function iconFor(layer: Layer): typeof Square {
+  if (layer.type === 'frame') {
+    switch (layer.props.layout) {
+      case 'row':
+        return Columns3;
+      case 'column':
+        return Rows3;
+      case 'grid':
+        return LayoutGrid;
+      default:
+        return Frame;
+    }
+  }
+  return TYPE_ICON[layer.type];
+}
+
 /**
- * The layers panel — Figma-style: nested rows, expand/collapse for groups,
- * click to select (syncs with the canvas), hover to preview-highlight. Type
- * icons mirror Figma's affordances. A future "critique zone" badge slots in
- * next to the name (milestone 3).
+ * The layers panel — Figma-style: nested rows with indent guides, expand/collapse
+ * for groups, click to select (syncs with the canvas), hover to preview-highlight.
+ * Frame icons reflect the inferred auto-layout flow (row / column / grid / free),
+ * mirroring how Figma distinguishes auto-layout frames from plain groups. A
+ * critique-zone badge sits at the row end (milestone 3).
  */
 export function LayerTree({
   layers,
@@ -67,19 +90,38 @@ function LayerRow({
   const [open, setOpen] = useState(true);
   const hasChildren = layer.children.length > 0;
   const active = selectedId === layer.id;
-  const Icon = TYPE_ICON[layer.type];
+  const Icon = iconFor(layer);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  // When this row becomes the selected layer (e.g. picked on the canvas),
+  // scroll it into the middle of the panel so it's always in view.
+  useEffect(() => {
+    if (active) {
+      rowRef.current?.scrollIntoView({ block: 'center', inline: 'nearest' });
+    }
+  }, [active]);
 
   return (
     <>
       <div
+        ref={rowRef}
         onClick={() => onSelect(layer.id)}
         onMouseEnter={() => onHover(layer.id)}
         className={[
-          'group flex cursor-pointer items-center gap-1.5 rounded-md py-1.5 pr-2 text-footnote transition-fast',
+          'group relative flex cursor-pointer items-center gap-1.5 rounded-md py-1.5 pr-2 text-footnote transition-fast',
           active ? 'bg-brand/10 text-brand' : 'text-secondary hover:bg-hover',
         ].join(' ')}
         style={{ paddingLeft: 8 + depth * 14 }}
       >
+        {/* Indent guides — one hairline per ancestor level, like Figma. */}
+        {Array.from({ length: depth }).map((_, i) => (
+          <span
+            key={i}
+            aria-hidden
+            className="pointer-events-none absolute top-0 bottom-0 w-px bg-border/60"
+            style={{ left: 8 + 7 + i * 14 }}
+          />
+        ))}
         {hasChildren ? (
           <button
             type="button"
@@ -88,12 +130,12 @@ function LayerRow({
               e.stopPropagation();
               setOpen((o) => !o);
             }}
-            className="flex h-4 w-4 shrink-0 items-center justify-center text-tertiary"
+            className="relative flex h-4 w-4 shrink-0 items-center justify-center text-tertiary"
           >
             <ChevronRight size={13} className={['transition-fast', open ? 'rotate-90' : ''].join(' ')} />
           </button>
         ) : (
-          <span className="h-4 w-4 shrink-0" />
+          <span className="relative h-4 w-4 shrink-0" />
         )}
         <Icon size={13} className={active ? 'text-brand' : 'text-tertiary'} />
         <span className="truncate">{layer.name}</span>

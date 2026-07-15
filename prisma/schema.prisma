@@ -23,6 +23,23 @@ enum Role {
   TEACHER
 }
 
+/// Visibility of a published authored lesson. PUBLIC = every learner (incl.
+/// anonymous) sees it on /learn. RESTRICTED = only learners explicitly granted
+/// via LessonLearnerAccess or membership in a granted Group (LessonGroupAccess).
+enum Access {
+  PUBLIC
+  RESTRICTED
+}
+
+/// A teacher-issued single-use link for a learner. TEST = "pass the grading
+/// test" (learner created on completion); LOGIN = "set your email + password"
+/// for an already-existing learner card (attaches credentials to it). Both are
+/// claimed atomically via `usedAt` (see the register/route.ts guard pattern).
+enum LearnerInviteKind {
+  TEST
+  LOGIN
+}
+
 /// An authenticated staff member (boss or teacher). Email + password credentials
 /// (bcrypt hash); session is a signed JWT cookie — see src/lib/auth/. Distinct
 /// from Learner on purpose: staff log in, learners are anonymous by cookie.
@@ -34,8 +51,40 @@ model User {
   role         Role     @default(TEACHER)
   createdAt    DateTime @default(now())
 
-  invitesCreated Invite[] @relation("InvitesCreated")
-  inviteUsed     Invite?  @relation("InviteUsed")
+  invitesCreated  Invite[]         @relation("InvitesCreated")
+  inviteUsed      Invite?          @relation("InviteUsed")
+  authoredLessons AuthoredLesson[] // lessons this staff member owns
+  groups          Group[] // learner groups this teacher owns
+  learners        Learner[]        @relation("TeacherLearners") // students this teacher tested/created
+  learnerInvites  LearnerInvite[] // test/login links this teacher issued
+}
+
+/// A teacher's named group of learners (a class/cohort). Used to organize
+/// learners and, later, to scope lesson access + analytics (milestone 4b).
+model Group {
+  id        String   @id @default(cuid())
+  name      String
+  teacher   User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacherId String
+  createdAt DateTime @default(now())
+
+  members     GroupMembership[]
+  lessonAccess LessonGroupAccess[]
+  invites      LearnerInvite[]
+
+  @@index([teacherId])
+}
+
+/// Join row: a learner's membership in a group (many-to-many).
+model GroupMembership {
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId   String
+  learner   Learner  @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  learnerId String
+  createdAt DateTime @default(now())
+
+  @@id([groupId, learnerId])
+  @@index([learnerId])
 }
 
 /// A single-use registration link the boss (or a teacher, later) hands out.
@@ -56,7 +105,10 @@ model Invite {
   @@index([createdById])
 }
 
-/// An anonymous or (later) authenticated learner. Identified by a cookie for now.
+/// An anonymous or authenticated learner. Anonymous learners are identified by
+/// the `learner` cookie (src/lib/learner.ts). Once a teacher issues a LOGIN
+/// invite and the learner sets credentials, `email` + `passwordHash` are filled
+/// and they can sign in (learner session — src/lib/auth/learner-session.ts).
 model Learner {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
@@ -65,17 +117,76 @@ model Learner {
   // Null until the learner introduces themselves; "letit prepodu" via /admin/results.
   name String?
 
+  // Credentials — null until the learner claims a LOGIN invite. `email` is
+  // unique so it can't collide across learner cards; staff Users live in a
+  // separate table, so a person could in theory reuse an address there.
+  email        String? @unique
+  passwordHash String?
+
+  // The teacher who tested/created this learner. Scopes the testing view +
+  // results per teacher (BOSS sees all). SetNull keeps orphaned cards visible
+  // to the boss if the teacher account is removed.
+  teacher   User?   @relation("TeacherLearners", fields: [teacherId], references: [id], onDelete: SetNull)
+  teacherId String?
+
   // Gamification / retention (PRD §8, §13)
   xp           Int      @default(0)
   streak       Int      @default(0)
   lastActiveOn String? // ISO date (YYYY-MM-DD) for streak calculation
 
-  attempts    Attempt[]
-  progress    LessonProgress[]
-  skills      SkillStat[]
-  submissions Submission[]
-  assessments Assessment[]
-  enrollments Enrollment[]
+  attempts         Attempt[]
+  progress         LessonProgress[]
+  skills           SkillStat[]
+  submissions      Submission[]
+  assessments      Assessment[]
+  enrollments      Enrollment[]
+  groupMemberships GroupMembership[]
+  lessonAccess     LessonLearnerAccess[]
+  invites          LearnerInvite[]
+  applications     Application[]
+}
+
+/// A guest learner's "оставить заявку" from the pricing screen — the tariff they
+/// picked after seeing their grade. A lead for the curator: it surfaces in the
+/// teacher/boss results view (filterable), where staff follow up and, once the
+/// course is paid, attach it via Enrollment (flipping them to a registered
+/// learner). One learner keeps their latest pick — a re-submit updates the plan.
+model Application {
+  id        String   @id @default(cuid())
+  learner   Learner  @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  learnerId String
+  plan      String // 'self' | 'mentor' | 'job'
+  status    String   @default("new") // 'new' | 'contacted' | 'closed'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([learnerId])
+}
+
+/// A single-use link a teacher hands to a learner. See LearnerInviteKind.
+/// Consumed atomically by guarding the update on `usedAt: null` — the same
+/// concurrency lock used for staff Invite (src/app/api/auth/register/route.ts).
+model LearnerInvite {
+  id        String            @id @default(cuid())
+  token     String            @unique
+  kind      LearnerInviteKind
+  teacher   User              @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacherId String
+
+  // Optional: drop the learner straight into this group on consume.
+  group   Group?  @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  groupId String?
+
+  // LOGIN: the existing card to attach credentials to (required at creation).
+  // TEST: null at creation, backfilled with the learner created on completion.
+  learner   Learner? @relation(fields: [learnerId], references: [id], onDelete: SetNull)
+  learnerId String?
+
+  usedAt    DateTime?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([teacherId])
 }
 
 /// A purchasable course. Seeded manually for the MVP (no course-authoring UI yet);
@@ -188,7 +299,43 @@ model AuthoredLesson {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  blocks ContentBlock[]
+  // Owning staff member. Nullable for pre-ownership (legacy) lessons — the seed
+  // backfills those to the boss so nothing is orphaned. SetNull on delete keeps
+  // the lesson if the author account is removed.
+  author   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId String?
+
+  // Visibility (milestone 4b). PUBLIC by default so existing lessons stay
+  // visible; RESTRICTED gates on the two access join tables below.
+  access Access @default(PUBLIC)
+
+  blocks        ContentBlock[]
+  groupAccess   LessonGroupAccess[]
+  learnerAccess LessonLearnerAccess[]
+
+  @@index([authorId])
+}
+
+/// Grants a group access to a RESTRICTED lesson (every member can see it).
+model LessonGroupAccess {
+  lesson   AuthoredLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId String
+  group    Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId  String
+
+  @@id([lessonId, groupId])
+  @@index([groupId])
+}
+
+/// Grants a single learner access to a RESTRICTED lesson.
+model LessonLearnerAccess {
+  lesson    AuthoredLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lessonId  String
+  learner   Learner        @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  learnerId String
+
+  @@id([lessonId, learnerId])
+  @@index([learnerId])
 }
 
 /// One ordered block inside an AuthoredLesson — theory line, video, or

@@ -26,6 +26,14 @@ async function main() {
   });
 
   console.log(`✓ BOSS ready: ${user.email}`);
+
+  // Backfill: legacy lessons authored before ownership existed → the boss, so
+  // the teacher cabinet's "my lessons" never leaves them orphaned.
+  const backfilled = await prisma.authoredLesson.updateMany({
+    where: { authorId: null },
+    data: { authorId: user.id },
+  });
+  if (backfilled.count > 0) console.log(`✓ Backfilled ${backfilled.count} lesson(s) → boss`);
 }
 
 main()

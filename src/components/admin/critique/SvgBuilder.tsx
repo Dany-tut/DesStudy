@@ -1,10 +1,11 @@
 'use client';
 
 import { useMemo, useRef, useState, useCallback, forwardRef } from 'react';
-import { Upload, Ruler, Palette, Target, Check, RotateCcw } from 'lucide-react';
+import { Upload, Target, Check, RotateCcw } from 'lucide-react';
 import { parseSvgToLayers } from '@/lib/editor/parseSvg';
 import { LayerTree } from '@/components/editor/LayerTree';
 import { LayerCanvas } from '@/components/editor/LayerCanvas';
+import { PropertiesPanel } from '@/components/editor/PropertiesPanel';
 import type { Layer } from '@/lib/editor/types';
 import type { CritiqueZone } from '@/lib/curriculum/types';
 
@@ -200,19 +201,19 @@ export function SvgBuilder({
         />
       </div>
 
-      {/* ── Inspector ── */}
-      <div className="rounded-xl border border-border bg-surface p-4">
+      {/* ── Properties ── */}
+      <div className="rounded-xl border border-border bg-surface p-3">
         {selLayer ? (
-          <Inspector
+          <PropertiesPanel
             layer={selLayer}
-            zone={zoneByLayer.get(selLayer.id)}
+            screen={screen}
             onRadius={(v) => mutateLayer(selLayer.id, (el) => setRadius(el, v))}
             onFill={(v) => mutateLayer(selLayer.id, (el) => el.setAttribute('fill', v))}
             onText={(v) => mutateLayer(selLayer.id, (el) => (el.textContent = v))}
-            onToggleZone={() => toggleZone(selLayer)}
+            footer={<ZoneAction isZone={!!zoneByLayer.get(selLayer.id)} onToggle={() => toggleZone(selLayer)} />}
           />
         ) : (
-          <p className="text-caption text-tertiary">Выбери слой слева или на холсте.</p>
+          <p className="p-1 text-caption text-tertiary">Выбери слой слева или на холсте.</p>
         )}
       </div>
     </div>
@@ -225,128 +226,35 @@ function setRadius(el: Element, v: number) {
   el.setAttribute('ry', String(v));
 }
 
-function Inspector({
-  layer,
-  zone,
-  onRadius,
-  onFill,
-  onText,
-  onToggleZone,
-}: {
-  layer: Layer;
-  zone?: CritiqueZone;
-  onRadius: (v: number) => void;
-  onFill: (v: string) => void;
-  onText: (v: string) => void;
-  onToggleZone: () => void;
-}) {
-  const isZone = !!zone;
+/** The critique-zone toggle that docks under the properties sections. */
+function ZoneAction({ isZone, onToggle }: { isZone: boolean; onToggle: () => void }) {
   return (
-    <div className="space-y-4">
-      <div>
-        <p className="text-caption font-medium uppercase tracking-wide text-tertiary">Свойства</p>
-        <p className="mt-0.5 truncate text-footnote font-semibold text-primary">{layer.name}</p>
-      </div>
-
-      {layer.type === 'block' && (
-        <InspectorRow icon={Ruler} label="Радиус">
-          <input
-            type="number"
-            defaultValue={layer.props.radius ?? 0}
-            onChange={(e) => onRadius(Number(e.target.value))}
-            className="w-16 rounded border border-border bg-canvas px-2 py-1 text-caption tabular-nums text-primary"
-          />
-        </InspectorRow>
-      )}
-
-      {(layer.type === 'block' || layer.type === 'vector' || layer.type === 'frame') && (
-        <InspectorRow icon={Palette} label="Фон">
-          <ColorField value={layer.props.fill ?? '#000000'} onChange={onFill} />
-        </InspectorRow>
-      )}
-
-      {layer.type === 'text' && (
-        <>
-          <InspectorRow icon={Palette} label="Цвет">
-            <ColorField value={layer.props.color ?? '#000000'} onChange={onFill} />
-          </InspectorRow>
-          <div>
-            <label className="mb-1 block text-caption text-tertiary">Текст</label>
-            <textarea
-              rows={2}
-              defaultValue={layer.props.text ?? ''}
-              onChange={(e) => onText(e.target.value)}
-              className="w-full resize-none rounded-lg border border-border bg-canvas px-2 py-1.5 text-caption text-primary"
-            />
-          </div>
-        </>
-      )}
-
-      <div className="border-t border-border pt-3">
-        <button
-          type="button"
-          onClick={onToggleZone}
-          className={[
-            'w-full rounded-lg py-2 text-footnote font-medium transition-fast',
-            isZone
-              ? 'bg-[#3FB950]/10 text-[#3FB950] hover:bg-[#3FB950]/15'
-              : 'bg-brand/10 text-brand hover:bg-brand/15',
-          ].join(' ')}
-        >
-          {isZone ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Check size={14} /> Зона критики — убрать
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5">
-              <Target size={14} /> Сделать зоной критики
-            </span>
-          )}
-        </button>
-        <p className="mt-2 text-caption text-tertiary">
-          {isZone
-            ? 'Критерии зоны (роли, дефекты, починка) — в карточке ниже.'
-            : 'Промоутнёт слой в кликабельную зону с критериями для ученика.'}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function ColorField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const hex = /^#[0-9a-f]{6}$/i.test(value) ? value : '#000000';
-  return (
-    <span className="flex items-center gap-1.5">
-      <input
-        type="color"
-        value={hex}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-5 w-5 shrink-0 cursor-pointer rounded border border-border bg-transparent p-0"
-      />
-      <input
-        defaultValue={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-20 rounded border border-border bg-canvas px-1.5 py-1 text-caption tabular-nums text-secondary"
-      />
-    </span>
-  );
-}
-
-function InspectorRow({
-  icon: Icon,
-  label,
-  children,
-}: {
-  icon: typeof Ruler;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="flex items-center gap-2 text-caption text-secondary">
-        <Icon size={13} className="text-tertiary" /> {label}
-      </span>
-      {children}
+    <div className="border-t border-border pt-3">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={[
+          'w-full rounded-lg py-2 text-footnote font-medium transition-fast',
+          isZone
+            ? 'bg-[#3FB950]/10 text-[#3FB950] hover:bg-[#3FB950]/15'
+            : 'bg-brand/10 text-brand hover:bg-brand/15',
+        ].join(' ')}
+      >
+        {isZone ? (
+          <span className="inline-flex items-center gap-1.5">
+            <Check size={14} /> Зона критики — убрать
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5">
+            <Target size={14} /> Сделать зоной критики
+          </span>
+        )}
+      </button>
+      <p className="mt-2 px-1 text-caption text-tertiary">
+        {isZone
+          ? 'Критерии зоны (роли, дефекты, починка) — в карточке ниже.'
+          : 'Промоутнёт слой в кликабельную зону с критериями для ученика.'}
+      </p>
     </div>
   );
 }

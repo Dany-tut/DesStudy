@@ -35,6 +35,8 @@ export const dictionaries = {
       teacherLessons: 'Уроки',
       teacherResults: 'Результаты',
       settings: 'Настройки',
+      profile: 'Профиль',
+      signOut: 'Выйти',
       sections: 'Разделы',
       more: 'Ещё',
       close: 'Закрыть',
@@ -58,6 +60,7 @@ export const dictionaries = {
     home: {
       welcomeBack: 'С возвращением 👋',
       heroTitle: 'Учись дизайну, делая',
+      signIn: 'Войти',
       heroSubtitle:
         'Интерактивная платформа, где ты становишься UI/UX-дизайнером через практику, мгновенную проверку и AI-наставника — а не через часы видео.',
       streak: 'Стрик',
@@ -153,6 +156,8 @@ export const dictionaries = {
       teacherLessons: 'Lessons',
       teacherResults: 'Results',
       settings: 'Settings',
+      profile: 'Profile',
+      signOut: 'Sign out',
       sections: 'Sections',
       more: 'More',
       close: 'Close',
@@ -176,6 +181,7 @@ export const dictionaries = {
     home: {
       welcomeBack: 'Welcome back 👋',
       heroTitle: 'Learn design by doing',
+      signIn: 'Sign in',
       heroSubtitle:
         'An interactive platform where you become a UI/UX designer through practice, instant feedback, and an AI mentor — not through hours of video.',
       streak: 'Streak',

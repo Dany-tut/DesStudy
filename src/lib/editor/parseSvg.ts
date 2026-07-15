@@ -81,6 +81,9 @@ function extractProps(el: Element, tag: string): LayerProps {
   const props: LayerProps = {};
   const fill = attrOrStyle(el, 'fill');
 
+  const op = num(attrOrStyle(el, 'opacity'));
+  if (op != null && op < 1) props.opacity = op;
+
   if (tag === 'rect') {
     props.radius = num(el.getAttribute('rx')) ?? num(el.getAttribute('ry'));
     if (fill && fill !== 'none') props.fill = fill;
@@ -100,6 +103,24 @@ function extractProps(el: Element, tag: string): LayerProps {
     if (fill && fill !== 'none') props.fill = fill;
   }
   return props;
+}
+
+type Box = NonNullable<LayerProps['box']>;
+
+/** Guess a frame's auto-layout flow from its children's boxes: aligned tops →
+ *  a horizontal row, aligned lefts → a vertical column, else a grid/free group.
+ *  Best-effort — used only to pick the Figma-style icon and layout hint. */
+function inferLayout(boxes: Box[]): 'row' | 'column' | 'grid' | 'none' {
+  if (boxes.length < 2) return 'none';
+  const tol = (vals: number[], span: number) => {
+    const min = Math.min(...vals), max = Math.max(...vals);
+    return max - min <= Math.max(2, span * 0.15);
+  };
+  const sameTop = tol(boxes.map((b) => b.y), Math.max(...boxes.map((b) => b.h)));
+  const sameLeft = tol(boxes.map((b) => b.x), Math.max(...boxes.map((b) => b.w)));
+  if (sameTop && !sameLeft) return 'row';
+  if (sameLeft && !sameTop) return 'column';
+  return sameTop && sameLeft ? 'none' : 'grid';
 }
 
 /** Walk one element's graphical children into Layers. `counter` gives every
@@ -122,11 +143,27 @@ function walkChildren(el: Element, counter: { n: number }): Layer[] {
     // content is already flattened into props.
     const children = tag === 'text' || VECTOR_TAGS.has(tag) ? [] : walkChildren(child, counter);
 
+    const props = extractProps(child, tag);
+    // Frames have no intrinsic geometry in SVG — derive a bounding box from the
+    // children we could measure, and infer the auto-layout flow from how those
+    // children line up (all same top ≈ a row, all same left ≈ a column).
+    if (type === 'frame' && children.length) {
+      const boxes = children.map((c) => c.props.box).filter(Boolean) as NonNullable<LayerProps['box']>[];
+      if (boxes.length) {
+        const x = Math.min(...boxes.map((b) => b.x));
+        const y = Math.min(...boxes.map((b) => b.y));
+        const w = Math.max(...boxes.map((b) => b.x + b.w)) - x;
+        const h = Math.max(...boxes.map((b) => b.y + b.h)) - y;
+        props.box = { x, y, w, h };
+        props.layout = inferLayout(boxes);
+      }
+    }
+
     out.push({
       id,
       name: nameOf(child, tag, siblingIndex),
       type,
-      props: extractProps(child, tag),
+      props,
       children,
     });
     siblingIndex++;

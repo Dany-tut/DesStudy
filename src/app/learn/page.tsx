@@ -1,17 +1,19 @@
 import { Flame } from 'lucide-react';
-import { getLearner } from '@/lib/learner';
+import { getCurrentLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
 import { getPaths, type LessonEntry } from '@/content/curriculum';
 import { blocksToLesson } from '@/lib/admin/blocksToLesson';
+import { visibleAuthoredLessonWhere } from '@/lib/curriculum/access';
 import { LearnBrowser, type LearnGroup } from '@/components/learn/LearnBrowser';
 import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
-/** Published teacher-authored lessons, converted to the same card shape the static PATHS use. */
-async function getAuthoredEntries(): Promise<LessonEntry[]> {
+/** Published teacher-authored lessons the current learner may see, converted to
+ *  the same card shape the static PATHS use. */
+async function getAuthoredEntries(learnerId: string | null): Promise<LessonEntry[]> {
   const rows = await prisma.authoredLesson.findMany({
-    where: { published: true },
+    where: visibleAuthoredLessonWhere(learnerId),
     include: { blocks: true },
   });
   return rows.flatMap((row) => {
@@ -42,12 +44,12 @@ async function getAuthoredEntries(): Promise<LessonEntry[]> {
 export default async function LearnPage() {
   const { t, tp, locale } = await getT();
   const PATHS = getPaths(locale);
-  const learner = await getLearner();
+  const learner = await getCurrentLearner();
   const progress = learner
     ? await prisma.lessonProgress.findMany({ where: { learnerId: learner.id } })
     : [];
   const bySlug = new Map(progress.map((p) => [p.lessonSlug, p]));
-  const authoredLessons = await getAuthoredEntries();
+  const authoredLessons = await getAuthoredEntries(learner?.id ?? null);
 
   const withProgress = (entry: LessonEntry) => {
     const p = bySlug.get(entry.slug);

@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ArrowRight, PlayCircle, Sparkles, Target } from 'lucide-react';
@@ -24,6 +25,25 @@ const GRADE_TONE: Record<Grade, GemTone> = {
   middle: 'amethyst',
   senior: 'gold',
 };
+
+/**
+ * Per-grade accent, tuned to the crystal the learner earns: the whole result
+ * screen (salary pill, radar, dot bars, growth points) picks up the gem's hue
+ * instead of the flat brand violet — a golden Senior page, a blue Junior page.
+ * `base` fills/borders, `ink` is the readable text tint, `soft`/`line` are
+ * pre-baked alphas so we don't lean on Tailwind opacity math over CSS vars.
+ */
+interface Accent {
+  base: string;
+  ink: string;
+  soft: string;
+  line: string;
+}
+const GRADE_ACCENT: Record<Grade, Accent> = {
+  junior: { base: '#3B82F6', ink: '#2563EB', soft: 'rgba(59,130,246,0.08)', line: 'rgba(59,130,246,0.35)' },
+  middle: { base: '#9B61FF', ink: '#7C3AED', soft: 'rgba(155,97,255,0.09)', line: 'rgba(155,97,255,0.38)' },
+  senior: { base: '#F5C043', ink: '#B4791A', soft: 'rgba(245,192,67,0.12)', line: 'rgba(245,192,67,0.45)' },
+};
 const GRADE_TAGLINE: Record<Grade, string> = {
   junior: 'Крепкий фундамент — впереди самый быстрый рост',
   middle: 'Уверенный уровень. Точки роста приблизят к senior',
@@ -43,9 +63,20 @@ export function ResultScreen({
   registered?: boolean;
 }) {
   const growth = growthSkills(scores);
+  const accent = GRADE_ACCENT[result.grade];
 
   return (
-    <main className="relative mx-auto max-w-[900px] px-6 pb-14 pt-20">
+    <main
+      className="relative mx-auto max-w-[900px] px-6 pb-14 pt-20"
+      style={
+        {
+          '--accent': accent.base,
+          '--accent-ink': accent.ink,
+          '--accent-soft': accent.soft,
+          '--accent-line': accent.line,
+        } as CSSProperties
+      }
+    >
       <Confetti />
 
       {/* Hero — crystal on the left, radar on the right. The extra top padding
@@ -56,7 +87,7 @@ export function ResultScreen({
         transition={{ duration: 0.4 }}
         className="grid items-center gap-8 sm:grid-cols-2"
       >
-        <div className="flex flex-col items-center text-center sm:items-start sm:text-left">
+        <div className="flex flex-col items-center text-center">
           <CrystalGem tone={GRADE_TONE[result.grade]} size={124} />
           <p className="mt-4 text-footnote uppercase tracking-widest text-tertiary">
             {name ? `${name}, ваш грейд` : 'Ваш грейд'}
@@ -64,7 +95,7 @@ export function ResultScreen({
           <h1 className="mt-1 text-display font-bold capitalize text-primary">
             {GRADE_LABEL[result.grade]}
           </h1>
-          <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/5 px-3.5 py-1.5 text-footnote font-medium text-brand tabular-nums">
+          <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[color:var(--accent-line)] bg-[var(--accent-soft)] px-3.5 py-1.5 text-footnote font-medium text-[var(--accent-ink)] tabular-nums">
             вилка {SALARY_BANDS[result.grade].min}–{SALARY_BANDS[result.grade].max}к ₽
           </span>
           <p className="mt-3 max-w-[420px] text-body text-secondary">
@@ -79,7 +110,8 @@ export function ResultScreen({
               label: c.short,
               value: result.radar.find((r) => r.category === c.id)?.value ?? 0,
             }))}
-            size={320}
+            size={368}
+            color={accent.base}
           />
         </div>
       </motion.div>
@@ -92,7 +124,7 @@ export function ResultScreen({
             <section key={c.id} className="rounded-xl border border-border bg-surface p-5">
               <div className="mb-4 flex items-baseline justify-between">
                 <h3 className="text-callout font-semibold text-primary">{c.title}</h3>
-                <span className="text-footnote capitalize text-brand">{catResult.grade}</span>
+                <span className="text-footnote capitalize text-[var(--accent-ink)]">{catResult.grade}</span>
               </div>
               <div className="space-y-2.5">
                 {skillsInCategory(c.id).map((s) => (
@@ -110,7 +142,7 @@ export function ResultScreen({
       {/* Growth points */}
       {growth.length > 0 && (
         <section className="mt-12">
-          <div className="mb-1 flex items-center gap-2 text-brand">
+          <div className="mb-1 flex items-center gap-2 text-[var(--accent-ink)]">
             <Target size={18} />
             <span className="text-footnote font-medium uppercase tracking-wide">Точки роста</span>
           </div>
@@ -138,8 +170,8 @@ export function ResultScreen({
                         <p className="text-caption uppercase tracking-wide text-tertiary">Сейчас</p>
                         <p className="mt-0.5 text-footnote text-secondary">{current}</p>
                       </div>
-                      <div className="rounded-lg border border-brand/30 bg-brand/5 px-3 py-2">
-                        <p className="text-caption uppercase tracking-wide text-brand">Следующий уровень</p>
+                      <div className="rounded-lg border border-[color:var(--accent-line)] bg-[var(--accent-soft)] px-3 py-2">
+                        <p className="text-caption uppercase tracking-wide text-[var(--accent-ink)]">Следующий уровень</p>
                         <p className="mt-0.5 text-footnote text-primary">{target}</p>
                       </div>
                     </div>
@@ -149,9 +181,9 @@ export function ResultScreen({
                       <Link
                         key={l.slug}
                         href={`/learn/${l.slug}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-canvas px-3 py-1.5 text-footnote text-primary transition-fast hover:border-brand"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-canvas px-3 py-1.5 text-footnote text-primary transition-fast hover:border-[color:var(--accent-line)]"
                       >
-                        <Sparkles size={13} className="text-brand" />
+                        <Sparkles size={13} className="text-[var(--accent-ink)]" />
                         {l.title}
                       </Link>
                     ))}
@@ -160,14 +192,14 @@ export function ResultScreen({
                         href={rec.video.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-canvas px-3 py-1.5 text-footnote text-primary transition-fast hover:border-brand"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-canvas px-3 py-1.5 text-footnote text-primary transition-fast hover:border-[color:var(--accent-line)]"
                       >
                         <PlayCircle size={14} className="text-danger" />
                         {rec.video.title}
                       </a>
                     )}
                     {rec.lessons.length === 0 && !rec.video && (
-                      <span className="text-footnote text-tertiary">
+                      <span className="px-1 py-1 text-footnote text-tertiary">
                         Материал скоро появится — спросите преподавателя
                       </span>
                     )}
@@ -210,7 +242,7 @@ export function DotBar({ level }: { level: SkillLevel }) {
           key={i}
           className={[
             'h-2.5 w-2.5 rounded-full transition-fast',
-            i <= level ? 'bg-brand' : 'bg-muted',
+            i <= level ? 'bg-[var(--accent,var(--brand))]' : 'bg-muted',
           ].join(' ')}
         />
       ))}

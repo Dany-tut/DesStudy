@@ -104,6 +104,19 @@ body {
 }
 
 /*
+ * Focus rings — kill the browser's default black outline everywhere and show a
+ * soft brand ring only for keyboard users (:focus-visible). Mouse/touch clicks
+ * leave no ring, so selecting a segment or answer never draws a hard border.
+ */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 55%, transparent);
+  outline-offset: 2px;
+}
+
+/*
  * Achievement crystals — the gem lifts and a specular band sweeps across the
  * glass when its card is hovered. Reduced-motion collapses both (rules below).
  */
@@ -383,3 +396,65 @@ body {
 .ui-slider:disabled::-moz-range-thumb {
   cursor: not-allowed;
 }
+
+/* ── Brand logo: 2×2 block mark, "cover" cycle ─────────────────────
+   4 squares → top pair covers bottom pair → 4 → left pair covers
+   right pair → 4 → right pair covers left pair → 4 → loop.
+   The covering pair stretches across the axis while the covered pair
+   collapses to zero. Geometry lives in a 48-unit box scaled by --u. */
+.brand-logo { position: relative; --u: 0.75px; }
+.brand-logo i {
+  position: absolute;
+  /* Fixed radius in units (not %), so corners keep the SAME rounding through
+     the whole morph instead of stretching with width/height. */
+  border-radius: calc(6.5 * var(--u));
+  display: block;
+  /* resting 2×2 grid — also the static fallback when motion is reduced */
+  width: calc(21.5 * var(--u));
+  height: calc(21.5 * var(--u));
+}
+.brand-logo .bl1 { left: 0;                   top: 0;                   background: var(--brand); }
+.brand-logo .bl2 { left: calc(26.5*var(--u)); top: 0;                   background: color-mix(in srgb, var(--brand) 78%, #fff); }
+.brand-logo .bl3 { left: 0;                   top: calc(26.5*var(--u)); background: color-mix(in srgb, var(--brand) 60%, #fff); }
+.brand-logo .bl4 { left: calc(26.5*var(--u)); top: calc(26.5*var(--u)); background: color-mix(in srgb, var(--brand) 42%, #fff); }
+
+/* Pulse only while hovering the brand link (icon + wordmark). */
+a:hover > .brand-logo .bl1 { animation: bl1 6s cubic-bezier(.65,0,.35,1) infinite; }
+a:hover > .brand-logo .bl2 { animation: bl2 6s cubic-bezier(.65,0,.35,1) infinite; }
+a:hover > .brand-logo .bl3 { animation: bl3 6s cubic-bezier(.65,0,.35,1) infinite; }
+a:hover > .brand-logo .bl4 { animation: bl4 6s cubic-bezier(.65,0,.35,1) infinite; }
+
+/* Timeline (per element). The "covering" pair EXPANDS across the axis
+   to swallow the other pair's row/column (staying anchored); the covered
+   pair collapses to zero at its centre (pushed out).
+   0–20%   phase 1 — top pair grows down over bottom pair → back to 4
+   35–55%  phase 2 — left pair grows right over right pair → back to 4
+   70–90%  phase 3 — right pair grows left over left pair → back to 4
+   rest held at 0/20/35/55/70/90/100; peaks at 10/45/80.
+   Collapse centres: TL(10.75,10.75) TR(37.25,10.75) BL(10.75,37.25) BR(37.25,37.25). */
+@keyframes bl1 { /* top-left */
+  0%,20%,35%,55%,70%,90%,100% { left:0; top:0; width:calc(21.5*var(--u)); height:calc(21.5*var(--u)); }
+  10% { left:0; top:0; width:calc(21.5*var(--u)); height:calc(48*var(--u)); } /* grow down over bottom-left */
+  45% { left:0; top:0; width:calc(48*var(--u));   height:calc(21.5*var(--u)); } /* grow right over top-right */
+  80% { left:calc(10.75*var(--u)); top:calc(10.75*var(--u)); width:0; height:0; } /* displaced — collapse */
+}
+@keyframes bl2 { /* top-right */
+  0%,20%,35%,55%,70%,90%,100% { left:calc(26.5*var(--u)); top:0; width:calc(21.5*var(--u)); height:calc(21.5*var(--u)); }
+  10% { left:calc(26.5*var(--u)); top:0; width:calc(21.5*var(--u)); height:calc(48*var(--u)); } /* grow down over bottom-right */
+  45% { left:calc(37.25*var(--u)); top:calc(10.75*var(--u)); width:0; height:0; } /* displaced — collapse */
+  80% { left:0; top:0; width:calc(48*var(--u)); height:calc(21.5*var(--u)); } /* grow left over top-left */
+}
+@keyframes bl3 { /* bottom-left */
+  0%,20%,35%,55%,70%,90%,100% { left:0; top:calc(26.5*var(--u)); width:calc(21.5*var(--u)); height:calc(21.5*var(--u)); }
+  10% { left:calc(10.75*var(--u)); top:calc(37.25*var(--u)); width:0; height:0; } /* displaced — collapse */
+  45% { left:0; top:calc(26.5*var(--u)); width:calc(48*var(--u)); height:calc(21.5*var(--u)); } /* grow right over bottom-right */
+  80% { left:calc(10.75*var(--u)); top:calc(37.25*var(--u)); width:0; height:0; } /* displaced — collapse */
+}
+@keyframes bl4 { /* bottom-right */
+  0%,20%,35%,55%,70%,90%,100% { left:calc(26.5*var(--u)); top:calc(26.5*var(--u)); width:calc(21.5*var(--u)); height:calc(21.5*var(--u)); }
+  10% { left:calc(37.25*var(--u)); top:calc(37.25*var(--u)); width:0; height:0; } /* displaced — collapse */
+  45% { left:calc(37.25*var(--u)); top:calc(37.25*var(--u)); width:0; height:0; } /* displaced — collapse */
+  80% { left:0; top:calc(26.5*var(--u)); width:calc(48*var(--u)); height:calc(21.5*var(--u)); } /* grow left over bottom-left */
+}
+/* No reduced-motion guard: the logo is static at rest and only pulses on an
+   explicit hover, so the motion is user-initiated rather than auto-playing. */

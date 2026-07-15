@@ -157,8 +157,8 @@ function TrackParticles({
       const ang = rnd() * Math.PI * 2; // full 360° spray
       const spd = (1.6 + rnd() * 3.4) * dpr; // energetic pop, then drag reins it in
       p.vx = Math.cos(ang) * spd;
-      p.vy = Math.sin(ang) * spd - 0.8 * dpr; // slight upward bias
-      p.r = (0.7 + rnd() * 2.1) * dpr;
+      p.vy = Math.sin(ang) * spd + 0.8 * dpr; // slight downward bias — spill out from under the thumb
+      p.r = (1.4 + rnd() * 2.4) * dpr;
       p.max = 38 + rnd() * 36;
       p.life = initial ? rnd() * p.max : 0;
       // Offset an initial particle along its trajectory so the first frame already
@@ -188,13 +188,14 @@ function TrackParticles({
     resize(trackRef.current);
 
     const dot = (x: number, y: number, rad: number, a: number) => {
-      const grd = ctx.createRadialGradient(x, y, 0, x, y, rad * 4);
+      // Crisp spark: a solid dot with only a tight edge feather — no wide halo.
+      const grd = ctx.createRadialGradient(x, y, 0, x, y, rad);
       grd.addColorStop(0, `rgba(${r},${g},${b},${a})`);
-      grd.addColorStop(0.35, `rgba(${r},${g},${b},${a * 0.4})`);
+      grd.addColorStop(0.7, `rgba(${r},${g},${b},${a})`);
       grd.addColorStop(1, `rgba(${r},${g},${b},0)`);
       ctx.fillStyle = grd;
       ctx.beginPath();
-      ctx.arc(x, y, rad * 4, 0, Math.PI * 2);
+      ctx.arc(x, y, rad, 0, Math.PI * 2);
       ctx.fill();
     };
 

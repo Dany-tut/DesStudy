@@ -79,6 +79,8 @@ export const exCore = {
         'Ты закрепил материал на практике. Следующий шаг — сохранение прогресса и адаптивная сложность.',
       nextUp: 'Следующий урок',
       backToPaths: 'Ко всем урокам',
+      achievementUnlocked: 'Достижение получено',
+      tapToContinue: 'Нажми, чтобы продолжить',
     },
     autoLayout: {
       canvasLabel: 'Холст auto-layout',
@@ -185,6 +187,8 @@ export const exCore = {
         'You locked in the material through practice. Next up: saving progress and adaptive difficulty.',
       nextUp: 'Next lesson',
       backToPaths: 'Back to all lessons',
+      achievementUnlocked: 'Achievement unlocked',
+      tapToContinue: 'Tap to continue',
     },
     autoLayout: {
       canvasLabel: 'Auto-layout canvas',

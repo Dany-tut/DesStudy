@@ -1,29 +1,58 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { SESSION_COOKIE, verifySession } from '@/lib/auth/session';
+import { LEARNER_SESSION_COOKIE, verifyLearnerSession } from '@/lib/auth/learner-session';
 
 /**
- * Coarse page-level access control. Runs on the edge, so it only verifies the
- * session JWT (role travels inside the token — no DB hit). Fine-grained checks
- * and the typed `user` for rendering live in the pages via requireBoss/
- * requireTeacher (src/lib/auth). Learners and public pages are untouched.
+ * Runs on the edge for every page request. Two jobs:
  *
- *   /admin/* → any signed-in staff. Boss-only areas (invites, teachers) are
- *   gated inside the page by role; a dedicated /teacher cabinet comes later.
+ *  1. Expose the request path to Server Components via the `x-pathname` header,
+ *     so the root layout can pick the right chrome (shell vs. bare flow).
+ *  2. Coarse page-level access control — it only verifies the session JWT
+ *     (identity travels inside the token, no DB hit). Fine-grained checks and
+ *     the typed `user` for rendering live in the pages via requireBoss/
+ *     requireTeacher (src/lib/auth).
+ *
+ *       /admin/*, /teacher/*   → any signed-in staff.
+ *       /student/*, course/*   → any signed-in learner (separate session cookie).
+ *
+ * Everything else is public and passes through untouched (still tagged).
  */
+
+/** Learner-only areas — the paid course. Gated behind the learner session. */
+const LEARNER_PREFIXES = ['/student', '/learn', '/dashboard', '/achievements', '/library', '/mentor'];
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const token = req.cookies.get(SESSION_COOKIE)?.value;
-  const user = token ? await verifySession(token) : null;
 
-  if (!user) {
-    const url = new URL('/signin', req.url);
-    url.searchParams.set('next', pathname);
-    return NextResponse.redirect(url);
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-pathname', pathname);
+  const pass = NextResponse.next({ request: { headers: requestHeaders } });
+
+  if (LEARNER_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    const token = req.cookies.get(LEARNER_SESSION_COOKIE)?.value;
+    const learner = token ? await verifyLearnerSession(token) : null;
+    if (!learner) return redirectToSignin(req, pathname);
+    return pass;
   }
 
-  return NextResponse.next();
+  if (pathname.startsWith('/admin') || pathname.startsWith('/teacher')) {
+    const token = req.cookies.get(SESSION_COOKIE)?.value;
+    const user = token ? await verifySession(token) : null;
+    if (!user) return redirectToSignin(req, pathname);
+    return pass;
+  }
+
+  return pass;
+}
+
+function redirectToSignin(req: NextRequest, next: string) {
+  const url = new URL('/signin', req.url);
+  url.searchParams.set('next', next);
+  return NextResponse.redirect(url);
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  // Run on all pages except Next internals and static assets (anything with a
+  // file extension), so `x-pathname` is set for every rendered route.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)'],
 };

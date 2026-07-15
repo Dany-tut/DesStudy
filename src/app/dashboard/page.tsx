@@ -9,7 +9,7 @@ import {
   CheckCircle2,
   XCircle,
 } from 'lucide-react';
-import { getLearner } from '@/lib/learner';
+import { getCurrentLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
 import { getPaths, type LessonEntry } from '@/content/curriculum';
 import { getT } from '@/lib/i18n/server';
@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
 export default async function DashboardPage() {
   const { t, tp, locale } = await getT();
   const ALL_LESSONS = getPaths(locale).flatMap((p) => p.lessons);
-  const learner = await getLearner();
+  const learner = await getCurrentLearner();
 
   if (!learner) {
     return (

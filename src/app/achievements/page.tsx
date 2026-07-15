@@ -1,6 +1,6 @@
 import { Trophy } from 'lucide-react';
 import { CrystalGem } from '@/components/achievements/CrystalGem';
-import { getLearner } from '@/lib/learner';
+import { getCurrentLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
 import { totalLessons } from '@/content/curriculum';
 import { getAchievements, type AchievementStats } from '@/content/achievements';
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export default async function AchievementsPage() {
   const { t, tp, locale } = await getT();
   const ACHIEVEMENTS = getAchievements(locale);
-  const learner = await getLearner();
+  const learner = await getCurrentLearner();
 
   if (!learner) {
     return (

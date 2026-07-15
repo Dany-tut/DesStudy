@@ -1,12 +1,14 @@
-import Link from 'next/link';
-import { Check, ArrowRight } from 'lucide-react';
+'use client';
+
+import { useState } from 'react';
+import { Check, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 
 /**
- * Guest-facing tariff cards. Placeholder pricing/packages shown to a learner who
- * has finished the grading test but isn't enrolled yet — their grade is saved
- * for the curator, and here they can see the packages and jump to the landing
- * (itself a stub for now). A teacher links the purchased course to the student
- * later, which flips them to a registered learner with the full app.
+ * Guest-facing tariff cards shown to a learner who finished the grading test but
+ * isn't enrolled yet — their grade is already saved for the curator. The learner
+ * picks a format: the chosen card highlights and reveals its "Оставить заявку"
+ * button, which posts to /api/application. That заявка then surfaces as a lead in
+ * the teacher/boss results view, where staff follow up and attach the paid course.
  */
 
 interface Plan {
@@ -52,7 +54,33 @@ const PLANS: Plan[] = [
   },
 ];
 
+type Status = 'idle' | 'sending' | 'sent';
+
 export function PricingPlans() {
+  const [selected, setSelected] = useState<string | null>(null);
+  const [status, setStatus] = useState<Status>('idle');
+  const [error, setError] = useState(false);
+
+  async function submit() {
+    if (!selected || status === 'sending') return;
+    setStatus('sending');
+    setError(false);
+    try {
+      const res = await fetch('/api/application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: selected }),
+      });
+      if (!res.ok) throw new Error('failed');
+      setStatus('sent');
+    } catch {
+      setError(true);
+      setStatus('idle');
+    }
+  }
+
+  const sentPlan = status === 'sent' ? PLANS.find((p) => p.id === selected) : null;
+
   return (
     <section className="mx-auto mt-16 max-w-[980px]">
       <div className="text-center">
@@ -63,54 +91,113 @@ export function PricingPlans() {
         </p>
       </div>
 
+      {/* items-stretch (grid default) keeps every card the same height; each card
+          is a flex column so its CTA slot pins to the bottom via mt-auto. */}
       <div className="mt-8 grid gap-4 md:grid-cols-3">
-        {PLANS.map((p) => (
-          <div
-            key={p.id}
-            className={[
-              'flex flex-col rounded-2xl border p-6 transition-base',
-              p.featured
-                ? 'border-brand/60 bg-brand/5 shadow-[0_0_0_1px_var(--brand)]'
-                : 'border-border bg-surface',
-            ].join(' ')}
-          >
-            {p.featured && (
-              <span className="mb-3 inline-flex w-fit rounded-full bg-brand px-2.5 py-1 text-caption font-medium text-on-brand">
-                Популярный
-              </span>
-            )}
-            <h3 className="text-callout font-semibold text-primary">{p.name}</h3>
-            <div className="mt-2 flex items-baseline gap-1.5">
-              <span className="text-title2 font-bold text-primary tabular-nums">{p.price}</span>
-              <span className="text-footnote text-tertiary">{p.period}</span>
-            </div>
-            <p className="mt-2 text-footnote text-secondary">{p.tagline}</p>
-            <ul className="mt-4 space-y-2">
-              {p.features.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-footnote text-secondary">
-                  <Check size={15} className="mt-0.5 shrink-0 text-brand" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <Link
-              href="/landing"
+        {PLANS.map((p) => {
+          const isSelected = selected === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                setSelected(p.id);
+                if (status === 'sent') setStatus('idle');
+              }}
+              aria-pressed={isSelected}
               className={[
-                'mt-6 inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-footnote font-medium transition-base',
-                p.featured
-                  ? 'bg-brand text-on-brand hover:bg-brand-hover'
-                  : 'border border-border text-primary hover:border-brand',
+                'flex flex-col rounded-2xl border p-6 text-left transition-base',
+                isSelected
+                  ? 'border-brand bg-brand/5 shadow-[0_0_0_2px_var(--brand)]'
+                  : p.featured
+                    ? 'border-brand/40 bg-surface hover:border-brand/70'
+                    : 'border-border bg-surface hover:border-border-strong',
               ].join(' ')}
             >
-              Оставить заявку <ArrowRight size={15} />
-            </Link>
-          </div>
-        ))}
+              {p.featured && (
+                <span className="mb-3 inline-flex w-fit rounded-full bg-brand px-2.5 py-1 text-caption font-medium text-on-brand">
+                  Популярный
+                </span>
+              )}
+              <h3 className="text-callout font-semibold text-primary">{p.name}</h3>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span
+                  className={[
+                    'font-bold text-primary tabular-nums whitespace-nowrap',
+                    /\d/.test(p.price) ? 'text-title2' : 'text-title3',
+                  ].join(' ')}
+                >
+                  {p.price}
+                </span>
+                <span className="text-footnote text-tertiary">{p.period}</span>
+              </div>
+              <p className="mt-2 text-footnote text-secondary">{p.tagline}</p>
+              <ul className="mt-4 space-y-2">
+                {p.features.map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-footnote text-secondary">
+                    <Check size={15} className="mt-0.5 shrink-0 text-brand" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+
+              {/* CTA slot — pinned to the bottom of every card (mt-auto). The
+                  button only appears on the selected card; other cards show a
+                  hint so the whole card still reads as pickable. */}
+              <div className="mt-auto pt-6">
+                {isSelected ? (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      submit();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        submit();
+                      }
+                    }}
+                    aria-disabled={status === 'sending'}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-transparent bg-brand px-4 py-2.5 text-footnote font-medium text-on-brand transition-base hover:bg-brand-hover"
+                  >
+                    {status === 'sending' ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" /> Отправляем…
+                      </>
+                    ) : (
+                      <>
+                        Оставить заявку <ArrowRight size={15} />
+                      </>
+                    )}
+                  </span>
+                ) : (
+                  <span className="inline-flex w-full items-center justify-center rounded-lg border border-dashed border-border px-4 py-2.5 text-footnote text-tertiary">
+                    Выбрать тариф
+                  </span>
+                )}
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      <p className="mt-6 text-center text-caption text-tertiary">
-        Оплата и тарифы — черновик. Позже подключим лендинг и реальную оплату.
-      </p>
+      {sentPlan ? (
+        <p className="mt-6 flex items-center justify-center gap-2 text-center text-footnote text-brand">
+          <CheckCircle2 size={16} />
+          Заявка на «{sentPlan.name}» отправлена — куратор скоро свяжется с вами.
+        </p>
+      ) : error ? (
+        <p className="mt-6 text-center text-footnote text-danger">
+          Не удалось отправить заявку. Попробуйте ещё раз.
+        </p>
+      ) : (
+        <p className="mt-6 text-center text-caption text-tertiary">
+          Выберите тариф — заявка уйдёт куратору. Оплата и тарифы пока черновик.
+        </p>
+      )}
     </section>
   );
 }

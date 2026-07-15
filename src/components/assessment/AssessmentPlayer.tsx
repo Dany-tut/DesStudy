@@ -21,9 +21,12 @@ type Phase = 'name' | 'questions' | 'result';
 export function AssessmentPlayer({
   initialName,
   registered = false,
+  inviteToken,
 }: {
   initialName: string | null;
   registered?: boolean;
+  /** Teacher's TEST link — forwarded to /api/assessment to attribute the card. */
+  inviteToken?: string;
 }) {
   const [phase, setPhase] = useState<Phase>(initialName ? 'questions' : 'name');
   const [name, setName] = useState(initialName ?? '');
@@ -38,9 +41,10 @@ export function AssessmentPlayer({
 
   const result = useMemo(() => computeGrade(scores), [scores]);
 
-  // Single-select self-assessment steps advance on click; interactive tasks and
-  // multi-answer steps let the learner tweak, so they keep an explicit continue.
-  const autoAdvance = Boolean(q) && !q.interactive && !q.multi;
+  // Choice-card single-selects are unambiguous — one tap answers, so they
+  // auto-advance. Segmented pickers, interactive tasks and multi-answer steps
+  // let the learner tweak, so they keep an explicit "Далее".
+  const autoAdvance = Boolean(q) && !q.interactive && !q.multi && q.present !== 'segmented';
 
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearTimer = () => {
@@ -71,7 +75,7 @@ export function AssessmentPlayer({
       await fetch('/api/assessment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() || undefined, scores: finalScores }),
+        body: JSON.stringify({ name: name.trim() || undefined, scores: finalScores, inviteToken }),
       });
     } catch {
       // Best-effort — still show the result; teacher view just won't have it.

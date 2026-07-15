@@ -3,6 +3,7 @@ import { designThinkingIntro } from './design-thinking-intro';
 import { figmaIntro } from './figma-intro';
 import { spacing8pt } from './spacing-8pt';
 import { radiusScale } from './radius-scale';
+import { paddingRadius } from './padding-radius';
 import { typeHierarchy } from './type-hierarchy';
 import { colorContrast } from './color-contrast';
 import { uxHeuristics } from './ux-heuristics';
@@ -40,6 +41,7 @@ export const lessons: Record<string, Lesson> = {
   [figmaIntro.slug]: figmaIntro,
   [spacing8pt.slug]: spacing8pt,
   [radiusScale.slug]: radiusScale,
+  [paddingRadius.slug]: paddingRadius,
   [typeHierarchy.slug]: typeHierarchy,
   [colorContrast.slug]: colorContrast,
   [microTypography.slug]: microTypography,
@@ -77,6 +79,7 @@ export {
   figmaIntro,
   spacing8pt,
   radiusScale,
+  paddingRadius,
   typeHierarchy,
   colorContrast,
   uxHeuristics,
