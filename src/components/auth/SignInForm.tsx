@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 const ERRORS: Record<string, string> = {
   invalid_credentials: 'Неверный email или пароль.',
@@ -17,6 +17,7 @@ export function SignInForm() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -59,14 +60,24 @@ export function SignInForm() {
       </label>
       <label className="flex flex-col gap-1.5">
         <span className="text-caption text-tertiary">Пароль</span>
-        <input
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="rounded-lg border border-border bg-surface px-3 py-2.5 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
-        />
+        <div className="relative">
+          <input
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 pr-10 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-tertiary transition-fast hover:text-primary"
+          >
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
       </label>
 
       {error && <p className="text-caption text-[#F85149]">{error}</p>}
