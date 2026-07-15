@@ -215,7 +215,7 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
         explanation: exercise.explanation,
         hint: correct
           ? undefined
-          : `Осмотрено ${visited.length} из ${STATE_KEYS.length} состояний — открой каждое.`,
+          : `Разобрано ${visited.length} из ${STATE_KEYS.length} рецептов — проверь каждое состояние.`,
       };
     }
     case 'hotspot': {

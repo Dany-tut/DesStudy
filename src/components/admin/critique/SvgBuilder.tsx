@@ -1,21 +1,11 @@
 'use client';
 
-import { useMemo, useRef, useState, useCallback, useLayoutEffect, forwardRef } from 'react';
-import {
-  Upload,
-  Square,
-  Type,
-  Layers,
-  Image as ImageIcon,
-  PenTool,
-  Ruler,
-  Palette,
-  Target,
-  Check,
-  RotateCcw,
-} from 'lucide-react';
+import { useMemo, useRef, useState, useCallback, forwardRef } from 'react';
+import { Upload, Ruler, Palette, Target, Check, RotateCcw } from 'lucide-react';
 import { parseSvgToLayers } from '@/lib/editor/parseSvg';
-import type { Layer, LayerType } from '@/lib/editor/types';
+import { LayerTree } from '@/components/editor/LayerTree';
+import { LayerCanvas } from '@/components/editor/LayerCanvas';
+import type { Layer } from '@/lib/editor/types';
 import type { CritiqueZone } from '@/lib/curriculum/types';
 
 /**
@@ -28,17 +18,13 @@ import type { CritiqueZone } from '@/lib/curriculum/types';
  * every edit mutates the markup and re-emits it. Zones link back to layers by
  * `layerId`; their `rect` is measured from the live DOM so it stays faithful
  * regardless of transforms or scale.
+ *
+ * Composes the shared milestone-2 renderer (`LayerTree` + `LayerCanvas`) so the
+ * editor and the standalone `/admin/editor` demo stay in sync; the editing
+ * inspector and zone promotion are what this component adds on top.
  */
 
 const rid = (p: string) => `${p}-${Math.random().toString(36).slice(2, 8)}`;
-
-const LAYER_ICON: Record<LayerType, typeof Square> = {
-  frame: Layers,
-  text: Type,
-  block: Square,
-  image: ImageIcon,
-  vector: PenTool,
-};
 
 export function SvgBuilder({
   svg,
@@ -51,9 +37,11 @@ export function SvgBuilder({
   onSvg: (svg: string | undefined) => void;
   onZones: (zones: CritiqueZone[]) => void;
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const canvasWrapRef = useRef<HTMLDivElement>(null);
 
   // Layer tree + faithful markup are always derived from the current `svg`, so
   // the persisted string is the only state that has to round-trip.
@@ -61,13 +49,20 @@ export function SvgBuilder({
   const screen = parsed?.screen ?? null;
   const rendered = parsed?.svg ?? '';
 
-  const flat = useMemo(() => (screen ? flatten(screen.layers) : []), [screen]);
-  const selLayer = flat.find((f) => f.layer.id === selected)?.layer ?? null;
+  const byId = useMemo(() => {
+    const m = new Map<string, Layer>();
+    const walk = (ls: Layer[]) => ls.forEach((l) => (m.set(l.id, l), walk(l.children)));
+    if (screen) walk(screen.layers);
+    return m;
+  }, [screen]);
+  const selLayer = selectedId ? byId.get(selectedId) ?? null : null;
+
   const zoneByLayer = useMemo(() => {
     const m = new Map<string, CritiqueZone>();
     for (const z of zones) if (z.layerId) m.set(z.layerId, z);
     return m;
   }, [zones]);
+  const zoneIds = useMemo(() => new Set(zoneByLayer.keys()), [zoneByLayer]);
 
   async function onImport(file: File) {
     setErrors([]);
@@ -78,7 +73,7 @@ export function SvgBuilder({
       return;
     }
     onSvg(result.svg);
-    setSelected(null);
+    setSelectedId(null);
   }
 
   // Edit the selected layer by mutating the source markup, then re-emit it.
@@ -89,11 +84,53 @@ export function SvgBuilder({
       const el = doc.querySelector(`[data-layer-id="${id}"]`);
       if (!el) return;
       fn(el);
-      const root = doc.documentElement;
-      onSvg(new XMLSerializer().serializeToString(root));
+      onSvg(new XMLSerializer().serializeToString(doc.documentElement));
     },
     [svg, onSvg],
   );
+
+  // Bounding box of a rendered layer node as % of the SVG, measured from the DOM
+  // so it accounts for transforms and responsive scaling.
+  const measureRect = useCallback((layerId: string): CritiqueZone['rect'] | null => {
+    const host = canvasWrapRef.current;
+    if (!host) return null;
+    const node = host.querySelector<SVGGraphicsElement>(`[data-layer-id="${layerId}"]`);
+    const svgEl = host.querySelector('svg');
+    if (!node || !svgEl) return null;
+    const nb = node.getBoundingClientRect();
+    const sb = svgEl.getBoundingClientRect();
+    if (sb.width === 0 || sb.height === 0) return null;
+    const clamp = (n: number) => Math.max(0, Math.min(100, n));
+    return {
+      x0: +clamp(((nb.left - sb.left) / sb.width) * 100).toFixed(1),
+      y0: +clamp(((nb.top - sb.top) / sb.height) * 100).toFixed(1),
+      x1: +clamp(((nb.right - sb.left) / sb.width) * 100).toFixed(1),
+      y1: +clamp(((nb.bottom - sb.top) / sb.height) * 100).toFixed(1),
+    };
+  }, []);
+
+  function toggleZone(layer: Layer) {
+    const existing = zoneByLayer.get(layer.id);
+    if (existing) {
+      onZones(zones.filter((z) => z.id !== existing.id));
+      return;
+    }
+    const rect = measureRect(layer.id);
+    onZones([
+      ...zones,
+      {
+        id: rid('zone'),
+        layerId: layer.id,
+        label: layer.name,
+        role: 'secondary',
+        roleNote: '',
+        intent: '',
+        defect: 'none',
+        defectNote: '',
+        rect: rect ?? { x0: 10, y0: 10, x1: 40, y1: 30 },
+      },
+    ]);
+  }
 
   if (!svg || !screen) {
     return (
@@ -142,39 +179,26 @@ export function SvgBuilder({
             <RotateCcw size={13} />
           </button>
         </div>
-        <div className="space-y-0.5">
-          {flat.map(({ layer, depth }) => {
-            const Icon = LAYER_ICON[layer.type];
-            const isZone = zoneByLayer.has(layer.id);
-            return (
-              <button
-                key={layer.id}
-                type="button"
-                onClick={() => setSelected(layer.id)}
-                style={{ paddingLeft: 8 + depth * 14 }}
-                className={[
-                  'flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-caption transition-fast',
-                  selected === layer.id ? 'bg-brand/10 text-brand' : 'text-secondary hover:bg-hover',
-                ].join(' ')}
-              >
-                <Icon size={13} className="shrink-0" />
-                <span className="truncate">{layer.name}</span>
-                {isZone && <Target size={11} className="ml-auto shrink-0 text-[#3FB950]" />}
-              </button>
-            );
-          })}
-        </div>
+        <LayerTree
+          layers={screen.layers}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onHover={setHoveredId}
+          zoneIds={zoneIds}
+        />
         <FileInput ref={fileRef} onPick={onImport} />
       </div>
 
       {/* ── Canvas ── */}
-      <Canvas
-        svg={rendered}
-        viewBox={{ w: screen.width, h: screen.height }}
-        selected={selected}
-        zoneLayerIds={zoneByLayer}
-        onSelect={setSelected}
-      />
+      <div ref={canvasWrapRef} className="flex items-center justify-center rounded-xl border border-border bg-canvas p-4">
+        <LayerCanvas
+          svg={rendered}
+          selectedId={selectedId}
+          hoveredId={hoveredId}
+          onSelect={setSelectedId}
+          onHover={setHoveredId}
+        />
+      </div>
 
       {/* ── Inspector ── */}
       <div className="rounded-xl border border-border bg-surface p-4">
@@ -193,139 +217,12 @@ export function SvgBuilder({
       </div>
     </div>
   );
-
-  function toggleZone(layer: Layer) {
-    const existing = zoneByLayer.get(layer.id);
-    if (existing) {
-      onZones(zones.filter((z) => z.id !== existing.id));
-      return;
-    }
-    const rect = measureRect(layer.id);
-    onZones([
-      ...zones,
-      {
-        id: rid('zone'),
-        layerId: layer.id,
-        label: layer.name,
-        role: 'secondary',
-        roleNote: '',
-        intent: '',
-        defect: 'none',
-        defectNote: '',
-        rect: rect ?? { x0: 10, y0: 10, x1: 40, y1: 30 },
-      },
-    ]);
-  }
 }
 
-/** Depth-first flatten of the layer tree for a flat, indented list. */
-function flatten(layers: Layer[], depth = 0): { layer: Layer; depth: number }[] {
-  const out: { layer: Layer; depth: number }[] = [];
-  for (const l of layers) {
-    out.push({ layer: l, depth });
-    if (l.children.length) out.push(...flatten(l.children, depth + 1));
-  }
-  return out;
-}
-
-/** rx/ry for rects; ignored for other tags (kept simple — teacher edits blocks). */
+/** rx/ry for rects (kept simple — teacher edits block corners). */
 function setRadius(el: Element, v: number) {
   el.setAttribute('rx', String(v));
   el.setAttribute('ry', String(v));
-}
-
-/** Bounding box of a rendered layer node as % of the SVG, measured from the DOM
- *  so it accounts for transforms and scale. Returns null if not on screen. */
-function measureRect(layerId: string): CritiqueZone['rect'] | null {
-  if (typeof document === 'undefined') return null;
-  const node = document.querySelector<SVGGraphicsElement>(`#svgb-canvas [data-layer-id="${layerId}"]`);
-  const svgEl = document.querySelector<SVGSVGElement>('#svgb-canvas svg');
-  if (!node || !svgEl) return null;
-  const nb = node.getBoundingClientRect();
-  const sb = svgEl.getBoundingClientRect();
-  if (sb.width === 0 || sb.height === 0) return null;
-  const clamp = (n: number) => Math.max(0, Math.min(100, n));
-  return {
-    x0: +clamp(((nb.left - sb.left) / sb.width) * 100).toFixed(1),
-    y0: +clamp(((nb.top - sb.top) / sb.height) * 100).toFixed(1),
-    x1: +clamp(((nb.right - sb.left) / sb.width) * 100).toFixed(1),
-    y1: +clamp(((nb.bottom - sb.top) / sb.height) * 100).toFixed(1),
-  };
-}
-
-function Canvas({
-  svg,
-  viewBox,
-  selected,
-  zoneLayerIds,
-  onSelect,
-}: {
-  svg: string;
-  viewBox: { w: number; h: number };
-  selected: string | null;
-  zoneLayerIds: Map<string, CritiqueZone>;
-  onSelect: (id: string) => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [outline, setOutline] = useState<{ left: number; top: number; w: number; h: number } | null>(null);
-
-  // Position the selection outline over the selected node after every render.
-  useLayoutEffect(() => {
-    const host = ref.current;
-    if (!host || !selected) {
-      setOutline(null);
-      return;
-    }
-    const node = host.querySelector<SVGGraphicsElement>(`[data-layer-id="${selected}"]`);
-    if (!node) {
-      setOutline(null);
-      return;
-    }
-    const nb = node.getBoundingClientRect();
-    const hb = host.getBoundingClientRect();
-    setOutline({ left: nb.left - hb.left, top: nb.top - hb.top, w: nb.width, h: nb.height });
-  }, [selected, svg]);
-
-  // Click-to-select: walk up from the clicked target to the nearest tagged layer.
-  function onClick(e: React.MouseEvent) {
-    let el = e.target as Element | null;
-    while (el && el !== ref.current) {
-      const id = el.getAttribute?.('data-layer-id');
-      if (id) {
-        onSelect(id);
-        return;
-      }
-      el = el.parentElement;
-    }
-  }
-
-  return (
-    <div className="flex items-center justify-center rounded-xl border border-border bg-canvas p-4">
-      <div
-        id="svgb-canvas"
-        ref={ref}
-        onClick={onClick}
-        className="relative w-full max-w-[300px] overflow-hidden rounded-xl border border-border shadow-sm [&_svg]:block [&_svg]:h-auto [&_svg]:w-full"
-        style={{ aspectRatio: viewBox.w && viewBox.h ? `${viewBox.w}/${viewBox.h}` : undefined }}
-        dangerouslySetInnerHTML={{ __html: svg }}
-      />
-      {/* selection + zone outlines are siblings so they don't get wiped by innerHTML */}
-      {outline && (
-        <div
-          className="pointer-events-none absolute rounded"
-          style={{
-            left: 0,
-            top: 0,
-            transform: `translate(${outline.left}px, ${outline.top}px)`,
-            width: outline.w,
-            height: outline.h,
-            outline: '2px solid var(--brand)',
-            outlineOffset: -1,
-          }}
-        />
-      )}
-    </div>
-  );
 }
 
 function Inspector({

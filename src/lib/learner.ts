@@ -34,3 +34,18 @@ export async function getLearner() {
   if (!id) return null;
   return prisma.learner.findUnique({ where: { id } });
 }
+
+/**
+ * A learner is a *registered* student once a teacher has linked them to a
+ * purchased course (≥1 Enrollment). Until then they're a guest: their ФИ and
+ * grade still reach curators via /admin/results, but they see the marketing
+ * shell (no app sidebar, pricing instead of learning CTAs). Progress attaches
+ * later when the teacher enrolls them from the student/test card.
+ */
+export async function isRegisteredLearner(): Promise<boolean> {
+  const jar = await cookies();
+  const id = jar.get(COOKIE)?.value;
+  if (!id) return false;
+  const count = await prisma.enrollment.count({ where: { learnerId: id } });
+  return count > 0;
+}

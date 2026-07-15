@@ -17,6 +17,7 @@ import {
   Minimize2,
   Play,
 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import type {
   BarBuildExercise,
   BarBuildAnswer,
@@ -404,12 +405,9 @@ function BarPreview({
             </span>
           )}
           {parts.cta && (
-            <button
-              type="button"
-              className="rounded-lg bg-brand px-3 py-2 text-footnote font-medium text-on-brand"
-            >
+            <Button variant="primary" size="sm" className={mini ? 'w-full px-0' : 'w-full'}>
               {mini ? '+' : 'Начать'}
-            </button>
+            </Button>
           )}
           {parts.avatar && (
             <span className="flex items-center gap-2">
@@ -503,12 +501,9 @@ function BarPreview({
           </span>
         )}
         {parts.cta && (
-          <button
-            type="button"
-            className="flex h-9 items-center rounded-full bg-brand px-4 text-footnote font-medium text-on-brand"
-          >
+          <Button variant="primary" size="sm">
             Начать
-          </button>
+          </Button>
         )}
         {parts.avatar && (
           <span className="flex items-center gap-2">

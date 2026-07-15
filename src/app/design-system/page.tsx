@@ -393,7 +393,7 @@ export default function DesignSystemPage() {
         <ScreenCritique />
       </Section>
 
-      <Section title="Screen-critique · редактор критериев для учителя — 3 варианта на выбор">
+      <Section title="Screen-critique · редактор критериев для учителя — полный редактор экрана (C)">
         <CritiqueEditorVariants />
       </Section>
 

@@ -13,12 +13,18 @@ import { ResultScreen } from './ResultScreen';
 type Phase = 'name' | 'questions' | 'result';
 
 /**
- * The entry grading test flow: optional ФИ step → 25 questions (DS modules +
+ * The entry grading test flow: optional ФИ step → 28 questions (DS modules +
  * interactive mini-tasks) → result. Progress bar + AnimatePresence between
  * steps, mirroring ScreenWalkthrough. Submits to /api/assessment on finish and
  * renders the celebratory result client-side.
  */
-export function AssessmentPlayer({ initialName }: { initialName: string | null }) {
+export function AssessmentPlayer({
+  initialName,
+  registered = false,
+}: {
+  initialName: string | null;
+  registered?: boolean;
+}) {
   const [phase, setPhase] = useState<Phase>(initialName ? 'questions' : 'name');
   const [name, setName] = useState(initialName ?? '');
   const [idx, setIdx] = useState(0);
@@ -76,7 +82,7 @@ export function AssessmentPlayer({ initialName }: { initialName: string | null }
   }
 
   if (phase === 'result') {
-    return <ResultScreen scores={scores} result={result} name={name} />;
+    return <ResultScreen scores={scores} result={result} name={name} registered={registered} />;
   }
 
   return (
@@ -98,11 +104,15 @@ export function AssessmentPlayer({ initialName }: { initialName: string | null }
       </div>
 
       {/* No mode="wait": if a tab is backgrounded mid-transition, rAF throttling
-          would otherwise leave the exiting step stuck and never mount the next. */}
+          would otherwise leave the exiting step stuck and never mount the next.
+          The grid stacks the exiting and entering steps in the SAME cell, so the
+          new step cross-fades in place instead of mounting below and jumping up. */}
+      <div className="grid">
       <AnimatePresence initial={false}>
         {phase === 'name' ? (
           <motion.section
             key="name"
+            className="col-start-1 row-start-1"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
@@ -136,6 +146,7 @@ export function AssessmentPlayer({ initialName }: { initialName: string | null }
         ) : (
           <motion.section
             key={q.order}
+            className="col-start-1 row-start-1"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
@@ -151,20 +162,29 @@ export function AssessmentPlayer({ initialName }: { initialName: string | null }
             <div className="mt-8 flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => setIdx((i) => Math.max(0, i - 1))}
+                onClick={() => {
+                  clearTimer();
+                  setIdx((i) => Math.max(0, i - 1));
+                }}
                 disabled={idx === 0}
                 className="flex items-center gap-1.5 text-footnote text-tertiary transition-fast hover:text-secondary disabled:opacity-0"
               >
                 <ArrowLeft size={15} /> Назад
               </button>
-              <Button disabled={!answered || submitting} onClick={next}>
-                {idx === total - 1 ? (submitting ? 'Считаем…' : 'Показать результат') : 'Далее'}
-                {!submitting && <ArrowRight size={16} />}
-              </Button>
+              {/* Auto-advance steps need no button; interactive & multi steps keep one. */}
+              {autoAdvance ? (
+                <span />
+              ) : (
+                <Button disabled={!answered || submitting} onClick={() => advance(scores)}>
+                  {idx === total - 1 ? (submitting ? 'Считаем…' : 'Показать результат') : 'Далее'}
+                  {!submitting && <ArrowRight size={16} />}
+                </Button>
+              )}
             </div>
           </motion.section>
         )}
       </AnimatePresence>
+      </div>
     </main>
   );
 }

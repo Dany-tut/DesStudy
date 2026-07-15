@@ -96,7 +96,3 @@ export const spacing8ptEn: Lesson = {
       '24px = 8 × 3 — a large, "breathing" gap for separating sections. It\'s a multiple of 8 and keeps the page\'s vertical rhythm.',
   },
 };
-
-export const lessons: Record<string, Lesson> = {
-  [spacing8ptEn.slug]: spacing8ptEn,
-};

@@ -30,6 +30,9 @@ import { insightsToConcept } from './insights-to-concept';
 import { paletteElements } from './palette-elements';
 import { responsiveLayout } from './responsive-layout';
 import { microcopy } from './microcopy';
+import { editingMilchin } from './editing-milchin';
+import { jtbdJobs } from './jtbd-jobs';
+import { cjmMap } from './cjm-map';
 
 /** Central registry — every built lesson, keyed by slug. */
 export const lessons: Record<string, Lesson> = {
@@ -64,6 +67,9 @@ export const lessons: Record<string, Lesson> = {
   [researchMethods.slug]: researchMethods,
   [insightsToConcept.slug]: insightsToConcept,
   [paletteElements.slug]: paletteElements,
+  [editingMilchin.slug]: editingMilchin,
+  [jtbdJobs.slug]: jtbdJobs,
+  [cjmMap.slug]: cjmMap,
 };
 
 export {
@@ -98,4 +104,7 @@ export {
   paletteElements,
   responsiveLayout,
   microcopy,
+  editingMilchin,
+  jtbdJobs,
+  cjmMap,
 };

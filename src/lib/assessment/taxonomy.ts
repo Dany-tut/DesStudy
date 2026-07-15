@@ -1,7 +1,7 @@
 /**
  * DesStudy — Entry Grading Test taxonomy.
  * ========================================
- * 25 skills across 4 categories (UI / UX / Product / Career), mirroring the
+ * 28 skills across 4 categories (UI / UX / Product / Career), mirroring the
  * FormFactor "тест на грейд" result screen. Each skill maps 1:1 to one question
  * in questions.ts. A skill level is 1..4 on the dmpatterns scale:
  *   1 awareness · 2 competence · 3 expertise · 4 leadership
@@ -41,7 +41,7 @@ export const CATEGORIES: CategoryDef[] = [
   { id: 'career', title: 'Career', short: 'Career', blurb: 'Кейсы, отклики, собесы, опыт' },
 ];
 
-/** Ordered exactly as the 25 questions appear (order === array index + 1). */
+/** Ordered exactly as the 28 questions appear (order === array index + 1). */
 export const SKILLS: SkillDef[] = [
   // UI design
   { id: 'client-approval', label: 'нравится заказчику', category: 'ui' },
@@ -72,6 +72,9 @@ export const SKILLS: SkillDef[] = [
   { id: 'test-tasks', label: 'тестовые', category: 'career' },
   { id: 'specialization', label: 'спец. опыт', category: 'career' },
   { id: 'experience', label: 'общий опыт', category: 'career' },
+  { id: 'portfolio', label: 'портфолио', category: 'career' },
+  { id: 'case-structure', label: 'структура кейса', category: 'career' },
+  { id: 'interview-craft', label: 'вайтборды', category: 'career' },
 ];
 
 export const SKILL_BY_ID: Record<string, SkillDef> = Object.fromEntries(

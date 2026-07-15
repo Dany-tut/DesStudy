@@ -1,4 +1,4 @@
-import { getLearner } from '@/lib/learner';
+import { getLearner, isRegisteredLearner } from '@/lib/learner';
 import { AssessmentPlayer } from '@/components/assessment/AssessmentPlayer';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +9,6 @@ export const dynamic = 'force-dynamic';
  * the result is persisted and surfaced to the teacher in /admin/results.
  */
 export default async function AssessmentPage() {
-  const learner = await getLearner();
-  return <AssessmentPlayer initialName={learner?.name ?? null} />;
+  const [learner, registered] = await Promise.all([getLearner(), isRegisteredLearner()]);
+  return <AssessmentPlayer initialName={learner?.name ?? null} registered={registered} />;
 }

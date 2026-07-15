@@ -77,6 +77,8 @@ export const exCore = {
         'Дальше — практические уроки раздела, где эти идеи закрепляются на деле.',
       lessonDoneBody:
         'Ты закрепил материал на практике. Следующий шаг — сохранение прогресса и адаптивная сложность.',
+      nextUp: 'Следующий урок',
+      backToPaths: 'Ко всем урокам',
     },
     autoLayout: {
       canvasLabel: 'Холст auto-layout',
@@ -181,6 +183,8 @@ export const exCore = {
         "Next up are the section's hands-on lessons, where these ideas stick through practice.",
       lessonDoneBody:
         'You locked in the material through practice. Next up: saving progress and adaptive difficulty.',
+      nextUp: 'Next lesson',
+      backToPaths: 'Back to all lessons',
     },
     autoLayout: {
       canvasLabel: 'Auto-layout canvas',

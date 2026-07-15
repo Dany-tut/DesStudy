@@ -1,5 +1,5 @@
 /**
- * The 25 questions of the entry grading test, transcribed from the FormFactor
+ * The 28 questions of the entry grading test, transcribed from the FormFactor
  * "тест на грейд". Each question maps 1:1 to a skill in taxonomy.ts; the four
  * options are ordered by level 1..4 (awareness → leadership).
  *
@@ -26,7 +26,7 @@ export interface Option {
 }
 
 export interface Question {
-  order: number; // 1..25
+  order: number; // 1..28
   skillId: string;
   category: Category;
   /** question stem shown as the step title */
@@ -378,10 +378,50 @@ export const QUESTIONS: Question[] = [
       o(4, 'Работа в бигтехе / госкомпании / известном сервисе'),
     ],
   },
+  {
+    order: 26,
+    skillId: 'portfolio',
+    category: 'career',
+    prompt: 'Есть ли у вас собранное портфолио?',
+    present: 'choice',
+    options: [
+      o(1, 'Нет, только несколько экранов в Figma'),
+      o(2, 'Разрозненно — ссылки на Behance / Dribbble без разборов'),
+      o(3, 'Собранное портфолио с кейсами: контекст → задача → решение'),
+      o(4, 'Портфолио-сайт с разборами процесса и результата, регулярно обновляю'),
+    ],
+  },
+  {
+    order: 27,
+    skillId: 'case-structure',
+    category: 'career',
+    prompt: 'Что входит в ваши кейсы? Отметьте всё, что есть',
+    present: 'choice',
+    multi: true,
+    options: [
+      o(1, 'Только финальные картинки'),
+      o(2, 'Контекст, задача, ограничения'),
+      o(3, 'Процесс: исследование, гипотезы, итерации'),
+      o(4, 'Результат и влияние на метрики'),
+    ],
+  },
+  {
+    order: 28,
+    skillId: 'interview-craft',
+    category: 'career',
+    prompt: 'Насколько готовы к собеседованиям дизайнера?',
+    present: 'choice',
+    options: [
+      o(1, 'Не проходил, не знаю, что спрашивают'),
+      o(2, 'Готовлю рассказ о себе и кейсах'),
+      o(3, 'Веду аккуратный Figma-файл для рекрутёра (структура, обложки), готов к разбору кейса'),
+      o(4, 'Спокойно веду вайтборд / лайв-дизайн и продуктовые вопросы на собесе'),
+    ],
+  },
 ];
 
-if (QUESTIONS.length !== 25) {
-  throw new Error(`Assessment must have 25 questions, got ${QUESTIONS.length}`);
+if (QUESTIONS.length !== 28) {
+  throw new Error(`Assessment must have 28 questions, got ${QUESTIONS.length}`);
 }
 
 export const QUESTION_BY_SKILL: Record<string, Question> = Object.fromEntries(

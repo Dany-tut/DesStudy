@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Clock, Target, Trophy, CheckCircle2, BookOpen } from 'lucide-react';
+import Link from 'next/link';
+import { Clock, Target, Trophy, CheckCircle2, BookOpen, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Lesson } from '@/lib/curriculum/types';
 import { useT } from '@/lib/i18n/client';
@@ -19,7 +20,13 @@ import { ConfettiBurst } from '@/components/lesson/ConfettiBurst';
  */
 const READ_EXERCISE_ID = '__read__';
 
-export function LessonPageClient({ lesson }: { lesson: Lesson }) {
+export function LessonPageClient({
+  lesson,
+  nextLesson,
+}: {
+  lesson: Lesson;
+  nextLesson?: { slug: string; title: string; emoji: string } | null;
+}) {
   const { t: tr } = useT();
   const isLecture = lesson.kind === 'lecture';
   const allExercises = useMemo(
@@ -256,6 +263,32 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
               ? tr('exercises.lesson.lectureDoneBody')
               : tr('exercises.lesson.lessonDoneBody')}
           </p>
+
+          {nextLesson ? (
+            <div className="relative mt-5 flex flex-col items-center gap-2">
+              <span className="text-caption font-medium uppercase tracking-wide text-tertiary">
+                {tr('exercises.lesson.nextUp')}
+              </span>
+              <Link
+                href={`/learn/${nextLesson.slug}`}
+                className="inline-flex items-center gap-2 rounded-full bg-brand px-6 py-3 text-callout font-semibold text-white transition-base hover:opacity-90"
+              >
+                <span aria-hidden>{nextLesson.emoji}</span>
+                <span>{nextLesson.title}</span>
+                <ArrowRight size={18} />
+              </Link>
+            </div>
+          ) : (
+            <div className="relative mt-5 flex justify-center">
+              <Link
+                href="/learn"
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-6 py-3 text-callout font-semibold text-primary transition-base hover:bg-hover"
+              >
+                {tr('exercises.lesson.backToPaths')}
+                <ArrowRight size={18} />
+              </Link>
+            </div>
+          )}
         </motion.div>
       )}
     </main>

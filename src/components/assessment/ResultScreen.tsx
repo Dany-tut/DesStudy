@@ -15,6 +15,7 @@ import { growthSkills, SALARY_BANDS, type GradeResult, type Scores } from '@/lib
 import { SKILL_BY_ID } from '@/lib/assessment/taxonomy';
 import { levelDescriptor, nextLevelDescriptor } from '@/lib/assessment/questions';
 import { recommendationFor } from '@/lib/assessment/recommendations';
+import { PricingPlans } from '@/components/marketing/PricingPlans';
 import { Confetti } from './Confetti';
 import { RadarChart } from './RadarChart';
 
@@ -34,49 +35,54 @@ export function ResultScreen({
   scores,
   result,
   name,
+  registered = false,
 }: {
   scores: Scores;
   result: GradeResult;
   name: string;
+  registered?: boolean;
 }) {
   const growth = growthSkills(scores);
 
   return (
-    <main className="relative mx-auto max-w-[860px] px-6 py-14">
+    <main className="relative mx-auto max-w-[900px] px-6 pb-14 pt-20">
       <Confetti />
 
-      {/* Hero */}
+      {/* Hero — crystal on the left, radar on the right. The extra top padding
+          gives the gem's glow room so it isn't clipped by the page edge. */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="flex flex-col items-center text-center"
+        className="grid items-center gap-8 sm:grid-cols-2"
       >
-        <CrystalGem tone={GRADE_TONE[result.grade]} size={112} />
-        <p className="mt-4 text-footnote uppercase tracking-widest text-tertiary">
-          {name ? `${name}, ваш грейд` : 'Ваш грейд'}
-        </p>
-        <h1 className="mt-1 text-display font-bold capitalize text-primary">
-          {GRADE_LABEL[result.grade]}
-        </h1>
-        <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/5 px-3.5 py-1.5 text-footnote font-medium text-brand tabular-nums">
-          вилка {SALARY_BANDS[result.grade].min}–{SALARY_BANDS[result.grade].max}к ₽
-        </span>
-        <p className="mt-3 max-w-[420px] text-body text-secondary">
-          {GRADE_TAGLINE[result.grade]}
-        </p>
-      </motion.div>
+        <div className="flex flex-col items-center text-center sm:items-start sm:text-left">
+          <CrystalGem tone={GRADE_TONE[result.grade]} size={124} />
+          <p className="mt-4 text-footnote uppercase tracking-widest text-tertiary">
+            {name ? `${name}, ваш грейд` : 'Ваш грейд'}
+          </p>
+          <h1 className="mt-1 text-display font-bold capitalize text-primary">
+            {GRADE_LABEL[result.grade]}
+          </h1>
+          <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/5 px-3.5 py-1.5 text-footnote font-medium text-brand tabular-nums">
+            вилка {SALARY_BANDS[result.grade].min}–{SALARY_BANDS[result.grade].max}к ₽
+          </span>
+          <p className="mt-3 max-w-[420px] text-body text-secondary">
+            {GRADE_TAGLINE[result.grade]}
+          </p>
+        </div>
 
-      {/* Radar over the 4 categories */}
-      <div className="mt-10 flex justify-center">
-        <RadarChart
-          axes={CATEGORIES.map((c) => ({
-            label: c.short,
-            value: result.radar.find((r) => r.category === c.id)?.value ?? 0,
-          }))}
-          size={340}
-        />
-      </div>
+        {/* Radar over the 4 categories */}
+        <div className="flex justify-center">
+          <RadarChart
+            axes={CATEGORIES.map((c) => ({
+              label: c.short,
+              value: result.radar.find((r) => r.category === c.id)?.value ?? 0,
+            }))}
+            size={320}
+          />
+        </div>
+      </motion.div>
 
       {/* Per-category dot bars */}
       <div className="mt-10 grid gap-6 sm:grid-cols-2">
@@ -173,18 +179,24 @@ export function ResultScreen({
         </section>
       )}
 
-      {/* CTA */}
-      <div className="mt-12 flex flex-col items-center gap-3 text-center">
-        <Link
-          href="/learn"
-          className="inline-flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-callout font-medium text-on-brand transition-base hover:bg-brand-hover"
-        >
-          Перейти к обучению <ArrowRight size={16} />
-        </Link>
-        <Link href="/dashboard" className="text-footnote text-tertiary hover:text-secondary">
-          Открыть дашборд прогресса
-        </Link>
-      </div>
+      {/* CTA — registered students go straight into learning; guests see the
+          packages and can leave a request (their grade is already saved for the
+          curator). */}
+      {registered ? (
+        <div className="mt-12 flex flex-col items-center gap-3 text-center">
+          <Link
+            href="/learn"
+            className="inline-flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-callout font-medium text-on-brand transition-base hover:bg-brand-hover"
+          >
+            Перейти к обучению <ArrowRight size={16} />
+          </Link>
+          <Link href="/dashboard" className="text-footnote text-tertiary hover:text-secondary">
+            Открыть дашборд прогресса
+          </Link>
+        </div>
+      ) : (
+        <PricingPlans />
+      )}
     </main>
   );
 }

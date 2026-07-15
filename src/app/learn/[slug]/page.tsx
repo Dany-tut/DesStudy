@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getLesson } from '@/lib/curriculum/resolve';
+import { getNextLesson } from '@/content/curriculum';
 import { getLocale } from '@/lib/i18n/server';
 import { LessonPageClient } from '@/components/lesson/LessonPageClient';
 
@@ -15,5 +16,7 @@ export default async function LessonPage({
   const lesson = await getLesson(slug, locale);
   if (!lesson) notFound();
 
-  return <LessonPageClient lesson={lesson} />;
+  const nextLesson = getNextLesson(slug, locale);
+
+  return <LessonPageClient lesson={lesson} nextLesson={nextLesson} />;
 }

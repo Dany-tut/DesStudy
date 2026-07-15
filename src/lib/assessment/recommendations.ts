@@ -48,8 +48,8 @@ export const RECOMMENDATIONS: Record<string, Recommendation> = {
   ds: { lessonSlugs: ['design-tokens', 'components-variants', 'figma-components-slots'] },
   style: { lessonSlugs: ['palette-elements', 'grids-composition', 'insights-to-concept'] },
   // UX
-  scenarios: { lessonSlugs: ['user-flows', 'user-flows-edge', 'information-architecture'], video: VIDEO_CJM },
-  'ux-writing': { lessonSlugs: ['microcopy', 'micro-typography'] },
+  scenarios: { lessonSlugs: ['cjm-map', 'user-flows', 'user-flows-edge', 'information-architecture'], video: VIDEO_CJM },
+  'ux-writing': { lessonSlugs: ['editing-milchin', 'microcopy', 'micro-typography'] },
   responsive: { lessonSlugs: ['responsive-layout'] },
   states: { lessonSlugs: ['forms-validation', 'empty-states', 'ux-heuristics-control'] },
   // Product
@@ -57,7 +57,7 @@ export const RECOMMENDATIONS: Record<string, Recommendation> = {
   tasks: { lessonSlugs: ['brief-research', 'design-thinking-intro'] },
   metrics: { lessonSlugs: ['research-methods', 'insights-to-concept'] },
   hypotheses: { lessonSlugs: ['insights-to-concept', 'research-methods'] },
-  audience: { lessonSlugs: ['brief-research', 'research-methods'] },
+  audience: { lessonSlugs: ['jtbd-jobs', 'brief-research', 'research-methods'] },
   interviews: { lessonSlugs: ['research-methods', 'brief-research'] },
   'ux-tests': { lessonSlugs: ['research-methods'] },
   'more-research': { lessonSlugs: ['research-methods'] },
@@ -68,6 +68,9 @@ export const RECOMMENDATIONS: Record<string, Recommendation> = {
   'test-tasks': { lessonSlugs: ['grids-composition', 'brief-research'], video: VIDEO_CAREER },
   specialization: { lessonSlugs: [] },
   experience: { lessonSlugs: [] },
+  portfolio: { lessonSlugs: ['insights-to-concept'], video: VIDEO_CAREER },
+  'case-structure': { lessonSlugs: ['insights-to-concept', 'brief-research'], video: VIDEO_CAREER },
+  'interview-craft': { lessonSlugs: ['grids-composition'], video: VIDEO_CAREER },
 };
 
 /** Resolved lesson link (slug + human title) for the UI. */

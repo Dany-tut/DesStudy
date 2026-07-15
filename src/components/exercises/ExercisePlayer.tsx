@@ -100,7 +100,7 @@ export function ExercisePlayer({
           : exercise.type === 'match'
             ? []
             : exercise.type === 'states'
-              ? ['default']
+              ? []
               : exercise.type === 'contrast-tune'
                 ? { textL: 38, bgL: 96 }
                 : exercise.type === 'scale-ramp'

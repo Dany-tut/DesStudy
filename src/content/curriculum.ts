@@ -117,6 +117,7 @@ const PATH_DEFS: PathDef[] = [
       { slug: 'forms-validation', emoji: '⚠️' },
       { slug: 'forms-structure', emoji: '🧱' },
       { slug: 'microcopy', emoji: '✏️' },
+      { slug: 'editing-milchin', emoji: '📖' },
       { slug: 'empty-states', emoji: '🗂️' },
     ],
   },
@@ -145,8 +146,10 @@ const PATH_DEFS: PathDef[] = [
     },
     lessons: [
       { slug: 'brief-research', emoji: '📋', popular: true },
+      { slug: 'jtbd-jobs', emoji: '🎯', popular: true },
       { slug: 'research-methods', emoji: '🔬' },
       { slug: 'insights-to-concept', emoji: '💡' },
+      { slug: 'cjm-map', emoji: '🗺️' },
       { slug: 'palette-elements', emoji: '🎨' },
     ],
   },
@@ -168,6 +171,21 @@ export function getPaths(locale: Locale = DEFAULT_LOCALE): LearningPath[] {
       })
       .filter((e): e is LessonEntry => e !== null),
   }));
+}
+
+/** The lesson that follows `slug` in curriculum order — next in the same path,
+ * then rolling into the first lesson of the following path. Returns `null` when
+ * `slug` is the very last lesson (or isn't found). Used for the end-of-lesson
+ * "next" CTA. */
+export function getNextLesson(
+  slug: string,
+  locale: Locale = DEFAULT_LOCALE,
+): { slug: string; title: string; emoji: string } | null {
+  const flat = getPaths(locale).flatMap((p) => p.lessons);
+  const i = flat.findIndex((l) => l.slug === slug);
+  if (i === -1 || i === flat.length - 1) return null;
+  const next = flat[i + 1];
+  return { slug: next.slug, title: next.title, emoji: next.emoji };
 }
 
 /** Russian paths — back-compat for call sites that haven't threaded a locale. */

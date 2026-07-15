@@ -8,6 +8,7 @@ import {
   Frame,
   Image as ImageIcon,
   PenTool,
+  Target,
 } from 'lucide-react';
 import type { Layer, LayerType } from '@/lib/editor/types';
 
@@ -30,16 +31,19 @@ export function LayerTree({
   selectedId,
   onSelect,
   onHover,
+  zoneIds,
 }: {
   layers: Layer[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
+  /** Layer ids promoted to critique zones — shown with a target badge. */
+  zoneIds?: Set<string>;
 }) {
   return (
     <div onMouseLeave={() => onHover(null)} className="flex flex-col">
       {layers.map((l) => (
-        <LayerRow key={l.id} layer={l} depth={0} selectedId={selectedId} onSelect={onSelect} onHover={onHover} />
+        <LayerRow key={l.id} layer={l} depth={0} selectedId={selectedId} onSelect={onSelect} onHover={onHover} zoneIds={zoneIds} />
       ))}
     </div>
   );
@@ -51,12 +55,14 @@ function LayerRow({
   selectedId,
   onSelect,
   onHover,
+  zoneIds,
 }: {
   layer: Layer;
   depth: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
+  zoneIds?: Set<string>;
 }) {
   const [open, setOpen] = useState(true);
   const hasChildren = layer.children.length > 0;
@@ -91,11 +97,14 @@ function LayerRow({
         )}
         <Icon size={13} className={active ? 'text-brand' : 'text-tertiary'} />
         <span className="truncate">{layer.name}</span>
+        {zoneIds?.has(layer.id) && (
+          <Target size={11} className="ml-auto shrink-0 text-[#3FB950]" aria-label="Зона критики" />
+        )}
       </div>
       {hasChildren && open && (
         <>
           {layer.children.map((c) => (
-            <LayerRow key={c.id} layer={c} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} onHover={onHover} />
+            <LayerRow key={c.id} layer={c} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} onHover={onHover} zoneIds={zoneIds} />
           ))}
         </>
       )}
