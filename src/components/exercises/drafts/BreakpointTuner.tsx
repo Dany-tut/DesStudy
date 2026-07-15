@@ -55,24 +55,35 @@ export function BreakpointTuner() {
         </span>
       </div>
 
-      {/* Viewport preview — one column, exactly `width` px wide, with a comfort
-          guide the learner is tuning the text line up to. */}
-      <div className="overflow-hidden rounded-xl border border-border bg-canvas p-4">
+      {/* Viewport preview — exactly `width` px wide. While the column is too
+          narrow-to-comfortable it stays a single column and the text line grows
+          toward a comfort guide. Once the breakpoint is hit, THIS SAME block
+          reflows to 2 columns — the payoff happens in place. */}
+      <div
+        className={[
+          'overflow-hidden rounded-xl border p-4 transition-base',
+          solved ? 'border-success/30 bg-success/10' : 'border-border bg-canvas',
+        ].join(' ')}
+      >
         <div className="relative mx-auto" style={{ width }}>
-          {/* Comfortable-measure guide (the reading limit). */}
-          <div
-            className="pointer-events-none absolute inset-y-0 z-10 border-r border-dashed border-success/70"
-            style={{ left: Math.min(width, MEASURE) }}
-            aria-hidden
-          />
-          <div className="grid grid-cols-1 gap-3">
+          {/* Comfortable-measure guide (the reading limit) — only meaningful
+              while we're still in one column, tuning the line up to it. */}
+          {!solved && (
+            <div
+              className="pointer-events-none absolute inset-y-0 z-10 border-r border-dashed border-success/70"
+              style={{ left: Math.min(width, MEASURE) }}
+              aria-hidden
+            />
+          )}
+          <div className={['grid gap-3', solved ? 'grid-cols-2' : 'grid-cols-1'].join(' ')}>
             {Array.from({ length: 2 }).map((_, i) => (
               <div key={i} className="rounded-lg border border-border bg-surface p-3">
-                <div className="mb-2 h-3 w-1/3 rounded-sm bg-brand/60" />
-                {/* The content line = full column width. The part spilling past
-                    the comfort guide is tinted, so "too long" is literal. */}
+                <div className={['mb-2 h-3 rounded-sm bg-brand/60', solved ? 'w-1/2' : 'w-1/3'].join(' ')} />
+                {/* The content line = full column width. While in one column, the
+                    part spilling past the comfort guide is tinted, so "too long"
+                    is literal. After the split each line is short again. */}
                 <div className="relative h-2 w-full overflow-hidden rounded-sm bg-tertiary/30">
-                  {overshoot > 0 && (
+                  {!solved && overshoot > 0 && (
                     <div
                       className="absolute inset-y-0 right-0 bg-warning/70"
                       style={{ width: `${overshoot}%` }}
@@ -85,21 +96,11 @@ export function BreakpointTuner() {
         </div>
       </div>
 
-      {/* Payoff: once found, show what the breakpoint buys — 2 tidy columns. */}
+      {/* Payoff caption — the block above already reflowed to 2 columns. */}
       {solved && (
-        <div className="mt-3 rounded-xl border border-success/30 bg-success/10 p-3">
-          <div className="grid grid-cols-2 gap-3">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="rounded-lg border border-border bg-surface p-3">
-                <div className="mb-2 h-3 w-1/2 rounded-sm bg-brand/60" />
-                <div className="h-2 w-full rounded-sm bg-tertiary/30" />
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-caption text-success">
-            ↑ На этой ширине разбиваем на 2 колонки — каждая строка снова короткая.
-          </p>
-        </div>
+        <p className="mt-2 text-caption text-success">
+          ↑ На этой ширине разбили на 2 колонки — каждая строка снова короткая.
+        </p>
       )}
 
       <div className="mt-6">

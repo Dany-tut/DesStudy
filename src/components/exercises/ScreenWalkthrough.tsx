@@ -20,6 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import type { ObserveConcept, ObserveReply } from '@/lib/ai/mentor';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Screen-walkthrough — a guided, layered breakdown of one real reference
@@ -58,11 +59,9 @@ type Region =
   | 'bonuses';
 
 interface Step {
-  id: string;
-  layer: string;
+  /** dictionary key under exercises.walkthrough.steps.* — also the icon/regions selector. */
+  id: 'see' | 'grid' | 'blocks' | 'align' | 'color' | 'radius' | 'bars';
   icon: typeof Eye;
-  title: string;
-  body: string;
   /** 'all' = spotlight nothing (whole screen readable); else spotlight these. */
   regions: Region[] | 'all';
   /** overlay the column/margin grid guides. */
@@ -70,63 +69,13 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  {
-    id: 'see',
-    layer: 'Наблюдение',
-    icon: Eye,
-    title: 'Что ты видишь?',
-    body: 'Прежде чем разбирать — просто опиши экран вслух. Что это за продукт? Что здесь главное, что второстепенное? Куда падает взгляд первым? Пока без терминов.',
-    regions: 'all',
-  },
-  {
-    id: 'grid',
-    layer: 'Сетка',
-    icon: Grid3x3,
-    title: 'Сетка и поля',
-    body: 'Всё содержимое живёт между единых боковых полей 16px — ничего не «прилипает» к краю. Ряд действий делит ширину на 3 равные колонки, бонусы — на 2. Сетка задаёт ритм ещё до контента.',
-    regions: 'all',
-    grid: true,
-  },
-  {
-    id: 'blocks',
-    layer: 'Блоки',
-    icon: Boxes,
-    title: 'Крупные блоки',
-    body: 'Экран читается как 4 смысловых блока: шапка карты с балансом → быстрые действия → промо-вклад → бонусы. Между блоками воздух больше, чем внутри — так группировка видна без линий.',
-    regions: ['header', 'actions', 'promo', 'bonuses'],
-  },
-  {
-    id: 'align',
-    layer: 'Выравнивание',
-    icon: AlignLeft,
-    title: 'Выравнивание',
-    body: 'Подписи и суммы образуют две оси: заголовок слева, баланс прижат вправо по той же линии. Три плитки действий распределены равномерно (space-between), иконки и подписи центрированы в каждой.',
-    regions: ['header', 'actions'],
-  },
-  {
-    id: 'color',
-    layer: 'Цвет',
-    icon: Palette,
-    title: 'Цвет и акценты',
-    body: 'Фиолетовый — фирменный, он только на карте и промо (то, что продаёт). Всё остальное — нейтральные поверхности. Оранжевый кэшбэка — единственный тёплый акцент, поэтому мгновенно цепляет глаз.',
-    regions: ['chips', 'promo', 'bonuses'],
-  },
-  {
-    id: 'radius',
-    layer: 'Скругления',
-    icon: Squircle,
-    title: 'Скругления',
-    body: 'Радиус растёт с размером блока: чипы карты меньше, плитки действий средние, промо и бонусы — крупные. Одна шкала на весь экран — ничего случайного, поэтому поверхность ощущается цельной.',
-    regions: ['chips', 'actions', 'promo', 'bonuses'],
-  },
-  {
-    id: 'bars',
-    layer: 'Топ-бар',
-    icon: PanelTop,
-    title: 'Топ-бар',
-    body: 'Верхняя панель минимальна: назад слева, настройки справа, между ними — воздух. Она не конкурирует с балансом за внимание, а только обрамляет экран и даёт выход.',
-    regions: ['topbar'],
-  },
+  { id: 'see', icon: Eye, regions: 'all' },
+  { id: 'grid', icon: Grid3x3, regions: 'all', grid: true },
+  { id: 'blocks', icon: Boxes, regions: ['header', 'actions', 'promo', 'bonuses'] },
+  { id: 'align', icon: AlignLeft, regions: ['header', 'actions'] },
+  { id: 'color', icon: Palette, regions: ['chips', 'promo', 'bonuses'] },
+  { id: 'radius', icon: Squircle, regions: ['chips', 'actions', 'promo', 'bonuses'] },
+  { id: 'bars', icon: PanelTop, regions: ['topbar'] },
 ];
 
 /** What a strong observation of this screen would notice — ground truth for
@@ -143,6 +92,7 @@ const SCREEN_TITLE = 'Экран банковской «Премиум карт�
 
 /** The "what do you see?" input + mentor reflection for the observation layer. */
 function ObservePanel() {
+  const { t } = useT();
   const [text, setText] = useState('');
   const [reply, setReply] = useState<ObserveReply | null>(null);
   const [loading, setLoading] = useState(false);
@@ -163,9 +113,9 @@ function ObservePanel() {
       setReply((await res.json()) as ObserveReply);
     } catch {
       setReply({
-        caught: 'Не удалось связаться с ментором.',
-        missed: 'Проверь соединение и попробуй ещё раз.',
-        nudge: 'Можно продолжить разбор и без обратной связи.',
+        caught: t('exercises.walkthrough.observe.offlineCaught'),
+        missed: t('exercises.walkthrough.observe.offlineMissed'),
+        nudge: t('exercises.walkthrough.observe.offlineNudge'),
         offline: true,
       });
     } finally {
@@ -179,7 +129,7 @@ function ObservePanel() {
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={3}
-        placeholder="Опиши экран своими словами: что за продукт, что здесь главное, куда падает взгляд первым?"
+        placeholder={t('exercises.walkthrough.observe.placeholder')}
         className="w-full resize-none rounded-lg border border-border bg-surface px-3 py-2.5 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
       />
       <div className="flex items-center gap-3">
@@ -190,21 +140,21 @@ function ObservePanel() {
           className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand transition-fast hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {loading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-          Показать ментору
+          {t('exercises.walkthrough.observe.showMentor')}
         </button>
         {reply?.offline && (
-          <span className="text-caption text-tertiary">офлайн-режим</span>
+          <span className="text-caption text-tertiary">{t('exercises.walkthrough.observe.offlineMode')}</span>
         )}
       </div>
 
       {reply && (
         <div className="flex flex-col gap-3 rounded-lg border border-brand/30 bg-brand/5 p-4">
           <div>
-            <p className="text-caption font-medium text-brand">Что ты уловил</p>
+            <p className="text-caption font-medium text-brand">{t('exercises.walkthrough.observe.caught')}</p>
             <p className="mt-0.5 text-footnote text-primary">{reply.caught}</p>
           </div>
           <div>
-            <p className="text-caption font-medium text-secondary">Присмотрись</p>
+            <p className="text-caption font-medium text-secondary">{t('exercises.walkthrough.observe.lookCloser')}</p>
             <p className="mt-0.5 text-footnote text-primary">{reply.missed}</p>
           </div>
           <p className="text-caption text-tertiary">{reply.nudge}</p>
@@ -216,6 +166,7 @@ function ObservePanel() {
 
 /** The reference phone, rendered entirely in code so overlays land precisely. */
 function BankScreen({ step }: { step: Step }) {
+  const { t } = useT();
   const spotlight = step.regions !== 'all';
   const on = (r: Region) => step.regions !== 'all' && step.regions.includes(r);
 
@@ -254,9 +205,9 @@ function BankScreen({ step }: { step: Step }) {
         <div className="flex items-start justify-between">
           <div>
             <p className="text-[11px]" style={{ color: APP.textDim }}>
-              Название карты
+              {t('exercises.walkthrough.screen.cardName')}
             </p>
-            <p className="text-[15px] font-semibold">Премиум карта</p>
+            <p className="text-[15px] font-semibold">{t('exercises.walkthrough.screen.cardTitle')}</p>
           </div>
           <p className="text-[15px] font-semibold tabular-nums">980 000 ₽</p>
         </div>
@@ -289,9 +240,9 @@ function BankScreen({ step }: { step: Step }) {
         style={ringStyle('actions')}
       >
         {[
-          { icon: CreditCard, label: 'Оплатить' },
-          { icon: Plus, label: 'Пополнить' },
-          { icon: ArrowLeftRight, label: 'Перевести' },
+          { icon: CreditCard, label: t('exercises.walkthrough.screen.payAction') },
+          { icon: Plus, label: t('exercises.walkthrough.screen.topupAction') },
+          { icon: ArrowLeftRight, label: t('exercises.walkthrough.screen.transferAction') },
         ].map(({ icon: Icon, label }) => (
           <div
             key={label}
@@ -315,7 +266,7 @@ function BankScreen({ step }: { step: Step }) {
         }}
       >
         <p className="max-w-[70%] text-[15px] font-bold leading-tight">
-          Откройте вклад с увеличенной ставкой до 18%
+          {t('exercises.walkthrough.screen.promo')}
         </p>
       </div>
 
@@ -324,7 +275,7 @@ function BankScreen({ step }: { step: Step }) {
         className={['relative z-10 mt-5 text-[13px] font-medium transition-base', dim('bonusTitle')].join(' ')}
         style={{ color: APP.textDim }}
       >
-        Бонусы по карте
+        {t('exercises.walkthrough.screen.bonusesTitle')}
       </p>
 
       {/* Bonuses */}
@@ -333,8 +284,8 @@ function BankScreen({ step }: { step: Step }) {
         style={ringStyle('bonuses')}
       >
         {[
-          { icon: Utensils, text: 'Кэшбэк за бронирование ресторанов' },
-          { icon: Hotel, text: 'Кэшбэк за бронирование туров и отелей' },
+          { icon: Utensils, text: t('exercises.walkthrough.screen.bonusRestaurants') },
+          { icon: Hotel, text: t('exercises.walkthrough.screen.bonusHotels') },
         ].map(({ icon: Icon, text }) => (
           <div
             key={text}
@@ -378,6 +329,7 @@ function GridOverlay() {
 }
 
 export function ScreenWalkthrough() {
+  const { t } = useT();
   const [idx, setIdx] = useState(0);
   const step = STEPS[idx];
   const StepIcon = step.icon;
@@ -385,9 +337,7 @@ export function ScreenWalkthrough() {
   return (
     <div className="flex flex-col gap-6">
       <p className="max-w-[640px] text-footnote text-secondary">
-        Один экран разбираем по слоям — как это делает ментор: сначала «что видишь?», потом сетка,
-        блоки, выравнивание, цвет, скругления и бары. Экран приглушается, подсвечивая только то, что
-        относится к текущему слою.
+        {t('exercises.walkthrough.intro')}
       </p>
 
       <div className="grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)]">
@@ -419,7 +369,7 @@ export function ScreenWalkthrough() {
                   ].join(' ')}
                 >
                   <Icon size={13} />
-                  {s.layer}
+                  {t(`exercises.walkthrough.steps.${s.id}.layer`)}
                 </button>
               );
             })}
@@ -441,12 +391,17 @@ export function ScreenWalkthrough() {
               </span>
               <div>
                 <span className="block text-caption text-tertiary">
-                  Слой {idx + 1} из {STEPS.length} · {step.layer}
+                  {t('exercises.walkthrough.layerCounter', { current: idx + 1, total: STEPS.length })} ·{' '}
+                  {t(`exercises.walkthrough.steps.${step.id}.layer`)}
                 </span>
-                <span className="block text-callout font-semibold text-primary">{step.title}</span>
+                <span className="block text-callout font-semibold text-primary">
+                  {t(`exercises.walkthrough.steps.${step.id}.title`)}
+                </span>
               </div>
             </div>
-            <p className="text-body text-secondary">{step.body}</p>
+            <p className="text-body text-secondary">
+              {t(`exercises.walkthrough.steps.${step.id}.body`)}
+            </p>
             {step.id === 'see' && (
               <div className="mt-4 border-t border-border pt-4">
                 <ObservePanel />
@@ -462,7 +417,7 @@ export function ScreenWalkthrough() {
               disabled={idx === 0}
               className="rounded-lg border border-border px-4 py-2 text-footnote font-medium text-secondary transition-fast hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Назад
+              {t('exercises.walkthrough.back')}
             </button>
             {idx < STEPS.length - 1 ? (
               <button
@@ -470,7 +425,7 @@ export function ScreenWalkthrough() {
                 onClick={() => setIdx((i) => Math.min(STEPS.length - 1, i + 1))}
                 className="rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand transition-fast hover:opacity-90"
               >
-                Следующий слой
+                {t('exercises.walkthrough.nextLayer')}
               </button>
             ) : (
               <button
@@ -478,7 +433,7 @@ export function ScreenWalkthrough() {
                 onClick={() => setIdx(0)}
                 className="rounded-lg border border-border px-4 py-2 text-footnote font-medium text-secondary transition-fast hover:bg-hover"
               >
-                Сначала
+                {t('exercises.walkthrough.restart')}
               </button>
             )}
           </div>

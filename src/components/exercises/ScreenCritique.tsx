@@ -18,6 +18,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import type { FixReply } from '@/lib/ai/mentor';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Screen-critique — the INVERSE of screen-walkthrough. Instead of the mentor
@@ -47,18 +48,12 @@ type Region = 'topbar' | 'header' | 'actions' | 'chips' | 'promo' | 'bonuses';
 type RoleId = 'accent' | 'secondary' | 'promo' | 'neutral' | 'nav';
 type Verdict = 'right' | 'debatable' | 'wrong';
 
-interface Role {
-  id: RoleId;
-  label: string;
-  hint: string;
-}
-
-const ROLES: Role[] = [
-  { id: 'accent', label: 'Главный акцент', hint: 'то, ради чего экран — ловит взгляд первым' },
-  { id: 'secondary', label: 'Второстепенное', hint: 'нужное, но не борется за внимание' },
-  { id: 'promo', label: 'Реклама, не часть карты', hint: 'продающий блок, живёт отдельно от продукта' },
-  { id: 'neutral', label: 'Нейтральный фон', hint: 'поверхность/обрамление, не несёт смысла само по себе' },
-  { id: 'nav', label: 'Навигация', hint: 'вход/выход, обрамляет экран' },
+const ROLES: { id: RoleId }[] = [
+  { id: 'accent' },
+  { id: 'secondary' },
+  { id: 'promo' },
+  { id: 'neutral' },
+  { id: 'nav' },
 ];
 
 interface Truth {
@@ -119,15 +114,6 @@ const TRUTH: Record<Region, Truth> = {
 const SCREEN_TITLE =
   'Экран банковской «Премиум карты» — баланс, действия, промо и бонусы';
 
-const REGION_TITLE: Record<Region, string> = {
-  topbar: 'Топ-бар',
-  header: 'Шапка с балансом',
-  chips: 'Чипы карты',
-  actions: 'Быстрые действия',
-  promo: 'Промо-вклад',
-  bonuses: 'Бонусы',
-};
-
 type Assignments = Partial<Record<Region, RoleId>>;
 type Fixes = Partial<Record<Region, string>>;
 
@@ -142,19 +128,13 @@ function grade(region: Region, role: RoleId): Verdict {
 // WHAT is wrong in each region, not just its role. ────────────────────────
 type DefectId = 'hierarchy' | 'radius' | 'contrast' | 'alignment' | 'consistency' | 'none';
 
-interface Defect {
-  id: DefectId;
-  label: string;
-  hint: string;
-}
-
-const DEFECTS: Defect[] = [
-  { id: 'hierarchy', label: 'Слабая иерархия', hint: 'главное не выделено — не читается, что важнее' },
-  { id: 'radius', label: 'Разнобой скруглений', hint: 'у соседних элементов разные радиусы' },
-  { id: 'contrast', label: 'Слабый контраст', hint: 'текст сливается с фоном, плохо читается' },
-  { id: 'alignment', label: 'Сбито выравнивание', hint: 'элементы не на одной линии / не по полям' },
-  { id: 'consistency', label: 'Рассогласованность', hint: 'однотипные блоки оформлены по-разному' },
-  { id: 'none', label: 'Здесь всё чисто', hint: 'в этой зоне нарушения нет' },
+const DEFECTS: { id: DefectId }[] = [
+  { id: 'hierarchy' },
+  { id: 'radius' },
+  { id: 'contrast' },
+  { id: 'alignment' },
+  { id: 'consistency' },
+  { id: 'none' },
 ];
 
 interface DefectTruth {
@@ -214,28 +194,35 @@ function worseVerdict(a?: Verdict, b?: Verdict): Verdict | undefined {
 
 const VERDICT_UI: Record<
   Verdict,
-  { ring: string; label: string; icon: typeof Check; text: string; bg: string }
+  { ring: string; icon: typeof Check; text: string; bg: string }
 > = {
-  right: { ring: '#3FB950', label: 'Верно', icon: Check, text: 'text-[#3FB950]', bg: 'bg-[#3FB950]/10' },
-  debatable: { ring: '#E3B341', label: 'Спорно', icon: CircleHelp, text: 'text-[#E3B341]', bg: 'bg-[#E3B341]/10' },
-  wrong: { ring: '#E0785F', label: 'Иначе', icon: Lightbulb, text: 'text-[#E0785F]', bg: 'bg-[#E0785F]/10' },
+  right: { ring: '#3FB950', icon: Check, text: 'text-[#3FB950]', bg: 'bg-[#3FB950]/10' },
+  debatable: { ring: '#E3B341', icon: CircleHelp, text: 'text-[#E3B341]', bg: 'bg-[#E3B341]/10' },
+  wrong: { ring: '#E0785F', icon: Lightbulb, text: 'text-[#E0785F]', bg: 'bg-[#E0785F]/10' },
 };
 
 /** Mentor verdict on a free-text fix → same green/yellow/red language. */
-const FIX_UI: Record<FixReply['verdict'], { label: string; text: string }> = {
-  improves: { label: 'Улучшает', text: 'text-[#3FB950]' },
-  subjective: { label: 'Дело вкуса', text: 'text-[#E3B341]' },
-  breaks: { label: 'Сломала бы', text: 'text-[#F85149]' },
+const FIX_UI: Record<FixReply['verdict'], { text: string }> = {
+  improves: { text: 'text-[#3FB950]' },
+  subjective: { text: 'text-[#E3B341]' },
+  breaks: { text: 'text-[#F85149]' },
 };
 
-/** The three compact steps inside a selected-region panel. */
-const CRITIQUE_STEPS = [
-  { label: 'Роль', title: 'Какая это роль на экране?' },
-  { label: 'Что не так', title: 'Что здесь не так?' },
-  { label: 'Правка', title: 'Что бы ты здесь поправил?' },
-] as const;
+/** The three compact steps inside a selected-region panel (labels/titles via i18n). */
+const CRITIQUE_STEPS = [{ id: 'role' }, { id: 'defect' }, { id: 'fix' }] as const;
 
 export function ScreenCritique() {
+  const { t } = useT();
+  const NS = 'exercises.screenCritique';
+  const roleLabel = (id: RoleId) => t(`${NS}.roles.${id}.label`);
+  const roleHint = (id: RoleId) => t(`${NS}.roles.${id}.hint`);
+  const defectLabel = (id: DefectId) => t(`${NS}.defects.${id}.label`);
+  const defectHint = (id: DefectId) => t(`${NS}.defects.${id}.hint`);
+  const regionTitle = (r: Region) => t(`${NS}.regionTitles.${r}`);
+  const roleNote = (r: Region) => t(`${NS}.roleNotes.${r}`);
+  const defectNote = (r: Region) => t(`${NS}.defectNotes.${r}`);
+  const verdictLabel = (v: Verdict) => t(`${NS}.verdict.${v}`);
+  const fixLabel = (v: FixReply['verdict']) => t(`${NS}.fix.${v}`);
   const [assignments, setAssignments] = useState<Assignments>({});
   const [defectPicks, setDefectPicks] = useState<Partial<Record<Region, DefectId>>>({});
   const [fixes, setFixes] = useState<Fixes>({});
@@ -296,7 +283,7 @@ export function ScreenCritique() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 screenTitle: SCREEN_TITLE,
-                region: REGION_TITLE[r],
+                region: regionTitle(r),
                 intent: TRUTH[r].intent,
                 fix: fixes[r],
               }),
@@ -307,7 +294,7 @@ export function ScreenCritique() {
               r,
               {
                 verdict: 'subjective',
-                comment: 'Не удалось связаться с ментором — оцени правку сам по разбору роли.',
+                comment: t(`${NS}.offlineComment`),
                 offline: true,
               } as FixReply,
             ] as const;
@@ -344,11 +331,7 @@ export function ScreenCritique() {
   return (
     <div className="flex flex-col gap-6">
       <p className="max-w-[640px] text-footnote text-secondary">
-        Теперь диагноз ставишь ты. Экран нарочно с шероховатостями — сбитые отступы, разнобой
-        скруглений, слабый контраст. Кликни зону, повесь на неё роль из палитры справа (главный
-        акцент, второстепенное, реклама или фон) и допиши, что бы ты здесь поправил. Потом
-        «Проверить»: дизайн субъективен, поэтому оценка в трёх цветах — зелёный «верно», жёлтый
-        «спорно, но защитимо», коралловый «прочитывается иначе».
+        {t(`${NS}.intro`)}
       </p>
 
       <div className="grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)]">
@@ -377,25 +360,25 @@ export function ScreenCritique() {
                         <Tag size={16} />
                       </span>
                       <div>
-                        <span className="block text-caption text-tertiary">Выбрана зона</span>
+                        <span className="block text-caption text-tertiary">{t(`${NS}.selectedZone`)}</span>
                         <span className="block text-callout font-semibold text-primary">
-                          {REGION_TITLE[selected]}
+                          {regionTitle(selected)}
                         </span>
                       </div>
                     </div>
                     {/* Step header — dots + "Шаг N из 3 · <label>" */}
                     <div className="mb-3 flex items-center justify-between">
                       <p className="text-caption text-tertiary">
-                        Шаг {step + 1} из {CRITIQUE_STEPS.length} ·{' '}
-                        <span className="text-secondary">{CRITIQUE_STEPS[step].title}</span>
-                        {step === 2 && <span className="text-tertiary/70"> (необязательно)</span>}
+                        {t(`${NS}.stepCounter`, { current: step + 1, total: CRITIQUE_STEPS.length })} ·{' '}
+                        <span className="text-secondary">{t(`${NS}.steps.${CRITIQUE_STEPS[step].id}.title`)}</span>
+                        {step === 2 && <span className="text-tertiary/70"> {t(`${NS}.optional`)}</span>}
                       </p>
                       <div className="flex items-center gap-1.5">
                         {CRITIQUE_STEPS.map((s, i) => (
                           <button
-                            key={s.label}
+                            key={s.id}
                             type="button"
-                            aria-label={s.label}
+                            aria-label={t(`${NS}.steps.${s.id}.label`)}
                             onClick={() => setStep(i)}
                             className={[
                               'h-1.5 rounded-full transition-fast',
@@ -429,9 +412,9 @@ export function ScreenCritique() {
                                   active ? 'text-brand' : 'text-primary',
                                 ].join(' ')}
                               >
-                                {role.label}
+                                {roleLabel(role.id)}
                               </span>
-                              <span className="text-caption text-tertiary">{role.hint}</span>
+                              <span className="text-caption text-tertiary">{roleHint(role.id)}</span>
                             </button>
                           );
                         })}
@@ -448,7 +431,7 @@ export function ScreenCritique() {
                               key={d.id}
                               type="button"
                               onClick={() => assignDefect(d.id)}
-                              title={d.hint}
+                              title={defectHint(d.id)}
                               className={[
                                 'rounded-lg border px-3 py-2 text-left text-footnote font-medium transition-fast',
                                 active
@@ -456,7 +439,7 @@ export function ScreenCritique() {
                                   : 'border-border bg-surface text-primary hover:border-brand/40',
                               ].join(' ')}
                             >
-                              {d.label}
+                              {defectLabel(d.id)}
                             </button>
                           );
                         })}
@@ -471,7 +454,7 @@ export function ScreenCritique() {
                           setFixes((f) => ({ ...f, [selected]: e.target.value }))
                         }
                         rows={3}
-                        placeholder="Например: слишком крупный радиус, конкурирует с картой…"
+                        placeholder={t(`${NS}.fixPlaceholder`)}
                         className="w-full resize-none rounded-lg border border-border bg-surface px-3 py-2 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
                       />
                     )}
@@ -484,7 +467,7 @@ export function ScreenCritique() {
                         disabled={step === 0}
                         className="rounded-lg border border-border px-3 py-2 text-footnote font-medium text-secondary transition-fast hover:bg-hover disabled:cursor-not-allowed disabled:opacity-30"
                       >
-                        Назад
+                        {t(`${NS}.back`)}
                       </button>
                       {step < CRITIQUE_STEPS.length - 1 ? (
                         <button
@@ -492,10 +475,10 @@ export function ScreenCritique() {
                           onClick={() => setStep((s) => Math.min(CRITIQUE_STEPS.length - 1, s + 1))}
                           className="rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand transition-fast hover:opacity-90"
                         >
-                          Далее
+                          {t(`${NS}.next`)}
                         </button>
                       ) : (
-                        <span className="text-caption text-tertiary">Зона размечена</span>
+                        <span className="text-caption text-tertiary">{t(`${NS}.zoneMarked`)}</span>
                       )}
                     </div>
                   </>
@@ -505,7 +488,7 @@ export function ScreenCritique() {
                       <Tag size={18} />
                     </span>
                     <p className="text-footnote text-secondary">
-                      Кликни любую зону на экране слева: назови её роль и дефект.
+                      {t(`${NS}.emptyHint`)}
                     </p>
                   </div>
                 )}
@@ -518,8 +501,8 @@ export function ScreenCritique() {
                     ...(Object.keys(assignments) as Region[]),
                     ...(Object.keys(defectPicks) as Region[]),
                   ])] as Region[]).map((r) => {
-                    const role = ROLES.find((x) => x.id === assignments[r]);
-                    const defect = DEFECTS.find((x) => x.id === defectPicks[r]);
+                    const roleId = assignments[r];
+                    const defectId = defectPicks[r];
                     return (
                       <button
                         key={r}
@@ -527,10 +510,10 @@ export function ScreenCritique() {
                         onClick={() => selectRegion(r)}
                         className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-caption text-secondary transition-fast hover:border-brand/40"
                       >
-                        <span className="font-medium text-primary">{REGION_TITLE[r]}</span>
+                        <span className="font-medium text-primary">{regionTitle(r)}</span>
                         <span className="text-tertiary">
-                          {role ? role.label : '—'}
-                          {defect ? ` · ${defect.label}` : ''}
+                          {roleId ? roleLabel(roleId) : '—'}
+                          {defectId ? ` · ${defectLabel(defectId)}` : ''}
                         </span>
                       </button>
                     );
@@ -540,7 +523,7 @@ export function ScreenCritique() {
 
               <div className="flex items-center justify-between">
                 <span className="text-caption text-tertiary">
-                  Размечено зон: {assignedCount} из 6
+                  {t(`${NS}.markedCount`, { count: assignedCount })}
                 </span>
                 <button
                   type="button"
@@ -548,7 +531,7 @@ export function ScreenCritique() {
                   disabled={assignedCount === 0}
                   className="rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand transition-fast hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Проверить
+                  {t(`${NS}.check`)}
                 </button>
               </div>
             </>
@@ -566,7 +549,7 @@ export function ScreenCritique() {
                     >
                       <Icon size={15} className={ui.text} />
                       <span className={['text-footnote font-semibold', ui.text].join(' ')}>
-                        {summary[v]} · {ui.label}
+                        {summary[v]} · {verdictLabel(v)}
                       </span>
                     </div>
                   );
@@ -580,12 +563,10 @@ export function ScreenCritique() {
                   const worst = vd.worst ?? 'right';
                   const ui = VERDICT_UI[worst];
                   const Icon = ui.icon;
-                  const role = ROLES.find((x) => x.id === assignments[r]);
-                  const defect = DEFECTS.find((x) => x.id === defectPicks[r]);
-                  const t = TRUTH[r];
+                  const roleId = assignments[r];
+                  const defectId = defectPicks[r];
+                  const truth = TRUTH[r];
                   const dt = DEFECT_TRUTH[r];
-                  const correctRole = ROLES.find((x) => x.id === t.correct)!;
-                  const correctDefect = DEFECTS.find((x) => x.id === dt.correct)!;
                   return (
                     <div
                       key={r}
@@ -595,61 +576,61 @@ export function ScreenCritique() {
                       <div className="mb-2 flex items-center gap-2">
                         <Icon size={15} className={ui.text} />
                         <span className="text-footnote font-semibold text-primary">
-                          {REGION_TITLE[r]}
+                          {regionTitle(r)}
                         </span>
                       </div>
 
                       {/* Role dimension */}
-                      {role && vd.role && (
+                      {roleId && vd.role && (
                         <div className="mb-1.5">
                           <p className="text-caption text-tertiary">
                             <span className={['font-medium', VERDICT_UI[vd.role].text].join(' ')}>
-                              {VERDICT_UI[vd.role].label}
+                              {verdictLabel(vd.role)}
                             </span>{' '}
-                            · роль: <span className="text-secondary">{role.label}</span>
+                            · {t(`${NS}.roleColon`)} <span className="text-secondary">{roleLabel(roleId)}</span>
                             {vd.role !== 'right' && (
                               <>
                                 {' '}
-                                · сильное прочтение:{' '}
-                                <span className="text-secondary">{correctRole.label}</span>
+                                · {t(`${NS}.strongReading`)}{' '}
+                                <span className="text-secondary">{roleLabel(truth.correct)}</span>
                               </>
                             )}
                           </p>
                           {vd.role !== 'right' && (
-                            <p className="mt-0.5 text-footnote text-secondary">{t.note}</p>
+                            <p className="mt-0.5 text-footnote text-secondary">{roleNote(r)}</p>
                           )}
                         </div>
                       )}
 
                       {/* Defect dimension */}
-                      {defect && vd.defect && (
+                      {defectId && vd.defect && (
                         <div className="mb-1">
                           <p className="text-caption text-tertiary">
                             <span className={['font-medium', VERDICT_UI[vd.defect].text].join(' ')}>
-                              {VERDICT_UI[vd.defect].label}
+                              {verdictLabel(vd.defect)}
                             </span>{' '}
-                            · дефект: <span className="text-secondary">{defect.label}</span>
+                            · {t(`${NS}.defectColon`)} <span className="text-secondary">{defectLabel(defectId)}</span>
                             {vd.defect !== 'right' && (
                               <>
                                 {' '}
-                                · на деле:{' '}
-                                <span className="text-secondary">{correctDefect.label}</span>
+                                · {t(`${NS}.actually`)}{' '}
+                                <span className="text-secondary">{defectLabel(dt.correct)}</span>
                               </>
                             )}
                           </p>
                           {vd.defect !== 'right' && (
-                            <p className="mt-0.5 text-footnote text-secondary">{dt.note}</p>
+                            <p className="mt-0.5 text-footnote text-secondary">{defectNote(r)}</p>
                           )}
                         </div>
                       )}
 
                       {fixes[r]?.trim() && (
                         <div className="mt-2 rounded-lg border border-border bg-surface p-2.5">
-                          <p className="text-caption text-tertiary">Твоя правка: «{fixes[r]}»</p>
+                          <p className="text-caption text-tertiary">{t(`${NS}.yourFix`, { fix: fixes[r] ?? '' })}</p>
                           {fixLoading && !fixReplies[r] ? (
                             <p className="mt-1.5 flex items-center gap-1.5 text-caption text-tertiary">
                               <Loader2 size={12} className="animate-spin" />
-                              Ментор оценивает правку…
+                              {t(`${NS}.mentorEvaluating`)}
                             </p>
                           ) : (
                             fixReplies[r] && (
@@ -661,9 +642,9 @@ export function ScreenCritique() {
                                   ].join(' ')}
                                 >
                                   <Sparkles size={12} />
-                                  {FIX_UI[fixReplies[r]!.verdict].label}
+                                  {fixLabel(fixReplies[r]!.verdict)}
                                   {fixReplies[r]!.offline && (
-                                    <span className="text-tertiary">· офлайн</span>
+                                    <span className="text-tertiary">· {t(`${NS}.offline`)}</span>
                                   )}
                                 </span>
                                 <p className="mt-0.5 text-footnote text-secondary">
@@ -685,7 +666,7 @@ export function ScreenCritique() {
                 className="inline-flex items-center gap-2 self-start rounded-lg border border-border px-4 py-2 text-footnote font-medium text-secondary transition-fast hover:bg-hover"
               >
                 <RotateCcw size={15} />
-                Пройти заново
+                {t(`${NS}.retry`)}
               </button>
             </>
           )}

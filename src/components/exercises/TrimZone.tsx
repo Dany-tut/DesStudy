@@ -1,6 +1,7 @@
 'use client';
 
 import { Slider } from '@/components/ui/Slider';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Exercise type — "trim-zone". The learner drags a slider to trim the invisible
@@ -26,6 +27,7 @@ export function TrimZone({
   disabled?: boolean;
   onChange: (v: number) => void;
 }) {
+  const { t } = useT();
   // Extra space present before trimming equals the target trim: at the target,
   // both bands vanish and the label is optically centered.
   const band = Math.max(0, targetTrim - value);
@@ -63,10 +65,10 @@ export function TrimZone({
 
         <p className="mt-2 text-center text-caption text-tertiary">
           {band > 0
-            ? 'Розовые полосы — лишнее поле шрифта'
+            ? t('exercises.trimZone.bandsHint')
             : overshoot > 0
-              ? 'Перебор — срезаются сами буквы'
-              : 'Поле срезано ровно — текст по центру'}
+              ? t('exercises.trimZone.overshootHint')
+              : t('exercises.trimZone.centeredHint')}
         </p>
       </div>
 

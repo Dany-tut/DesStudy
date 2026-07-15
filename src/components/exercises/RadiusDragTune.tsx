@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Mirrors src/design/tokens.ts `radius`, plus `full` — at the top of the scale
@@ -49,6 +50,7 @@ export function RadiusDragTune({
   disabled?: boolean;
   onChange: (value: number) => void;
 }) {
+  const { t } = useT();
   const cardRef = useRef<HTMLDivElement>(null);
   // A ref, not state — pointerdown/pointermove can fire back-to-back within
   // the same tick (fast drags, automated tests), and a state-based flag reads
@@ -92,7 +94,7 @@ export function RadiusDragTune({
         >
           <div
             role="slider"
-            aria-label="Радиус"
+            aria-label={t('exercises.radiusTune.label')}
             aria-valuemin={min}
             aria-valuemax={max}
             aria-valuenow={value}

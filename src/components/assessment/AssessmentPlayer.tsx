@@ -82,7 +82,9 @@ export function AssessmentPlayer({ initialName }: { initialName: string | null }
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
+      {/* No mode="wait": if a tab is backgrounded mid-transition, rAF throttling
+          would otherwise leave the exiting step stuck and never mount the next. */}
+      <AnimatePresence initial={false}>
         {phase === 'name' ? (
           <motion.section
             key="name"

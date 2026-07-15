@@ -80,11 +80,11 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
       <div className="mt-4 flex flex-wrap items-center gap-4 text-footnote text-secondary">
         {isLecture && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-0.5 font-medium text-brand">
-            <BookOpen size={14} /> Лекция
+            <BookOpen size={14} /> {tr('exercises.lesson.lecture')}
           </span>
         )}
         <span className="flex items-center gap-1.5">
-          <Clock size={14} /> {lesson.estimatedMinutes} мин
+          <Clock size={14} /> {lesson.estimatedMinutes} {tr('exercises.lesson.minutes')}
         </span>
         <span className="flex items-center gap-1.5">
           <Target size={14} /> {lesson.difficulty}
@@ -103,7 +103,7 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
       {/* Theory */}
       {lesson.theory.length > 0 && (
         <>
-          <SectionTitle>Теория</SectionTitle>
+          <SectionTitle>{tr('exercises.lesson.theory')}</SectionTitle>
           <div className="max-w-[70ch] space-y-3">
             {lesson.theory.map((t, i) => (
               <p key={i} className="text-body text-secondary">
@@ -154,7 +154,7 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
       {/* Video */}
       {lesson.videos && lesson.videos.length > 0 && (
         <>
-          <SectionTitle>Видео</SectionTitle>
+          <SectionTitle>{tr('exercises.lesson.video')}</SectionTitle>
           <div className="space-y-6">
             {lesson.videos.map((v, i) => (
               <VideoEmbed key={i} video={v} />
@@ -166,7 +166,7 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
       {/* Examples */}
       {lesson.examples.length > 0 && (
         <>
-          <SectionTitle>Примеры</SectionTitle>
+          <SectionTitle>{tr('exercises.lesson.examples')}</SectionTitle>
           <div className="grid gap-5 sm:grid-cols-2">
             {lesson.examples.map((ex, i) => (
               <div key={i}>
@@ -176,7 +176,7 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
                     ex.kind === 'good' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger',
                   ].join(' ')}
                 >
-                  {ex.kind === 'good' ? '✓ Хорошо' : '✕ Плохо'}
+                  {ex.kind === 'good' ? tr('exercises.lesson.good') : tr('exercises.lesson.bad')}
                 </span>
                 <ExampleVisual visual={ex.visual} />
                 <p className="mt-2 text-footnote text-tertiary">{ex.caption}</p>
@@ -189,7 +189,7 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
       {/* Practice */}
       {lesson.exercises.length > 0 && (
         <>
-          <SectionTitle>Практика</SectionTitle>
+          <SectionTitle>{tr('exercises.lesson.practice')}</SectionTitle>
           <div className="space-y-6">
             {lesson.exercises.map((ex) => (
               <ExercisePlayer
@@ -233,7 +233,8 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
             disabled={reading}
             className="inline-flex items-center gap-2 rounded-full bg-brand px-6 py-3 text-callout font-semibold text-white transition-base hover:opacity-90 disabled:opacity-60"
           >
-            <CheckCircle2 size={18} /> {reading ? 'Отмечаем…' : 'Отметить прочитанной'}
+            <CheckCircle2 size={18} />{' '}
+            {reading ? tr('exercises.lesson.marking') : tr('exercises.lesson.markRead')}
           </button>
         </div>
       )}
@@ -248,12 +249,12 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
           <ConfettiBurst />
           <Trophy size={28} className="mx-auto mb-2 text-brand" />
           <p className="text-title3 font-semibold text-primary">
-            {isLecture ? 'Лекция пройдена 🎉' : 'Урок пройден 🎉'}
+            {isLecture ? tr('exercises.lesson.lectureDone') : tr('exercises.lesson.lessonDone')}
           </p>
           <p className="mt-1 text-body text-secondary">
             {isLecture
-              ? 'Дальше — практические уроки раздела, где эти идеи закрепляются на деле.'
-              : 'Ты закрепил материал на практике. Следующий шаг — сохранение прогресса и адаптивная сложность.'}
+              ? tr('exercises.lesson.lectureDoneBody')
+              : tr('exercises.lesson.lessonDoneBody')}
           </p>
         </motion.div>
       )}

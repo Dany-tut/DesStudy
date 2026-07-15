@@ -23,17 +23,18 @@ import {
 import type { FixReply } from '@/lib/ai/mentor';
 import { PremiumCardScene } from './scenes/PremiumCardScene';
 import { ImageScene } from './scenes/ImageScene';
+import { useT } from '@/lib/i18n/client';
 
-const VERDICT_UI: Record<Verdict, { ring: string; label: string; icon: typeof Check; text: string; bg: string }> = {
-  right: { ring: '#3FB950', label: 'Верно', icon: Check, text: 'text-[#3FB950]', bg: 'bg-[#3FB950]/10' },
-  debatable: { ring: '#E3B341', label: 'Спорно', icon: CircleHelp, text: 'text-[#E3B341]', bg: 'bg-[#E3B341]/10' },
-  wrong: { ring: '#E0785F', label: 'Иначе', icon: Lightbulb, text: 'text-[#E0785F]', bg: 'bg-[#E0785F]/10' },
+const VERDICT_UI: Record<Verdict, { ring: string; icon: typeof Check; text: string; bg: string }> = {
+  right: { ring: '#3FB950', icon: Check, text: 'text-[#3FB950]', bg: 'bg-[#3FB950]/10' },
+  debatable: { ring: '#E3B341', icon: CircleHelp, text: 'text-[#E3B341]', bg: 'bg-[#E3B341]/10' },
+  wrong: { ring: '#E0785F', icon: Lightbulb, text: 'text-[#E0785F]', bg: 'bg-[#E0785F]/10' },
 };
 
-const FIX_UI: Record<FixReply['verdict'], { label: string; text: string }> = {
-  improves: { label: 'Улучшает', text: 'text-[#3FB950]' },
-  subjective: { label: 'Дело вкуса', text: 'text-[#E3B341]' },
-  breaks: { label: 'Сломала бы', text: 'text-[#F85149]' },
+const FIX_UI: Record<FixReply['verdict'], { text: string }> = {
+  improves: { text: 'text-[#3FB950]' },
+  subjective: { text: 'text-[#E3B341]' },
+  breaks: { text: 'text-[#F85149]' },
 };
 
 /**
@@ -57,6 +58,9 @@ export function ScreenCritiqueExercise({
   lessonTotal?: number;
   onSolved?: (attempts: number) => void;
 }) {
+  const { t } = useT();
+  const verdictLabel = (v: Verdict) => t(`exercises.critiqueExercise.verdict.${v}`);
+  const fixLabel = (v: FixReply['verdict']) => t(`exercises.critiqueExercise.fix.${v}`);
   const [answer, setAnswer] = useState<CritiqueAnswer>(emptyCritiqueAnswer());
   const [selected, setSelected] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
@@ -153,7 +157,7 @@ export function ScreenCritiqueExercise({
           } catch {
             return [
               z.id,
-              { verdict: 'subjective', comment: 'Не удалось связаться с ментором — оцени правку по разбору.', offline: true } as FixReply,
+              { verdict: 'subjective', comment: t('exercises.critiqueExercise.offlineComment'), offline: true } as FixReply,
             ] as const;
           }
         }),
@@ -238,13 +242,13 @@ export function ScreenCritiqueExercise({
                       <Tag size={16} />
                     </span>
                     <div>
-                      <span className="block text-caption text-tertiary">Выбрана зона</span>
+                      <span className="block text-caption text-tertiary">{t('exercises.critiqueExercise.selectedZone')}</span>
                       <span className="block text-callout font-semibold text-primary">{sel.label}</span>
                     </div>
                   </div>
 
                   {/* Role */}
-                  <p className="mb-2 text-caption text-tertiary">Какая это роль на экране?</p>
+                  <p className="mb-2 text-caption text-tertiary">{t('exercises.critiqueExercise.roleQuestion')}</p>
                   <div className="flex flex-col gap-2">
                     {CRITIQUE_ROLES.map((role) => {
                       const active = answer.roles[sel.id] === role.id;
@@ -270,7 +274,7 @@ export function ScreenCritiqueExercise({
                   {/* Defect */}
                   <div className="mt-4 border-t border-border pt-4">
                     <p className="mb-3 text-caption text-tertiary">
-                      Что здесь не так? <span className="text-tertiary/70">— можно выбрать несколько</span>
+                      {t('exercises.critiqueExercise.defectQuestion')} <span className="text-tertiary/70">{t('exercises.critiqueExercise.defectMulti')}</span>
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       {CRITIQUE_DEFECTS.map((d) => {
@@ -307,7 +311,7 @@ export function ScreenCritiqueExercise({
                   {sel.fixes && sel.fixes.length > 0 && (
                     <div className="mt-4 border-t border-border pt-4">
                       <p className="mb-3 flex items-center gap-1.5 text-caption text-tertiary">
-                        <Wrench size={13} /> Как это починить?
+                        <Wrench size={13} /> {t('exercises.critiqueExercise.howToFix')}
                       </p>
                       <div className="flex flex-col gap-2">
                         {sel.fixes.map((f) => {
@@ -335,7 +339,7 @@ export function ScreenCritiqueExercise({
                       </div>
                       {answer.fixes[sel.id] && answer.fixes[sel.id] !== correctFixId(sel) && (
                         <p className="mt-2 text-caption text-tertiary">
-                          Экран пока не починился — попробуй другой вариант.
+                          {t('exercises.critiqueExercise.notFixedYet')}
                         </p>
                       )}
                     </div>
@@ -344,13 +348,13 @@ export function ScreenCritiqueExercise({
                   {/* Optional note */}
                   <div className="mt-4 border-t border-border pt-4">
                     <label className="mb-2 block text-caption text-tertiary">
-                      Что бы ты здесь поправил словами? (необязательно)
+                      {t('exercises.critiqueExercise.noteLabel')}
                     </label>
                     <textarea
                       value={answer.notes[sel.id] ?? ''}
                       onChange={(e) => setNote(e.target.value)}
                       rows={2}
-                      placeholder="Например: слишком крупный радиус, конкурирует с картой…"
+                      placeholder={t('exercises.critiqueExercise.notePlaceholder')}
                       className="w-full resize-none rounded-lg border border-border bg-surface px-3 py-2 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
                     />
                   </div>
@@ -361,7 +365,7 @@ export function ScreenCritiqueExercise({
                     <Tag size={18} />
                   </span>
                   <p className="text-footnote text-secondary">
-                    Кликни любую зону на экране слева: назови роль, дефект и выбери исправление.
+                    {t('exercises.critiqueExercise.emptyHint')}
                   </p>
                 </div>
               )}
@@ -400,7 +404,12 @@ export function ScreenCritiqueExercise({
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="text-caption text-tertiary">
-                Размечено: {diagnosedCount} из {zones.length} · Пересобрано: {rebuilt} из {rebuildTotal}
+                {t('exercises.critiqueExercise.progress', {
+                  diagnosed: diagnosedCount,
+                  zones: zones.length,
+                  rebuilt,
+                  rebuildTotal,
+                })}
               </span>
               <button
                 type="button"
@@ -408,7 +417,7 @@ export function ScreenCritiqueExercise({
                 disabled={diagnosedCount === 0}
                 className="rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand transition-fast hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Проверить
+                {t('exercises.critiqueExercise.check')}
               </button>
             </div>
           </>
@@ -419,7 +428,7 @@ export function ScreenCritiqueExercise({
               <div className="flex items-center gap-2 rounded-lg bg-[#3FB950]/10 px-4 py-3">
                 <Check size={16} className="text-[#3FB950]" />
                 <span className="text-footnote font-semibold text-[#3FB950]">
-                  Экран пересобран и разобран — задание пройдено
+                  {t('exercises.critiqueExercise.solvedBanner')}
                 </span>
               </div>
             )}
@@ -433,7 +442,7 @@ export function ScreenCritiqueExercise({
                   <div key={v} className={['flex items-center gap-2 rounded-lg px-3 py-2', ui.bg].join(' ')}>
                     <Icon size={15} className={ui.text} />
                     <span className={['text-footnote font-semibold', ui.text].join(' ')}>
-                      {summary[v]} · {ui.label}
+                      {summary[v]} · {verdictLabel(v)}
                     </span>
                   </div>
                 );
@@ -473,11 +482,11 @@ export function ScreenCritiqueExercise({
                       {role && vd.role && (
                         <div className="mb-1.5">
                           <p className="text-caption text-tertiary">
-                            <span className={['font-medium', VERDICT_UI[vd.role].text].join(' ')}>{VERDICT_UI[vd.role].label}</span>{' '}
-                            · роль: <span className="text-secondary">{role.label}</span>
+                            <span className={['font-medium', VERDICT_UI[vd.role].text].join(' ')}>{verdictLabel(vd.role)}</span>{' '}
+                            · {t('exercises.critiqueExercise.roleColon')} <span className="text-secondary">{role.label}</span>
                             {vd.role !== 'right' && (
                               <>
-                                {' '}· сильное прочтение: <span className="text-secondary">{correctRole.label}</span>
+                                {' '}· {t('exercises.critiqueExercise.strongReading')} <span className="text-secondary">{correctRole.label}</span>
                               </>
                             )}
                           </p>
@@ -488,11 +497,11 @@ export function ScreenCritiqueExercise({
                       {defectLabels && vd.defect && (
                         <div className="mb-1">
                           <p className="text-caption text-tertiary">
-                            <span className={['font-medium', VERDICT_UI[vd.defect].text].join(' ')}>{VERDICT_UI[vd.defect].label}</span>{' '}
-                            · {pickedDefects.length > 1 ? 'дефекты' : 'дефект'}: <span className="text-secondary">{defectLabels}</span>
+                            <span className={['font-medium', VERDICT_UI[vd.defect].text].join(' ')}>{verdictLabel(vd.defect)}</span>{' '}
+                            · {pickedDefects.length > 1 ? t('exercises.critiqueExercise.defectPlural') : t('exercises.critiqueExercise.defectSingular')}: <span className="text-secondary">{defectLabels}</span>
                             {vd.defect !== 'right' && (
                               <>
-                                {' '}· на деле: <span className="text-secondary">{correctDefect.label}</span>
+                                {' '}· {t('exercises.critiqueExercise.actually')} <span className="text-secondary">{correctDefect.label}</span>
                               </>
                             )}
                           </p>
@@ -504,25 +513,25 @@ export function ScreenCritiqueExercise({
                         <p className="mt-1 flex items-center gap-1.5 text-caption">
                           <Wrench size={12} className={fixDone ? 'text-[#3FB950]' : 'text-[#E0785F]'} />
                           <span className={fixDone ? 'text-[#3FB950]' : 'text-[#E0785F]'}>
-                            {fixDone ? 'Пересобрано верно' : 'Ещё не пересобрано — вернись и выбери верное исправление'}
+                            {fixDone ? t('exercises.critiqueExercise.rebuiltRight') : t('exercises.critiqueExercise.notRebuilt')}
                           </span>
                         </p>
                       )}
 
                       {answer.notes[z.id]?.trim() && (
                         <div className="mt-2 rounded-lg border border-border bg-surface p-2.5">
-                          <p className="text-caption text-tertiary">Твоя правка: «{answer.notes[z.id]}»</p>
+                          <p className="text-caption text-tertiary">{t('exercises.critiqueExercise.yourFix', { note: answer.notes[z.id] ?? '' })}</p>
                           {fixLoading && !fixReplies[z.id] ? (
                             <p className="mt-1.5 flex items-center gap-1.5 text-caption text-tertiary">
-                              <Loader2 size={12} className="animate-spin" /> Ментор оценивает правку…
+                              <Loader2 size={12} className="animate-spin" /> {t('exercises.critiqueExercise.mentorEvaluating')}
                             </p>
                           ) : (
                             fixReplies[z.id] && (
                               <div className="mt-1.5">
                                 <span className={['inline-flex items-center gap-1 text-caption font-medium', FIX_UI[fixReplies[z.id].verdict].text].join(' ')}>
                                   <Sparkles size={12} />
-                                  {FIX_UI[fixReplies[z.id].verdict].label}
-                                  {fixReplies[z.id].offline && <span className="text-tertiary">· офлайн</span>}
+                                  {fixLabel(fixReplies[z.id].verdict)}
+                                  {fixReplies[z.id].offline && <span className="text-tertiary">· {t('exercises.critiqueExercise.offline')}</span>}
                                 </span>
                                 <p className="mt-0.5 text-footnote text-secondary">{fixReplies[z.id].comment}</p>
                               </div>
@@ -542,7 +551,7 @@ export function ScreenCritiqueExercise({
                   onClick={refine}
                   className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand transition-fast hover:opacity-90"
                 >
-                  <Wrench size={15} /> Доработать
+                  <Wrench size={15} /> {t('exercises.critiqueExercise.refine')}
                 </button>
               )}
               <button
@@ -550,7 +559,7 @@ export function ScreenCritiqueExercise({
                 onClick={reset}
                 className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-footnote font-medium text-secondary transition-fast hover:bg-hover"
               >
-                <RotateCcw size={15} /> Пройти заново
+                <RotateCcw size={15} /> {t('exercises.critiqueExercise.retry')}
               </button>
             </div>
           </>

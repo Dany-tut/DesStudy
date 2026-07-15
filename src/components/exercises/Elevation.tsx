@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import { Check } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Exercise type — "elevation". The learner drags a card vertically to lift it
@@ -24,6 +25,7 @@ export function Elevation({
   disabled?: boolean;
   onChange: (v: number) => void;
 }) {
+  const { t } = useT();
   const areaRef = useRef<HTMLDivElement>(null);
   const onTarget = value === targetLevel;
 
@@ -83,7 +85,7 @@ export function Elevation({
               type="button"
               onPointerDown={startDrag}
               disabled={disabled}
-              aria-label="Тянуть карточку вверх, чтобы поднять уровень"
+              aria-label={t('exercises.elevation.dragLabel')}
               className={[
                 'flex min-h-24 w-52 select-none flex-col items-center justify-center gap-1 rounded-lg bg-elevated px-5 py-4 transition-fast',
                 disabled ? 'cursor-default' : 'cursor-ns-resize',
@@ -100,7 +102,7 @@ export function Elevation({
               >
                 {onTarget ? (
                   <>
-                    <Check size={13} strokeWidth={3} /> уровень {value}
+                    <Check size={13} strokeWidth={3} /> {t('exercises.elevation.level', { value })}
                   </>
                 ) : (
                   <>elevation {value}</>
@@ -112,7 +114,7 @@ export function Elevation({
       </div>
 
       <p className="mt-3 text-caption text-tertiary">
-        Тяни карточку вверх/вниз — тень меняется по шкале токенов, а не вручную.
+        {t('exercises.elevation.hint')}
       </p>
     </div>
   );

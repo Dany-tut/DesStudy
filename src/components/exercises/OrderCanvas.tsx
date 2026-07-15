@@ -3,6 +3,7 @@
 import { Reorder, useDragControls } from 'framer-motion';
 import { GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
 import type { OrderExercise, OrderItem } from '@/lib/curriculum/types';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Drag-and-drop canvas: the learner arranges cards into the correct order.
@@ -21,6 +22,7 @@ export function OrderCanvas({
   disabled: boolean;
   onChange: (order: string[]) => void;
 }) {
+  const { t } = useT();
   const byId = new Map(exercise.items.map((i) => [i.id, i]));
 
   function move(from: number, to: number) {
@@ -51,12 +53,13 @@ export function OrderCanvas({
               total={value.length}
               disabled={disabled}
               onMove={move}
+              t={t}
             />
           );
         })}
       </Reorder.Group>
       <p className="mt-3 px-1 text-caption text-tertiary">
-        Перетащи карточки (или используй ↑/↓), чтобы задать правильный порядок.
+        {t('exercises.order.hint')}
       </p>
     </div>
   );
@@ -69,6 +72,7 @@ function OrderRow({
   total,
   disabled,
   onMove,
+  t,
 }: {
   id: string;
   item: OrderItem;
@@ -76,6 +80,7 @@ function OrderRow({
   total: number;
   disabled: boolean;
   onMove: (from: number, to: number) => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   const controls = useDragControls();
   return (
@@ -112,7 +117,7 @@ function OrderRow({
           <button
             onClick={() => onMove(index, index - 1)}
             disabled={index === 0}
-            aria-label={`${item.label}: вверх`}
+            aria-label={t('exercises.order.moveUp', { label: item.label })}
             className="flex h-5 w-6 items-center justify-center rounded text-tertiary transition-fast hover:text-primary disabled:opacity-30"
           >
             <ChevronUp size={14} />
@@ -120,7 +125,7 @@ function OrderRow({
           <button
             onClick={() => onMove(index, index + 1)}
             disabled={index === total - 1}
-            aria-label={`${item.label}: вниз`}
+            aria-label={t('exercises.order.moveDown', { label: item.label })}
             className="flex h-5 w-6 items-center justify-center rounded text-tertiary transition-fast hover:text-primary disabled:opacity-30"
           >
             <ChevronDown size={14} />

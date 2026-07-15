@@ -13,6 +13,7 @@ import {
   Lightbulb,
 } from 'lucide-react';
 import type { Verdict } from '@/lib/curriculum/screenCritique';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * The built-in "Премиум карта" scene for screen-critique. Every zone renders a
@@ -59,6 +60,7 @@ export function PremiumCardScene({
   checked?: boolean;
   interactive?: boolean;
 }) {
+  const { t } = useT();
   const isFixed = (id: string) => fixed.has(id);
 
   const zoneStyle = (id: string): React.CSSProperties => {
@@ -112,9 +114,9 @@ export function PremiumCardScene({
         <div className={['flex justify-between', isFixed('header') ? 'items-baseline' : 'items-start'].join(' ')}>
           <div>
             <p className="text-[11px]" style={{ color: APP.textDim }}>
-              Название карты
+              {t('exercises.premiumCard.cardName')}
             </p>
-            <p className="text-[15px] font-semibold">Премиум карта</p>
+            <p className="text-[15px] font-semibold">{t('exercises.premiumCard.cardTitle')}</p>
           </div>
           {isFixed('header') ? (
             <p className="text-[20px] font-semibold tabular-nums" style={{ color: APP.text }}>
@@ -163,9 +165,9 @@ export function PremiumCardScene({
       >
         <Badge id="actions" />
         {[
-          { icon: CreditCard, label: 'Оплатить', radius: 'rounded-2xl', ml: 0 },
-          { icon: Plus, label: 'Пополнить', radius: 'rounded-none', ml: 6 },
-          { icon: ArrowLeftRight, label: 'Перевести', radius: 'rounded-full', ml: 14 },
+          { icon: CreditCard, label: t('exercises.premiumCard.payAction'), radius: 'rounded-2xl', ml: 0 },
+          { icon: Plus, label: t('exercises.premiumCard.topupAction'), radius: 'rounded-none', ml: 6 },
+          { icon: ArrowLeftRight, label: t('exercises.premiumCard.transferAction'), radius: 'rounded-full', ml: 14 },
         ].map(({ icon: Icon, label, radius, ml }) => (
           <div
             key={label}
@@ -197,7 +199,7 @@ export function PremiumCardScene({
           className="max-w-[70%] text-[15px] font-bold leading-tight"
           style={{ color: isFixed('promo') ? '#FFFFFF' : 'rgba(255,255,255,0.42)' }}
         >
-          Откройте вклад с увеличенной ставкой до 18%
+          {t('exercises.premiumCard.promo')}
         </p>
       </div>
 
@@ -206,7 +208,7 @@ export function PremiumCardScene({
         className="relative z-10 mt-3 font-normal"
         style={{ color: APP.textDim, fontSize: isFixed('bonuses') ? 12 : 10 }}
       >
-        Бонусы по карте
+        {t('exercises.premiumCard.bonusesTitle')}
       </p>
       <div
         className={['mt-3 grid grid-cols-2 gap-3 items-start', cls()].join(' ')}
@@ -215,8 +217,8 @@ export function PremiumCardScene({
       >
         <Badge id="bonuses" />
         {[
-          { icon: Utensils, text: 'Кэшбэк за бронирование ресторанов', pct: '5%' },
-          { icon: Hotel, text: 'Кэшбэк за бронирование туров и отелей', pct: '5%' },
+          { icon: Utensils, text: t('exercises.premiumCard.bonusRestaurants'), pct: '5%' },
+          { icon: Hotel, text: t('exercises.premiumCard.bonusHotels'), pct: '5%' },
         ].map(({ icon: Icon, text, pct }, i) => {
           // Broken: second card has tight padding, small radius, and no percent.
           const broken = !isFixed('bonuses') && i === 1;

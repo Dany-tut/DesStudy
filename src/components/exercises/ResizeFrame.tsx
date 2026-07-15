@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import type { ResizeBreakpoint } from '@/lib/curriculum/types';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Exercise type — "resize-frame". The learner drags the frame's right-edge
@@ -28,6 +29,7 @@ export function ResizeFrame({
   disabled?: boolean;
   onChange: (v: number) => void;
 }) {
+  const { t } = useT();
   const trackRef = useRef<HTMLDivElement>(null);
 
   // Active band = highest breakpoint whose `at` is ≤ current width.
@@ -91,7 +93,7 @@ export function ResizeFrame({
               <span className="h-2 w-2 rounded-full bg-warning/60" />
               <span className="h-2 w-2 rounded-full bg-success/60" />
               <span className="ml-auto text-caption tabular-nums text-tertiary">
-                {active?.label} · {columns} кол.
+                {active?.label} · {t('exercises.resizeFrame.cols', { count: columns })}
               </span>
             </div>
             {/* Reflowing content grid */}
@@ -117,7 +119,7 @@ export function ResizeFrame({
             type="button"
             onPointerDown={startDrag}
             disabled={disabled}
-            aria-label="Тянуть ширину рамки"
+            aria-label={t('exercises.resizeFrame.dragLabel')}
             className={[
               'absolute -right-2.5 top-1/2 flex h-14 w-5 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-elevated shadow-sm transition-fast',
               disabled ? 'cursor-default opacity-60' : 'cursor-ew-resize hover:bg-muted',
@@ -128,7 +130,7 @@ export function ResizeFrame({
         </div>
 
         <p className="mt-3 text-caption tabular-nums text-tertiary">
-          Ширина: {Math.round(value)}px · перетаскивай ручку справа
+          {t('exercises.resizeFrame.widthHint', { value: Math.round(value) })}
         </p>
       </div>
     </div>

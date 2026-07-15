@@ -232,9 +232,11 @@ export function ExerciseFieldsEditor({
           scene={draft.scene}
           screenTitle={draft.screenTitle}
           zones={draft.zones}
+          image={draft.image}
           onScene={(v) => set('scene', v)}
           onScreenTitle={(v) => set('screenTitle', v)}
           onZones={(v) => set('zones', v)}
+          onImage={(v) => set('image', v)}
         />
       )}
 

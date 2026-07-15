@@ -2,6 +2,7 @@
 
 import { Check } from 'lucide-react';
 import { Slider } from '@/components/ui/Slider';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Exercise type — "nested-radius". The learner sets the radius of a nested
@@ -24,6 +25,7 @@ export function NestedRadius({
   disabled?: boolean;
   onChange: (v: number) => void;
 }) {
+  const { t } = useT();
   const target = outerRadius - padding;
   const concentric = value === target;
 
@@ -49,16 +51,20 @@ export function NestedRadius({
           >
             {concentric ? (
               <span className="flex items-center gap-1">
-                <Check size={16} strokeWidth={3} /> концентрично
+                <Check size={16} strokeWidth={3} /> {t('exercises.nestedRadius.concentric')}
               </span>
             ) : (
-              'кнопка'
+              t('exercises.nestedRadius.button')
             )}
           </div>
         </div>
 
         <p className="mt-4 text-center text-caption text-tertiary tabular-nums">
-          внешний {outerRadius}px · отступ {padding}px · внутренний {value}px
+          {t('exercises.nestedRadius.readout', {
+            outer: outerRadius,
+            padding,
+            inner: value,
+          })}
         </p>
       </div>
 

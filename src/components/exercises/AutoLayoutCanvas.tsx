@@ -2,6 +2,7 @@
 
 import type { BuildAnswer, BuildExercise } from '@/lib/curriculum/types';
 import { Stepper } from '@/components/ui/Stepper';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Interactive Canvas — auto-layout build surface.
@@ -21,6 +22,7 @@ export function AutoLayoutCanvas({
   /** Functional updater — avoids stale-closure bugs on rapid stepping. */
   onChange: (update: (prev: BuildAnswer) => BuildAnswer) => void;
 }) {
+  const { t } = useT();
   const { min, max, step, blocks } = exercise;
   const clamp = (n: number) => Math.min(max, Math.max(min, n));
   const nudgeGap = (delta: number) =>
@@ -33,7 +35,7 @@ export function AutoLayoutCanvas({
       {/* Canvas / live preview */}
       <div
         className="canvas-grid flex items-start justify-center rounded-xl border border-border bg-canvas p-6"
-        aria-label="Холст auto-layout"
+        aria-label={t('exercises.autoLayout.canvasLabel')}
       >
         <div
           className="w-full max-w-[260px] rounded-lg border border-border-strong bg-surface shadow-sm transition-all"
@@ -54,7 +56,7 @@ export function AutoLayoutCanvas({
       {/* Controls */}
       <div className="flex flex-col gap-4">
         <Stepper
-          label="Отступ между блоками"
+          label={t('exercises.autoLayout.gapLabel')}
           value={value.gap}
           min={min}
           max={max}
@@ -63,7 +65,7 @@ export function AutoLayoutCanvas({
           onChange={(v) => nudgeGap(v - value.gap)}
         />
         <Stepper
-          label="Внутренние поля"
+          label={t('exercises.autoLayout.paddingLabel')}
           value={value.padding}
           min={min}
           max={max}
@@ -72,7 +74,7 @@ export function AutoLayoutCanvas({
           onChange={(v) => nudgePad(v - value.padding)}
         />
         <p className="text-caption text-tertiary">
-          Шаг {step}px — держись 8pt-сетки.
+          {t('exercises.autoLayout.stepHint', { step })}
         </p>
       </div>
     </div>

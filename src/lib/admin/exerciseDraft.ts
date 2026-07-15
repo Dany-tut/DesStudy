@@ -117,7 +117,13 @@ export function payloadToDraft(payload: Record<string, unknown>): ExerciseDraft 
     d.scene = (payload.scene as string) || 'premium-card';
     d.screenTitle = (payload.screenTitle as string) || PREMIUM_CARD_SCREEN_TITLE;
     const zones = payload.zones as CritiqueZone[] | undefined;
-    d.zones = zones && zones.length ? zones : (JSON.parse(JSON.stringify(PREMIUM_CARD_ZONES)) as CritiqueZone[]);
+    d.zones =
+      d.scene === 'image'
+        ? (zones ?? [])
+        : zones && zones.length
+          ? zones
+          : (JSON.parse(JSON.stringify(PREMIUM_CARD_ZONES)) as CritiqueZone[]);
+    d.image = (payload.image as ExerciseDraft['image']) ?? undefined;
   }
   return d;
 }
@@ -169,6 +175,7 @@ export function draftToPayload(d: ExerciseDraft): Record<string, unknown> {
         scene: d.scene,
         screenTitle: d.screenTitle,
         zones: d.zones,
+        ...(d.scene === 'image' && d.image ? { image: d.image } : {}),
       };
   }
 }

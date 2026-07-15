@@ -157,6 +157,11 @@ export function parseExercise(data: Record<string, unknown>): Exercise {
         }
         const asIds = (v: unknown): CritiqueDefectId[] | undefined =>
           Array.isArray(v) ? (v as CritiqueDefectId[]) : undefined;
+        const r = z.rect as Record<string, unknown> | undefined;
+        const rect =
+          r && ['x0', 'y0', 'x1', 'y1'].every((k) => Number.isFinite(Number(r[k])))
+            ? { x0: Number(r.x0), y0: Number(r.y0), x1: Number(r.x1), y1: Number(r.y1) }
+            : undefined;
         return {
           id: str(z.id, `zones[${i}].id`),
           label: text(z.label),
@@ -168,14 +173,24 @@ export function parseExercise(data: Record<string, unknown>): Exercise {
           debatableDefects: asIds(z.debatableDefects),
           defectNote: text(z.defectNote),
           fixes: fixes.length ? fixes : undefined,
+          rect,
         };
       });
       if (zones.length === 0) throw new ValidationError('screen-critique: нужна хотя бы одна зона');
+      let image: { url: string; goodUrl?: string } | undefined;
+      if (scene === 'image') {
+        const img = (data.image ?? {}) as Record<string, unknown>;
+        image = { url: str(img.url, 'image.url'), goodUrl: optionalStr(img.goodUrl) };
+        if (zones.some((z) => !z.rect)) {
+          throw new ValidationError('image-сцена: у каждой зоны должна быть рамка (rect)');
+        }
+      }
       return {
         id,
         type: 'screen-critique',
         prompt,
         scene,
+        image,
         screenTitle: text(data.screenTitle),
         zones,
         explanation,

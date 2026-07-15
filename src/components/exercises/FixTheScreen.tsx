@@ -24,6 +24,7 @@ import {
   type FixOption,
   type FixScreenAnswer,
 } from '@/lib/curriculum/fixScreen';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Fix-the-screen — the learner repairs a deliberately broken mobile mockup by
@@ -223,6 +224,7 @@ export function FixTheScreen({
   disabled?: boolean;
   onChange?: (next: FixScreenAnswer) => void;
 } = {}) {
+  const { t, tp } = useT();
   const controlled = onChange !== undefined;
   const [internalFixes, setInternalFixes] = useState<FixScreenAnswer>(FIX_INITIAL);
   const fixes = controlled ? (value ?? FIX_INITIAL) : internalFixes;
@@ -259,8 +261,7 @@ export function FixTheScreen({
       {/* Progress counter */}
       <div className="flex items-center justify-between gap-4">
         <p className="text-footnote text-secondary">
-          Слева — как было (сломанный макет). Проходи по нарушениям и выбирай правильное
-          исправление — по центру «твой экран» меняется на глазах.
+          {t('exercises.fixScreen.intro')}
         </p>
         <span
           className={[
@@ -275,14 +276,14 @@ export function FixTheScreen({
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr_1.1fr]">
         {/* LEFT — the original broken screen, frozen as the "before" reference. */}
         <div className="flex flex-col gap-2">
-          <span className="text-caption font-medium text-tertiary">Было</span>
+          <span className="text-caption font-medium text-tertiary">{t('exercises.fixScreen.before')}</span>
           <PhonePreview fixes={FIX_INITIAL} highlight={allFixed ? null : active} faded />
         </div>
 
         {/* MIDDLE — the learner's screen: starts identical (broken) and updates
             live as each fix is applied. */}
         <div className="flex flex-col gap-2">
-          <span className="text-caption font-medium text-tertiary">Твой экран</span>
+          <span className="text-caption font-medium text-tertiary">{t('exercises.fixScreen.yourScreen')}</span>
           <PhonePreview fixes={fixes} highlight={allFixed ? null : active} />
         </div>
 
@@ -360,7 +361,7 @@ export function FixTheScreen({
               </div>
               {showWrong && (
                 <p className="mt-2 text-caption text-danger">
-                  {activePicked?.feedback ?? 'Не то — сверься с эталоном «Было» слева.'}
+                  {activePicked?.feedback ?? t('exercises.fixScreen.fallbackFeedback')}
                 </p>
               )}
             </div>
@@ -371,11 +372,10 @@ export function FixTheScreen({
           {allFixed && !controlled && (
             <div className="rounded-lg border border-success/40 bg-success/10 p-4">
               <p className="text-footnote font-semibold text-success">
-                Все {FIX_DEFECTS.length} нарушений исправлены ✓
+                {tp('exercises.fixScreen.allFixed', FIX_DEFECTS.length)}
               </p>
               <p className="mt-1 text-caption text-secondary">
-                Сравни «было» слева и «твой экран» — увидишь, как мелочи складываются в аккуратный
-                экран.
+                {t('exercises.fixScreen.compareHint')}
               </p>
               <div className="mt-3 flex gap-2">
                 <button
@@ -383,7 +383,7 @@ export function FixTheScreen({
                   onClick={reset}
                   className="rounded-md border border-border px-3 py-1.5 text-caption font-medium text-secondary hover:bg-hover"
                 >
-                  Заново
+                  {t('exercises.fixScreen.restart')}
                 </button>
               </div>
             </div>
