@@ -4,7 +4,6 @@
  * the client). Import only from server components / route handlers.
  */
 
-import 'server-only';
 import { cookies } from 'next/headers';
 import { DEFAULT_LOCALE, LOCALE_COOKIE, type Locale, isLocale } from './config';
 import { createTranslator, type Translator } from './translator';

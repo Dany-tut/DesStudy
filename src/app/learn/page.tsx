@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { PATHS, type LessonEntry } from '@/content/curriculum';
 import { blocksToLesson } from '@/lib/admin/blocksToLesson';
 import { LearnBrowser, type LearnGroup } from '@/components/learn/LearnBrowser';
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,7 @@ async function getAuthoredEntries(): Promise<LessonEntry[]> {
 }
 
 export default async function LearnPage() {
+  const { t, tp } = await getT();
   const learner = await getLearner();
   const progress = learner
     ? await prisma.lessonProgress.findMany({ where: { learnerId: learner.id } })
@@ -66,8 +68,8 @@ export default async function LearnPage() {
   if (authoredLessons.length > 0) {
     groups.push({
       id: 'authored',
-      title: 'От преподавателя',
-      description: 'Уроки, собранные в конструкторе — рядом с основной программой.',
+      title: t('learn.authoredTitle'),
+      description: t('learn.authoredDescription'),
       emoji: '📚',
       lessons: authoredLessons.map(withProgress),
     });
@@ -77,14 +79,12 @@ export default async function LearnPage() {
     <main className="mx-auto max-w-[1200px] px-8 py-10">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-title1 font-bold text-primary">Обучение</h1>
-          <p className="mt-1 text-footnote text-secondary">
-            Пути от нуля до профессионала — теория, практика, mastery.
-          </p>
+          <h1 className="text-title1 font-bold text-primary">{t('learn.title')}</h1>
+          <p className="mt-1 text-footnote text-secondary">{t('learn.subtitle')}</p>
         </div>
         <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-medium text-primary">
           <Flame size={15} className="text-warning" />
-          {learner?.streak ?? 0} дн.
+          {tp('common.days', learner?.streak ?? 0)}
         </div>
       </div>
 

@@ -1,6 +1,8 @@
 'use client';
 
 import { Plus, X } from 'lucide-react';
+import type { CritiqueZone } from '@/lib/curriculum/types';
+import { ScreenCritiqueFields } from './ScreenCritiqueFields';
 
 /**
  * Flat draft shape covering every Exercise type's fields at once — simplest
@@ -9,7 +11,7 @@ import { Plus, X } from 'lucide-react';
  * `draftToPayload` in LessonBuilder.tsx).
  */
 export interface ExerciseDraft {
-  type: 'choose' | 'tune' | 'build' | 'order' | 'figma-link' | 'file-upload';
+  type: 'choose' | 'tune' | 'build' | 'order' | 'figma-link' | 'file-upload' | 'screen-critique';
   id: string;
   prompt: string;
   explanation: string;
@@ -30,6 +32,10 @@ export interface ExerciseDraft {
   checklist: string[];
   accept: string;
   maxSizeMB: number;
+  // screen-critique
+  scene: string;
+  screenTitle: string;
+  zones: CritiqueZone[];
 }
 
 const inputClass =
@@ -218,6 +224,17 @@ export function ExerciseFieldsEditor({
             Ученик увидит их перемешанными — правильный порядок это тот, что задан здесь.
           </p>
         </div>
+      )}
+
+      {draft.type === 'screen-critique' && (
+        <ScreenCritiqueFields
+          scene={draft.scene}
+          screenTitle={draft.screenTitle}
+          zones={draft.zones}
+          onScene={(v) => set('scene', v)}
+          onScreenTitle={(v) => set('screenTitle', v)}
+          onZones={(v) => set('zones', v)}
+        />
       )}
 
       {draft.type === 'figma-link' && (

@@ -11,3 +11,6 @@ prisma/dev.db-journal
 # Runtime learner uploads — keep the directory, not its contents.
 public/uploads/*
 !public/uploads/.gitkeep
+
+# Local env
+.env

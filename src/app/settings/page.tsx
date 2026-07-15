@@ -37,19 +37,17 @@ export default function SettingsPage() {
 
   return (
     <main className="mx-auto max-w-[1200px] px-8 py-12 md:py-16">
-      <h1 className="text-title1 font-bold text-primary">Настройки</h1>
-      <p className="mt-2 text-body text-secondary">
-        Всё применяется сразу и сохраняется на этом устройстве.
-      </p>
+      <h1 className="text-title1 font-bold text-primary">{t('settings.title')}</h1>
+      <p className="mt-2 text-body text-secondary">{t('settings.subtitle')}</p>
 
       <div className="mt-10 flex flex-col gap-8" aria-busy={!ready}>
         {/* Appearance */}
-        <Section icon={<Palette size={18} />} title="Оформление">
-          <Row label="Тема" hint="Выберите оформление интерфейса.">
+        <Section icon={<Palette size={18} />} title={t('settings.appearance')}>
+          <Row label={t('settings.themeLabel')} hint={t('settings.themeHint')}>
             <SegmentedControl<ThemePref>
               options={[
-                { value: 'light', label: 'Светлая' },
-                { value: 'dark', label: 'Тёмная' },
+                { value: 'light', label: t('settings.themeLight') },
+                { value: 'dark', label: t('settings.themeDark') },
               ]}
               value={settings.theme}
               onChange={(theme) => update({ theme })}
@@ -57,18 +55,29 @@ export default function SettingsPage() {
           </Row>
         </Section>
 
+        {/* Language */}
+        <Section icon={<Languages size={18} />} title={t('settings.languageLabel')}>
+          <Row label={t('settings.languageLabel')} hint={t('settings.languageHint')}>
+            <SegmentedControl<Locale>
+              options={LOCALES.map((l) => ({ value: l, label: LOCALE_NAMES[l] }))}
+              value={locale}
+              onChange={(next) => setLocale(next)}
+            />
+          </Row>
+        </Section>
+
         {/* Accessibility */}
-        <Section icon={<Accessibility size={18} />} title="Доступность">
+        <Section icon={<Accessibility size={18} />} title={t('settings.accessibility')}>
           <Row
-            label="Приглушённые анимации"
-            hint="Убирает движение переходов — для чувствительных к анимации."
+            label={t('settings.reduceMotionLabel')}
+            hint={t('settings.reduceMotionHint')}
           >
             <Switch
               checked={settings.reduceMotion}
               onChange={(reduceMotion) => update({ reduceMotion })}
             />
           </Row>
-          <Row label="Высокий контраст" hint="Усиливает границы и приглушённый текст.">
+          <Row label={t('settings.highContrastLabel')} hint={t('settings.highContrastHint')}>
             <Switch
               checked={settings.highContrast}
               onChange={(highContrast) => update({ highContrast })}

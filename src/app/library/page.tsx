@@ -1,11 +1,13 @@
 import { Library } from 'lucide-react';
 import { ComingSoon } from '@/components/shell/ComingSoon';
+import { getT } from '@/lib/i18n/server';
 
-export default function LibraryPage() {
+export default async function LibraryPage() {
+  const { t } = await getT();
   return (
     <ComingSoon
-      title="Библиотека"
-      description="Mobbin-подобная галерея: экраны, потоки, паттерны, дизайн-системы — с поиском по платформе, индустрии и компоненту."
+      title={t('library.title')}
+      description={t('library.description')}
       icon={<Library size={28} />}
     />
   );

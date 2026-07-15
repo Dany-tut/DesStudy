@@ -14,6 +14,7 @@ const EXERCISE_TYPES: { value: ExerciseDraft['type']; label: string }[] = [
   { value: 'order', label: 'Порядок (drag)' },
   { value: 'figma-link', label: 'Ссылка на Figma' },
   { value: 'file-upload', label: 'Загрузка файла' },
+  { value: 'screen-critique', label: 'Разбор экрана' },
 ];
 
 export function AddBlockBar({

@@ -3,10 +3,12 @@ import { ArrowRight, Zap, Flame, PlayCircle, Clock, Lock, Check } from 'lucide-r
 import { getLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
 import { PATHS, availableLessons } from '@/content/curriculum';
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
+  const { t, tp } = await getT();
   const learner = await getLearner();
   const progress = learner
     ? await prisma.lessonProgress.findMany({ where: { learnerId: learner.id } })
@@ -24,20 +26,17 @@ export default async function HomePage() {
       {/* Hero */}
       <section className="mb-10">
         <h1 className="text-title1 font-bold text-primary">
-          {learner ? 'С возвращением 👋' : 'Учись дизайну, делая'}
+          {learner ? t('home.welcomeBack') : t('home.heroTitle')}
         </h1>
-        <p className="mt-2 max-w-[560px] text-body text-secondary">
-          Интерактивная платформа, где ты становишься UI/UX-дизайнером через практику,
-          мгновенную проверку и AI-наставника — а не через часы видео.
-        </p>
+        <p className="mt-2 max-w-[560px] text-body text-secondary">{t('home.heroSubtitle')}</p>
 
         {learner && (
           <div className="mt-6 flex gap-4">
             <MiniStat icon={<Zap size={16} className="text-brand" />} value={learner.xp} label="XP" />
             <MiniStat
               icon={<Flame size={16} className="text-warning" />}
-              value={`${learner.streak} дн.`}
-              label="Стрик"
+              value={tp('common.days', learner.streak)}
+              label={t('home.streak')}
             />
           </div>
         )}
@@ -52,10 +51,10 @@ export default async function HomePage() {
           <PlayCircle size={28} />
         </span>
         <div className="flex-1">
-          <p className="text-footnote font-medium text-brand">Продолжить обучение</p>
+          <p className="text-footnote font-medium text-brand">{t('home.continueLearning')}</p>
           <p className="mt-0.5 text-title3 font-semibold text-primary">{continueLesson.title}</p>
           <p className="mt-1 flex items-center gap-1.5 text-footnote text-tertiary">
-            <Clock size={13} /> {continueLesson.minutes} мин
+            <Clock size={13} /> {continueLesson.minutes} {t('common.min')}
           </p>
         </div>
         <ArrowRight size={22} className="text-tertiary transition-base group-hover:text-brand" />
@@ -63,9 +62,9 @@ export default async function HomePage() {
 
       {/* Paths */}
       <div className="mb-6 flex items-baseline justify-between">
-        <h2 className="text-title3 font-semibold text-primary">Пути обучения</h2>
+        <h2 className="text-title3 font-semibold text-primary">{t('home.paths')}</h2>
         <Link href="/learn" className="text-footnote font-medium text-brand hover:underline">
-          Все уроки →
+          {t('common.allLessons')}
         </Link>
       </div>
 
@@ -79,7 +78,7 @@ export default async function HomePage() {
                 <div>
                   <p className="text-callout font-semibold text-primary">{path.title}</p>
                   <p className="text-caption text-tertiary">
-                    {done}/{path.lessons.length} уроков
+                    {tp('home.lessonsCount', path.lessons.length, { done, total: path.lessons.length })}
                   </p>
                 </div>
               </div>
@@ -116,7 +115,7 @@ export default async function HomePage() {
       </div>
 
       <p className="mt-8 text-center text-footnote text-tertiary">
-        {availableLessons} урок доступен · остальные в разработке
+        {tp('home.lessonsAvailable', availableLessons)}
       </p>
     </main>
   );

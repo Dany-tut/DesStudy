@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { LessonCard } from '@/components/learn/LessonCard';
+import { useT } from '@/lib/i18n/client';
 import type { LessonEntry, Level } from '@/content/curriculum';
 
 export interface LearnGroupLesson {
@@ -29,6 +30,7 @@ type StatusFilter = 'all' | 'new' | 'progress' | 'done';
  * filters the already-fetched list, no new API needed.
  */
 export function LearnBrowser({ groups }: { groups: LearnGroup[] }) {
+  const { t } = useT();
   const [query, setQuery] = useState('');
   const [level, setLevel] = useState<LevelFilter>('all');
   const [status, setStatus] = useState<StatusFilter>('all');
@@ -63,7 +65,7 @@ export function LearnBrowser({ groups }: { groups: LearnGroup[] }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Поиск урока…"
+            placeholder={t('learn.searchPlaceholder')}
             className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
           />
         </div>
@@ -72,20 +74,20 @@ export function LearnBrowser({ groups }: { groups: LearnGroup[] }) {
             value={level}
             onChange={setLevel}
             options={[
-              { value: 'all', label: 'Все уровни' },
-              { value: 'beginner', label: 'Начальный' },
-              { value: 'medium', label: 'Средний' },
-              { value: 'advanced', label: 'Продвинутый' },
+              { value: 'all', label: t('learn.levelAll') },
+              { value: 'beginner', label: t('learn.levelBeginner') },
+              { value: 'medium', label: t('learn.levelMedium') },
+              { value: 'advanced', label: t('learn.levelAdvanced') },
             ]}
           />
           <SegmentedControl
             value={status}
             onChange={setStatus}
             options={[
-              { value: 'all', label: 'Все' },
-              { value: 'new', label: 'Не начато' },
-              { value: 'progress', label: 'В процессе' },
-              { value: 'done', label: 'Пройдено' },
+              { value: 'all', label: t('learn.statusAll') },
+              { value: 'new', label: t('learn.statusNew') },
+              { value: 'progress', label: t('learn.statusProgress') },
+              { value: 'done', label: t('learn.statusDone') },
             ]}
           />
         </div>
@@ -93,7 +95,7 @@ export function LearnBrowser({ groups }: { groups: LearnGroup[] }) {
 
       {totalMatches === 0 ? (
         <p className="rounded-lg border border-dashed border-border-strong py-10 text-center text-body text-tertiary">
-          Ничего не нашлось — попробуй другой запрос или сними фильтр.
+          {t('learn.noMatches')}
         </p>
       ) : (
         <div className="space-y-10">

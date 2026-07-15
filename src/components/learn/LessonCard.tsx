@@ -1,15 +1,14 @@
 import Link from 'next/link';
 import { ListChecks, BarChart3, Clock, Lock, Check, Flame, BookOpen } from 'lucide-react';
-import { LEVEL_LABEL, type LessonEntry } from '@/content/curriculum';
+import { type LessonEntry } from '@/content/curriculum';
+import { useT } from '@/lib/i18n/client';
 
-/** Russian plural for "задача": 1 задача, 2–4 задачи, 5+ задач. */
-function tasksLabel(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return `${n} задача`;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${n} задачи`;
-  return `${n} задач`;
-}
+/** Level → its dictionary key under `learn.*`. */
+const LEVEL_KEY = {
+  beginner: 'learn.levelBeginner',
+  medium: 'learn.levelMedium',
+  advanced: 'learn.levelAdvanced',
+} as const;
 
 /**
  * Kodree-style lesson card: icon tile, title, a row of metadata chips
@@ -24,6 +23,7 @@ export function LessonCard({
   progressPct?: number;
   completed?: boolean;
 }) {
+  const { t, tp } = useT();
   const locked = lesson.status === 'soon';
 
   const inner = (
@@ -34,7 +34,7 @@ export function LessonCard({
         </span>
         {lesson.popular && !locked && (
           <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-caption font-medium text-brand">
-            <Flame size={11} /> Популярное
+            <Flame size={11} /> {t('lessonCard.popular')}
           </span>
         )}
         {locked && <Lock size={16} className="text-tertiary" />}
@@ -51,19 +51,19 @@ export function LessonCard({
         <span className="inline-flex items-center gap-1">
           {lesson.kind === 'lecture' ? (
             <>
-              <BookOpen size={13} /> Лекция
+              <BookOpen size={13} /> {t('lessonCard.lecture')}
             </>
           ) : (
             <>
-              <ListChecks size={13} /> {tasksLabel(lesson.tasks)}
+              <ListChecks size={13} /> {tp('lessonCard.tasks', lesson.tasks)}
             </>
           )}
         </span>
         <span className="inline-flex items-center gap-1">
-          <BarChart3 size={13} /> {LEVEL_LABEL[lesson.level]}
+          <BarChart3 size={13} /> {t(LEVEL_KEY[lesson.level])}
         </span>
         <span className="inline-flex items-center gap-1">
-          <Clock size={13} /> {lesson.minutes} мин
+          <Clock size={13} /> {lesson.minutes} {t('common.min')}
         </span>
       </div>
 

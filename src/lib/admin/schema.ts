@@ -5,7 +5,8 @@
  * before being written to the DB, so `src/lib/curriculum/types.ts` stays the
  * single source of truth for shape (no parallel Prisma-model-per-exercise-type).
  */
-import type { Exercise, LessonVideo } from '@/lib/curriculum/types';
+import type { Exercise, LessonVideo, CritiqueZone, CritiqueRoleId, CritiqueDefectId } from '@/lib/curriculum/types';
+import { CRITIQUE_ROLES, CRITIQUE_DEFECTS, CRITIQUE_SCENES } from '@/lib/curriculum/screenCritique';
 
 export class ValidationError extends Error {}
 
@@ -127,6 +128,56 @@ export function parseExercise(data: Record<string, unknown>): Exercise {
         accept: text(data.accept) || 'image/png,image/jpeg,application/pdf',
         maxSizeMB: num(data.maxSizeMB, 'maxSizeMB'),
         checklist: (arr(data.checklist ?? [], 'checklist') as string[]).filter(Boolean),
+        explanation,
+      };
+    }
+    case 'screen-critique': {
+      const scene = str(data.scene, 'scene');
+      if (!(CRITIQUE_SCENES as readonly string[]).includes(scene)) {
+        throw new ValidationError(`Неизвестная сцена: ${scene}`);
+      }
+      const roleIds = new Set(CRITIQUE_ROLES.map((r) => r.id));
+      const defectIds = new Set(CRITIQUE_DEFECTS.map((d) => d.id));
+      const zones: CritiqueZone[] = arr(data.zones, 'zones').map((raw, i) => {
+        const z = raw as Record<string, unknown>;
+        const role = str(z.role, `zones[${i}].role`) as CritiqueRoleId;
+        if (!roleIds.has(role)) throw new ValidationError(`zones[${i}].role: неизвестная роль`);
+        const defect = str(z.defect, `zones[${i}].defect`) as CritiqueDefectId;
+        if (!defectIds.has(defect)) throw new ValidationError(`zones[${i}].defect: неизвестный дефект`);
+        const fixesRaw = z.fixes ? arr(z.fixes, `zones[${i}].fixes`) : [];
+        const fixes = fixesRaw.map((fr, j) => {
+          const f = fr as Record<string, unknown>;
+          return { id: str(f.id ?? `fix-${j}`, `zones[${i}].fixes[${j}].id`), label: text(f.label), correct: !!f.correct };
+        });
+        if (defect !== 'none' && fixes.length > 0) {
+          const correct = fixes.filter((f) => f.correct).length;
+          if (correct !== 1) {
+            throw new ValidationError(`zones[${i}]: должно быть ровно одно верное исправление`);
+          }
+        }
+        const asIds = (v: unknown): CritiqueDefectId[] | undefined =>
+          Array.isArray(v) ? (v as CritiqueDefectId[]) : undefined;
+        return {
+          id: str(z.id, `zones[${i}].id`),
+          label: text(z.label),
+          role,
+          debatableRoles: Array.isArray(z.debatableRoles) ? (z.debatableRoles as CritiqueRoleId[]) : undefined,
+          roleNote: text(z.roleNote),
+          intent: text(z.intent),
+          defect,
+          debatableDefects: asIds(z.debatableDefects),
+          defectNote: text(z.defectNote),
+          fixes: fixes.length ? fixes : undefined,
+        };
+      });
+      if (zones.length === 0) throw new ValidationError('screen-critique: нужна хотя бы одна зона');
+      return {
+        id,
+        type: 'screen-critique',
+        prompt,
+        scene,
+        screenTitle: text(data.screenTitle),
+        zones,
         explanation,
       };
     }

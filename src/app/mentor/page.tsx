@@ -1,11 +1,13 @@
 import { Sparkles } from 'lucide-react';
 import { ComingSoon } from '@/components/shell/ComingSoon';
+import { getT } from '@/lib/i18n/server';
 
-export default function MentorPage() {
+export default async function MentorPage() {
+  const { t } = await getT();
   return (
     <ComingSoon
-      title="AI-ментор"
-      description="Персональный наставник: разбор ошибок, подсказки, план на день, подготовка к собеседованиям. Уже работает внутри упражнений."
+      title={t('mentor.title')}
+      description={t('mentor.description')}
       icon={<Sparkles size={28} />}
     />
   );

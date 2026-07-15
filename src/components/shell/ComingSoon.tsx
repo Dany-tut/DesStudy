@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 /** Placeholder for modules that are on the roadmap but not built yet. */
 export function ComingSoon({
@@ -11,6 +14,7 @@ export function ComingSoon({
   description: string;
   icon: React.ReactNode;
 }) {
+  const { t } = useT();
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-[560px] flex-col items-center justify-center px-6 text-center">
       <span className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand/10 text-brand">
@@ -19,13 +23,13 @@ export function ComingSoon({
       <h1 className="text-title1 font-bold text-primary">{title}</h1>
       <p className="mt-3 text-body text-secondary">{description}</p>
       <span className="mt-5 rounded-full bg-muted px-3 py-1 text-footnote text-tertiary">
-        В разработке
+        {t('common.inDevelopment')}
       </span>
       <Link
         href="/"
         className="mt-8 inline-flex items-center gap-2 text-footnote font-medium text-brand hover:underline"
       >
-        <ArrowLeft size={15} /> На главную
+        <ArrowLeft size={15} /> {t('common.backHome')}
       </Link>
     </main>
   );

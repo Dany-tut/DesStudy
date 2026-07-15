@@ -111,7 +111,7 @@ export const dictionaries = {
       title: 'Достижения',
       emptyDescription: 'Пройди первое упражнение, и здесь появятся бейджи за прогресс.',
       unlocked: {
-        one: '{done} из {total} бейджа разблокировано.',
+        one: '{done} из {total} бейджей разблокировано.',
         few: '{done} из {total} бейджей разблокировано.',
         many: '{done} из {total} бейджей разблокировано.',
       } as PluralForms,

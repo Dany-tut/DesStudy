@@ -5,17 +5,19 @@ import { prisma } from '@/lib/db';
 import { totalLessons } from '@/content/curriculum';
 import { ACHIEVEMENTS, type AchievementStats } from '@/content/achievements';
 import { ComingSoon } from '@/components/shell/ComingSoon';
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AchievementsPage() {
+  const { t, tp } = await getT();
   const learner = await getLearner();
 
   if (!learner) {
     return (
       <ComingSoon
-        title="Достижения"
-        description="Пройди первое упражнение, и здесь появятся бейджи за прогресс."
+        title={t('achievements.title')}
+        description={t('achievements.emptyDescription')}
         icon={<Trophy size={28} />}
       />
     );
@@ -41,9 +43,12 @@ export default async function AchievementsPage() {
 
   return (
     <main className="mx-auto max-w-[1200px] px-8 py-16">
-      <h1 className="text-title1 font-bold text-primary">Достижения</h1>
+      <h1 className="text-title1 font-bold text-primary">{t('achievements.title')}</h1>
       <p className="mt-2 text-body text-secondary">
-        {unlocked.length} из {ACHIEVEMENTS.length} бейджей разблокировано.
+        {tp('achievements.unlocked', unlocked.length, {
+          done: unlocked.length,
+          total: ACHIEVEMENTS.length,
+        })}
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -53,7 +58,7 @@ export default async function AchievementsPage() {
             <div
               key={a.id}
               className={[
-                'flex items-center gap-4 rounded-2xl border p-5 transition-base',
+                'gem-wrap flex items-center gap-4 rounded-2xl border p-5 transition-base',
                 done ? 'border-brand/40 bg-brand/[0.06]' : 'border-border bg-surface',
               ].join(' ')}
             >

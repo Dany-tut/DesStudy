@@ -1,4 +1,10 @@
 import type { ExerciseDraft } from '@/components/admin/ExerciseFieldsEditor';
+import type { CritiqueZone } from '@/lib/curriculum/types';
+import {
+  premiumCardCritique,
+  PREMIUM_CARD_SCREEN_TITLE,
+  PREMIUM_CARD_ZONES,
+} from '@/lib/curriculum/screenCritique';
 
 function rid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
@@ -28,6 +34,9 @@ export function emptyDraft(type: ExerciseDraft['type']): ExerciseDraft {
     checklist: [],
     accept: 'image/png,image/jpeg,application/pdf',
     maxSizeMB: 8,
+    scene: 'premium-card',
+    screenTitle: '',
+    zones: [],
   };
   if (type === 'choose') {
     const a = rid('opt');
@@ -46,6 +55,15 @@ export function emptyDraft(type: ExerciseDraft['type']): ExerciseDraft {
       { id: b, label: '' },
     ];
     base.correctOrder = [a, b];
+  }
+  if (type === 'screen-critique') {
+    // Seed from the built-in scene so the teacher has a full, editable draft.
+    const seed = premiumCardCritique(base.id);
+    base.prompt = seed.prompt;
+    base.explanation = seed.explanation;
+    base.scene = seed.scene;
+    base.screenTitle = seed.screenTitle;
+    base.zones = JSON.parse(JSON.stringify(seed.zones)) as CritiqueZone[];
   }
   return base;
 }
@@ -95,6 +113,12 @@ export function payloadToDraft(payload: Record<string, unknown>): ExerciseDraft 
     d.maxSizeMB = Number(payload.maxSizeMB ?? 8);
     d.checklist = (payload.checklist as string[]) ?? [];
   }
+  if (payload.type === 'screen-critique') {
+    d.scene = (payload.scene as string) || 'premium-card';
+    d.screenTitle = (payload.screenTitle as string) || PREMIUM_CARD_SCREEN_TITLE;
+    const zones = payload.zones as CritiqueZone[] | undefined;
+    d.zones = zones && zones.length ? zones : (JSON.parse(JSON.stringify(PREMIUM_CARD_ZONES)) as CritiqueZone[]);
+  }
   return d;
 }
 
@@ -138,6 +162,13 @@ export function draftToPayload(d: ExerciseDraft): Record<string, unknown> {
         accept: d.accept,
         maxSizeMB: d.maxSizeMB,
         checklist: d.checklist.filter(Boolean),
+      };
+    case 'screen-critique':
+      return {
+        ...base,
+        scene: d.scene,
+        screenTitle: d.screenTitle,
+        zones: d.zones,
       };
   }
 }

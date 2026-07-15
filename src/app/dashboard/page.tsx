@@ -12,22 +12,23 @@ import {
 import { getLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
 import { PATHS } from '@/content/curriculum';
+import { getT } from '@/lib/i18n/server';
+import type { Translator } from '@/lib/i18n/translator';
 
 export const dynamic = 'force-dynamic';
 
 const ALL_LESSONS = PATHS.flatMap((p) => p.lessons);
 
 export default async function DashboardPage() {
+  const { t, tp } = await getT();
   const learner = await getLearner();
 
   if (!learner) {
     return (
       <main className="mx-auto max-w-[1200px] px-8 py-16">
-        <h1 className="text-title1 font-bold text-primary">Дашборд</h1>
-        <p className="mt-3 text-body text-secondary">
-          Пройди первое упражнение, и здесь появится твой прогресс.
-        </p>
-        <StartLink slug={ALL_LESSONS[0]?.slug} />
+        <h1 className="text-title1 font-bold text-primary">{t('dashboard.title')}</h1>
+        <p className="mt-3 text-body text-secondary">{t('dashboard.emptySubtitle')}</p>
+        <StartLink slug={ALL_LESSONS[0]?.slug} label={t('dashboard.continueLearning')} />
       </main>
     );
   }
@@ -56,28 +57,28 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-[1200px] px-8 py-16">
-      <h1 className="text-title1 font-bold text-primary">Дашборд</h1>
-      <p className="mt-2 text-body text-secondary">Твой измеримый прогресс.</p>
+      <h1 className="text-title1 font-bold text-primary">{t('dashboard.title')}</h1>
+      <p className="mt-2 text-body text-secondary">{t('dashboard.subtitle')}</p>
 
       {/* Stat tiles */}
       <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <Stat icon={<Zap size={18} className="text-brand" />} label="XP" value={learner.xp} />
+        <Stat icon={<Zap size={18} className="text-brand" />} label={t('dashboard.xp')} value={learner.xp} />
         <Stat
           icon={<Flame size={18} className="text-warning" />}
-          label="Стрик"
-          value={`${learner.streak} дн.`}
+          label={t('dashboard.streak')}
+          value={tp('common.days', learner.streak)}
         />
         <Stat
           icon={<BookOpen size={18} className="text-success" />}
-          label="Уроков пройдено"
+          label={t('dashboard.lessonsCompleted')}
           value={lessons.filter((l) => l.completed).length}
         />
       </div>
 
       {/* Lessons */}
-      <h2 className="mb-4 mt-12 text-title3 font-semibold text-primary">Уроки</h2>
+      <h2 className="mb-4 mt-12 text-title3 font-semibold text-primary">{t('dashboard.lessons')}</h2>
       {lessons.length === 0 ? (
-        <p className="text-body text-tertiary">Пока нет активных уроков.</p>
+        <p className="text-body text-tertiary">{t('dashboard.noLessons')}</p>
       ) : (
         <div className="space-y-3">
           {lessons.map((l) => {
@@ -105,12 +106,12 @@ export default async function DashboardPage() {
       {ranked.length > 0 && (
         <div className="mt-12 grid gap-6 sm:grid-cols-2">
           <SkillList
-            title="Слабые навыки"
+            title={t('dashboard.weakSkills')}
             icon={<TrendingDown size={16} className="text-danger" />}
             items={weak}
           />
           <SkillList
-            title="Сильные навыки"
+            title={t('dashboard.strongSkills')}
             icon={<TrendingUp size={16} className="text-success" />}
             items={strong}
           />
@@ -120,7 +121,7 @@ export default async function DashboardPage() {
       {/* Activity feed */}
       {attempts.length > 0 && (
         <>
-          <h2 className="mb-4 mt-12 text-title3 font-semibold text-primary">Недавняя активность</h2>
+          <h2 className="mb-4 mt-12 text-title3 font-semibold text-primary">{t('dashboard.recentActivity')}</h2>
           <ul className="space-y-2">
             {attempts.map((a) => (
               <li
@@ -137,7 +138,7 @@ export default async function DashboardPage() {
                   <span className="ml-2 text-footnote text-tertiary">{a.skill}</span>
                 </span>
                 <span className="text-footnote tabular-nums text-tertiary">
-                  {formatWhen(a.createdAt)}
+                  {formatWhen(a.createdAt, t)}
                 </span>
               </li>
             ))}
@@ -145,7 +146,10 @@ export default async function DashboardPage() {
         </>
       )}
 
-      <StartLink slug={startSlug} done={allDone} />
+      <StartLink
+        slug={startSlug}
+        label={allDone ? t('dashboard.allDone') : t('dashboard.continueLearning')}
+      />
     </main>
   );
 }
@@ -154,15 +158,15 @@ function lessonTitle(slug: string): string {
   return ALL_LESSONS.find((l) => l.slug === slug)?.title ?? slug;
 }
 
-function formatWhen(date: Date): string {
+function formatWhen(date: Date, t: Translator['t']): string {
   const diffMs = Date.now() - new Date(date).getTime();
   const mins = Math.round(diffMs / 60000);
-  if (mins < 1) return 'сейчас';
-  if (mins < 60) return `${mins} мин назад`;
+  if (mins < 1) return t('dashboard.justNow');
+  if (mins < 60) return t('dashboard.minsAgo', { count: mins });
   const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours} ч назад`;
+  if (hours < 24) return t('dashboard.hoursAgo', { count: hours });
   const days = Math.round(hours / 24);
-  return `${days} дн назад`;
+  return t('dashboard.daysAgo', { count: days });
 }
 
 function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
@@ -205,15 +209,14 @@ function SkillList({
   );
 }
 
-function StartLink({ slug, done }: { slug?: string; done?: boolean }) {
+function StartLink({ slug, label }: { slug?: string; label: string }) {
   if (!slug) return null;
   return (
     <Link
       href={`/learn/${slug}`}
       className="mt-10 inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-3 text-callout font-medium text-on-brand transition-base hover:bg-brand-hover"
     >
-      {done ? 'Вся программа пройдена — повторить урок' : 'Продолжить обучение'}{' '}
-      <ArrowRight size={16} />
+      {label} <ArrowRight size={16} />
     </Link>
   );
 }
