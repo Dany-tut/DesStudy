@@ -330,4 +330,4 @@ const Highlight = forwardRef<HTMLDivElement, { box: Box; kind: 'select' | 'hover
       }}
     />
   );
-}
+});
