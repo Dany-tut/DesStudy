@@ -94,18 +94,33 @@ function ValueBubble({ text }: { text: string }) {
   );
 }
 
+// The particle overlay extends this far above/below the track so sparks can fly
+// clear of it in every direction — the celebration isn't clipped to the slider.
+const PARTICLE_PAD = 64; // px of vertical overflow on each side
+
 /**
- * A stream of glowing sparks that shoot out of the thumb and race back along the
- * filled track, fading as they go — a "charged" celebration when the answer
- * lands. Particles are emitted at the fill edge (thumb center) with an energetic
- * leftward velocity plus vertical jitter, drawn with additive glow + a motion
- * trail, and recycled once spent. Clipped to the filled width so nothing spills
- * past the fill edge.
+ * A burst of glowing sparks that erupt from the thumb and fly outward in every
+ * direction — up, down, and out to the sides — arcing under a little gravity and
+ * fading as they go, like Telegram Premium's star bursts. A "charged"
+ * celebration when the answer lands. Emitted continuously from the thumb center,
+ * drawn with additive glow + a motion trail, recycled once spent. The canvas is
+ * larger than the track (see PARTICLE_PAD) and unclipped so nothing is cut off.
  */
-function TrackParticles({ fillW, height }: { fillW: number; height: number }) {
+function TrackParticles({
+  trackW,
+  thumbX,
+  height,
+}: {
+  trackW: number;
+  thumbX: number;
+  height: number;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fillRef = useRef(fillW);
-  fillRef.current = fillW;
+  // Emission follows the live thumb position; canvas spans the whole track.
+  const thumbRef = useRef(thumbX);
+  thumbRef.current = thumbX;
+  const trackRef = useRef(trackW);
+  trackRef.current = trackW;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -128,29 +143,29 @@ function TrackParticles({ fillW, height }: { fillW: number; height: number }) {
     let seed = 20259;
     const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
 
-    // Particles live in canvas px. Emitted at the right edge (thumb), flying left
-    // at a *sustained* speed so each spark streaks the whole filled track (rather
-    // than stalling near the thumb) before it's recycled at the left edge.
-    type P = { x: number; y: number; vx: number; vy: number; r: number };
-    const N = 30;
+    // Particles live in canvas px. Erupt from the thumb in all directions.
+    type P = { x: number; y: number; vx: number; vy: number; r: number; life: number; max: number };
+    const N = 48;
+    const H = height + PARTICLE_PAD * 2;
     const midY = () => canvas.height / 2;
 
     const spawn = (p: P, initial = false) => {
-      // New sparks launch from the thumb; on first fill, scatter across the whole
-      // track so the stream reads as full immediately.
-      p.x = initial ? rnd() * canvas.width : canvas.width - 2 * dpr;
-      p.y = midY() + (rnd() - 0.5) * canvas.height * 0.55;
-      // Gentle leftward drift (no decay) — travel = speed × lifetime spans the
-      // full width. Slower than before so the stream reads as a soft glide rather
-      // than buckshot; faster sparks still streak ahead for a layered feel.
-      p.vx = -(3.2 + rnd() * 3) * dpr;
-      // Real vertical spread so sparks fan out sideways, not just along the track.
-      p.vy = (rnd() - 0.5) * 0.5 * dpr;
-      p.r = (0.8 + rnd() * 1.8) * dpr;
+      const ox = thumbRef.current * dpr; // thumb center in canvas px
+      const ang = rnd() * Math.PI * 2; // full 360° spray
+      const spd = (2.4 + rnd() * 6.2) * dpr; // energetic, varied
+      p.vx = Math.cos(ang) * spd;
+      p.vy = Math.sin(ang) * spd - 1.1 * dpr; // slight upward bias
+      p.r = (0.7 + rnd() * 2.1) * dpr;
+      p.max = 46 + rnd() * 74;
+      p.life = initial ? rnd() * p.max : 0;
+      // Offset an initial particle along its own trajectory so the first frame
+      // already shows a full, in-flight burst rather than a point.
+      p.x = ox + p.vx * p.life;
+      p.y = midY() + p.vy * p.life;
     };
 
     const ps: P[] = Array.from({ length: N }, () => {
-      const p: P = { x: 0, y: 0, vx: 0, vy: 0, r: 0 };
+      const p: P = { x: 0, y: 0, vx: 0, vy: 0, r: 0, life: 0, max: 1 };
       spawn(p, true);
       return p;
     });
@@ -160,11 +175,11 @@ function TrackParticles({ fillW, height }: { fillW: number; height: number }) {
 
     const resize = (w: number) => {
       canvas.width = Math.max(1, Math.round(w * dpr));
-      canvas.height = Math.round(height * dpr);
+      canvas.height = Math.round(H * dpr);
       canvas.style.width = `${w}px`;
-      canvas.style.height = `${height}px`;
+      canvas.style.height = `${H}px`;
     };
-    resize(fillRef.current);
+    resize(trackRef.current);
 
     const dot = (x: number, y: number, rad: number, a: number) => {
       const grd = ctx.createRadialGradient(x, y, 0, x, y, rad * 4);
@@ -178,24 +193,24 @@ function TrackParticles({ fillW, height }: { fillW: number; height: number }) {
     };
 
     const draw = () => {
-      const w = fillRef.current;
+      const w = trackRef.current;
       if (Math.abs(w * dpr - canvas.width) > 1) resize(w);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.globalCompositeOperation = 'lighter';
 
       for (const p of ps) {
+        p.life += 1;
         p.x += p.vx;
         p.y += p.vy;
-        // Fade along the flight: quick fade-in leaving the thumb, then fade out as
-        // the spark nears the far (left) edge. `prog` is 0 at the thumb → 1 at 0.
-        const prog = 1 - p.x / Math.max(1, canvas.width);
-        const a =
-          Math.max(0, Math.min(1, prog < 0.12 ? prog / 0.12 : 1 - Math.max(0, prog - 0.7) / 0.3)) *
-          0.85;
-        // Motion trail streaming back toward the thumb (opposite travel).
-        dot(p.x - p.vx * 1.6, p.y, p.r * 0.7, a * 0.4);
+        p.vy += 0.035 * dpr; // gentle gravity → arcing trajectories
+        p.vx *= 0.99; // mild air drag
+        // Quick fade-in off the thumb, then a long fade out over the lifetime.
+        const t = p.life / p.max;
+        const a = Math.max(0, Math.min(1, t < 0.1 ? t / 0.1 : 1 - (t - 0.1) / 0.9)) * 0.9;
+        // Motion trail streaming back along the flight path.
+        dot(p.x - p.vx * 1.5, p.y - p.vy * 1.5, p.r * 0.7, a * 0.4);
         dot(p.x, p.y, p.r, a);
-        if (p.x < -4 * dpr) spawn(p);
+        if (p.life >= p.max) spawn(p);
       }
       if (alive) raf = requestAnimationFrame(draw);
     };
@@ -210,7 +225,7 @@ function TrackParticles({ fillW, height }: { fillW: number; height: number }) {
     <canvas
       ref={canvasRef}
       className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2"
-      style={{ borderRadius: 9999, width: fillW, height }}
+      style={{ width: trackW, height: height + PARTICLE_PAD * 2 }}
       aria-hidden
     />
   );
@@ -344,7 +359,7 @@ export function Slider({
       {/* Track + floating bubble */}
       <div ref={trackRef} className="relative">
         {celebrate && trackW > 0 && (
-          <TrackParticles fillW={(pct / 100) * trackW} height={14} />
+          <TrackParticles trackW={trackW} thumbX={centerX} height={14} />
         )}
         <div
           ref={bubbleRef}

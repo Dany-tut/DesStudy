@@ -1,0 +1,191 @@
+/**
+ * SVG → layer tree. The pure core, `svgToScreen(doc)`, walks a parsed SVG
+ * Document using only the standard DOM interface, so it runs both in the browser
+ * (native DOMParser) and under test (xmldom). It MUTATES the document — tagging
+ * every layer node with `data-layer-id` — so the caller can serialize the same
+ * tree for the canvas and later find nodes by id for selection highlights.
+ *
+ * Geometry is intentionally NOT fully resolved (no transform-matrix math): the
+ * canvas renders the original SVG for faithful pixels and measures nodes via the
+ * DOM. What we extract here is STRUCTURE (names, nesting, type) + the few props
+ * the teacher edits (radius / fill / text). Best-effort by design.
+ */
+import type { Layer, LayerType, ParsedScreen, ParseResult, LayerProps } from './types';
+
+/** Tags Figma/most tools leave out of the visible tree — skip when walking. */
+const SKIP_TAGS = new Set(['defs', 'clippath', 'lineargradient', 'radialgradient', 'pattern', 'mask', 'filter', 'title', 'desc', 'metadata', 'style', 'symbol', 'use']);
+
+const VECTOR_TAGS = new Set(['path', 'circle', 'ellipse', 'polygon', 'polyline', 'line']);
+
+function localName(el: Element): string {
+  // xmldom exposes tagName with namespace prefix sometimes; normalize.
+  return (el.localName || el.tagName || '').toLowerCase().replace(/^.*:/, '');
+}
+
+function typeOf(tag: string): LayerType {
+  if (tag === 'g' || tag === 'svg') return 'frame';
+  if (tag === 'text' || tag === 'tspan') return 'text';
+  if (tag === 'rect') return 'block';
+  if (tag === 'image') return 'image';
+  return 'vector';
+}
+
+/** Pull a style property out of an inline `style="a:b; c:d"` attribute. */
+function styleProp(el: Element, prop: string): string | undefined {
+  const style = el.getAttribute('style');
+  if (!style) return undefined;
+  const m = style.match(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, 'i'));
+  return m ? m[1].trim() : undefined;
+}
+
+/** attribute-or-style lookup, attribute wins. */
+function attrOrStyle(el: Element, name: string): string | undefined {
+  const a = el.getAttribute(name);
+  if (a != null && a !== '') return a;
+  return styleProp(el, name);
+}
+
+function num(v: string | undefined): number | undefined {
+  if (v == null) return undefined;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Name from the most explicit source available, else a type-derived fallback. */
+function nameOf(el: Element, tag: string, index: number): string {
+  const explicit =
+    el.getAttribute('data-name') ||
+    el.getAttribute('aria-label') ||
+    el.getAttribute('id');
+  if (explicit && explicit.trim()) return explicit.trim();
+
+  // A <title> child (Figma "Include 'id' attribute" off but titles on).
+  for (let i = 0; i < el.childNodes.length; i++) {
+    const c = el.childNodes[i] as Element;
+    if (c.nodeType === 1 && localName(c) === 'title' && c.textContent?.trim()) {
+      return c.textContent.trim();
+    }
+  }
+
+  const fallback: Record<LayerType, string> = {
+    frame: 'Группа', text: 'Текст', block: 'Блок', image: 'Картинка', vector: 'Вектор',
+  };
+  return `${fallback[typeOf(tag)]} ${index + 1}`;
+}
+
+function textContent(el: Element): string {
+  return (el.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
+function extractProps(el: Element, tag: string): LayerProps {
+  const props: LayerProps = {};
+  const fill = attrOrStyle(el, 'fill');
+
+  if (tag === 'rect') {
+    props.radius = num(el.getAttribute('rx')) ?? num(el.getAttribute('ry'));
+    if (fill && fill !== 'none') props.fill = fill;
+    const x = num(el.getAttribute('x')), y = num(el.getAttribute('y'));
+    const w = num(el.getAttribute('width')), h = num(el.getAttribute('height'));
+    if (x != null && y != null && w != null && h != null) props.box = { x, y, w, h };
+  } else if (tag === 'text' || tag === 'tspan') {
+    props.text = textContent(el);
+    props.fontSize = num(attrOrStyle(el, 'font-size'));
+    props.fontWeight = attrOrStyle(el, 'font-weight');
+    if (fill && fill !== 'none') props.color = fill;
+  } else if (tag === 'image') {
+    const x = num(el.getAttribute('x')), y = num(el.getAttribute('y'));
+    const w = num(el.getAttribute('width')), h = num(el.getAttribute('height'));
+    if (x != null && y != null && w != null && h != null) props.box = { x, y, w, h };
+  } else {
+    if (fill && fill !== 'none') props.fill = fill;
+  }
+  return props;
+}
+
+/** Walk one element's graphical children into Layers. `counter` gives every
+ *  layer a document-unique id (and drives fallback names). */
+function walkChildren(el: Element, counter: { n: number }): Layer[] {
+  const out: Layer[] = [];
+  let siblingIndex = 0;
+  for (let i = 0; i < el.childNodes.length; i++) {
+    const node = el.childNodes[i];
+    if (node.nodeType !== 1) continue; // elements only
+    const child = node as Element;
+    const tag = localName(child);
+    if (SKIP_TAGS.has(tag)) continue;
+
+    const id = `L${counter.n++}`;
+    child.setAttribute('data-layer-id', id);
+
+    const type = typeOf(tag);
+    // Text is a leaf — don't descend into tspans as separate layers; the text
+    // content is already flattened into props.
+    const children = tag === 'text' || VECTOR_TAGS.has(tag) ? [] : walkChildren(child, counter);
+
+    out.push({
+      id,
+      name: nameOf(child, tag, siblingIndex),
+      type,
+      props: extractProps(child, tag),
+      children,
+    });
+    siblingIndex++;
+  }
+  return out;
+}
+
+/** viewBox "minX minY w h" → {w,h}; falls back to width/height attributes. */
+function screenSize(svg: Element): { width: number; height: number } {
+  const vb = svg.getAttribute('viewBox');
+  if (vb) {
+    const p = vb.trim().split(/[\s,]+/).map(Number);
+    if (p.length === 4 && p.every(Number.isFinite)) return { width: p[2], height: p[3] };
+  }
+  return {
+    width: num(svg.getAttribute('width')) ?? 0,
+    height: num(svg.getAttribute('height')) ?? 0,
+  };
+}
+
+/** Pure core: parse a DOM Document into a ParsedScreen, mutating it in place
+ *  (adds data-layer-id to every layer node). Throws only on a missing svg root. */
+export function svgToScreen(doc: Document): ParsedScreen {
+  const svg = doc.documentElement && localName(doc.documentElement) === 'svg'
+    ? doc.documentElement
+    : doc.getElementsByTagName('svg')[0];
+  if (!svg) throw new Error('no_svg_root');
+
+  const { width, height } = screenSize(svg);
+  const layers = walkChildren(svg, { n: 0 });
+  return { width, height, layers };
+}
+
+/** Browser entry: parse an SVG string → tree + the (tagged) markup to render.
+ *  Never throws — parse problems come back in `errors`. */
+export function parseSvgToLayers(svgText: string): ParseResult {
+  const empty: ParseResult = { screen: { width: 0, height: 0, layers: [] }, svg: '', errors: [] };
+  if (!svgText.trim()) return { ...empty, errors: ['Файл пустой.'] };
+
+  let doc: Document;
+  try {
+    doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+  } catch {
+    return { ...empty, errors: ['Не удалось разобрать файл как SVG.'] };
+  }
+  // DOMParser reports XML errors as a <parsererror> node instead of throwing.
+  if (doc.getElementsByTagName('parsererror').length > 0) {
+    return { ...empty, errors: ['Файл содержит ошибки разметки SVG.'] };
+  }
+
+  let screen: ParsedScreen;
+  try {
+    screen = svgToScreen(doc);
+  } catch {
+    return { ...empty, errors: ['В файле нет корневого <svg>.'] };
+  }
+
+  const rootSvg = localName(doc.documentElement) === 'svg' ? doc.documentElement : doc.getElementsByTagName('svg')[0];
+  const svg = new XMLSerializer().serializeToString(rootSvg);
+  const errors = screen.layers.length === 0 ? ['В SVG не найдено слоёв для разбора.'] : [];
+  return { screen, svg, errors };
+}
