@@ -8,11 +8,15 @@ export interface AchievementStats {
   firstTryCount: number;
 }
 
+import type { GemTone } from '@/components/achievements/CrystalGem';
+
 export interface Achievement {
   id: string;
   title: string;
   description: string;
   emoji: string;
+  /** Which faceted crystal to render for this badge. */
+  tone: GemTone;
   check: (s: AchievementStats) => boolean;
 }
 
@@ -20,6 +24,7 @@ export interface Achievement {
 export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'first-steps',
+    tone: 'sapphire',
     title: 'Первые шаги',
     description: 'Пройди свой первый урок',
     emoji: '👣',
@@ -27,6 +32,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'five-lessons',
+    tone: 'sapphire',
     title: 'Пять уроков',
     description: 'Пройди 5 уроков',
     emoji: '📚',
@@ -34,6 +40,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'full-program',
+    tone: 'gold',
     title: 'Вся программа',
     description: 'Пройди всю программу целиком',
     emoji: '🏆',
@@ -41,6 +48,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'streak-3',
+    tone: 'ember',
     title: 'Разогрев',
     description: 'Занимайся 3 дня подряд',
     emoji: '🔥',
@@ -48,6 +56,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'streak-7',
+    tone: 'ember',
     title: 'Неделя без пропусков',
     description: 'Занимайся 7 дней подряд',
     emoji: '🔥',
@@ -55,6 +64,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'streak-30',
+    tone: 'ember',
     title: 'Железная дисциплина',
     description: 'Занимайся 30 дней подряд',
     emoji: '🔥',
@@ -62,6 +72,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'xp-100',
+    tone: 'amethyst',
     title: '100 XP',
     description: 'Набери 100 очков опыта',
     emoji: '⚡',
@@ -69,6 +80,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'xp-500',
+    tone: 'amethyst',
     title: '500 XP',
     description: 'Набери 500 очков опыта',
     emoji: '⚡',
@@ -76,6 +88,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'xp-1000',
+    tone: 'amethyst',
     title: '1000 XP',
     description: 'Набери 1000 очков опыта',
     emoji: '⚡',
@@ -83,6 +96,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'skill-master',
+    tone: 'emerald',
     title: 'Мастер навыка',
     description: 'Держи точность 90%+ в каком-то навыке (от 5 попыток)',
     emoji: '🎯',
@@ -90,6 +104,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'first-try-5',
+    tone: 'emerald',
     title: 'С первой попытки',
     description: 'Реши 5 заданий с первой попытки',
     emoji: '✨',

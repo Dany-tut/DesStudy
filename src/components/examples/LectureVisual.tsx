@@ -30,6 +30,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { ExampleVisual } from './ExampleVisual';
+import { LectureInteractive, LECTURE_INTERACTIVE_KEYS } from './LectureInteractive';
 
 /**
  * Interactive schemas for the Figma intro lecture — the click-to-reveal
@@ -38,6 +39,7 @@ import { ExampleVisual } from './ExampleVisual';
  * section's `visual` can point at either.
  */
 export function LectureVisual({ visual }: { visual: string }) {
+  if (LECTURE_INTERACTIVE_KEYS.includes(visual)) return <LectureInteractive visual={visual} />;
   if (visual === 'figma-toolbar') return <Picker items={TOOLBAR} />;
   if (visual === 'figma-canvas') return <Picker items={CANVAS_PANELS} />;
   if (visual === 'figma-modes') return <Picker items={MODES} />;

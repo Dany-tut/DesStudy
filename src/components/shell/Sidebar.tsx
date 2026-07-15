@@ -15,17 +15,19 @@ import {
   MoreHorizontal,
   X,
 } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
-type NavItem = { href: string; label: string; icon: typeof Home; soon?: boolean };
+/** Nav entries carry a translation key; the label is resolved at render. */
+type NavItem = { href: string; labelKey: string; icon: typeof Home; soon?: boolean };
 
 const NAV: NavItem[] = [
-  { href: '/', label: 'Главная', icon: Home },
-  { href: '/learn', label: 'Обучение', icon: GraduationCap },
-  { href: '/dashboard', label: 'Дашборд', icon: LayoutDashboard },
-  { href: '/library', label: 'Библиотека', icon: Library, soon: true },
-  { href: '/mentor', label: 'AI-ментор', icon: Sparkles, soon: true },
-  { href: '/achievements', label: 'Достижения', icon: Trophy },
-  { href: '/design-system', label: 'Дизайн-система', icon: Palette },
+  { href: '/', labelKey: 'nav.home', icon: Home },
+  { href: '/learn', labelKey: 'nav.learn', icon: GraduationCap },
+  { href: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+  { href: '/library', labelKey: 'nav.library', icon: Library, soon: true },
+  { href: '/mentor', labelKey: 'nav.mentor', icon: Sparkles, soon: true },
+  { href: '/achievements', labelKey: 'nav.achievements', icon: Trophy },
+  { href: '/design-system', labelKey: 'nav.designSystem', icon: Palette },
 ];
 
 /** Primary destinations for the mobile bottom bar; the rest live under "Ещё". */
@@ -54,7 +56,7 @@ export function Sidebar() {
           </nav>
           <div className="mt-auto border-t border-border/60 pt-2">
             <SidebarLink
-              item={{ href: '/settings', label: 'Настройки', icon: Settings }}
+              item={{ href: '/settings', labelKey: 'nav.settings', icon: Settings }}
               active={isActive('/settings')}
             />
           </div>
@@ -68,7 +70,8 @@ export function Sidebar() {
 }
 
 function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
-  const { href, label, icon: Icon, soon } = item;
+  const { href, labelKey, icon: Icon, soon } = item;
+  const { t } = useT();
   return (
     <Link
       href={href}
@@ -80,13 +83,13 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
       ].join(' ')}
     >
       <Icon size={20} className={active ? 'text-brand' : ''} />
-      <span className="flex-1">{label}</span>
+      <span className="flex-1">{t(labelKey)}</span>
       {soon && (
         <span
           className="rounded-full bg-muted text-caption font-medium leading-none text-tertiary"
           style={{ padding: '3px 8px' }}
         >
-          скоро
+          {t('common.soon')}
         </span>
       )}
     </Link>
@@ -94,11 +97,12 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
 }
 
 function BottomBar({ isActive }: { isActive: (href: string) => boolean }) {
+  const { t } = useT();
   const [sheet, setSheet] = useState(false);
   const primary = NAV.filter((i) => PRIMARY.includes(i.href));
   const rest = NAV.filter((i) => !PRIMARY.includes(i.href)).concat({
     href: '/settings',
-    label: 'Настройки',
+    labelKey: 'nav.settings',
     icon: Settings,
   });
   const moreActive = rest.some((i) => isActive(i.href));
@@ -114,16 +118,16 @@ function BottomBar({ isActive }: { isActive: (href: string) => boolean }) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-1 flex items-center justify-between px-3 pt-2">
-              <span className="text-footnote font-medium text-secondary">Разделы</span>
+              <span className="text-footnote font-medium text-secondary">{t('nav.sections')}</span>
               <button
                 onClick={() => setSheet(false)}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-tertiary transition-fast hover:bg-hover"
-                aria-label="Закрыть"
+                aria-label={t('nav.close')}
               >
                 <X size={18} />
               </button>
             </div>
-            {rest.map(({ href, label, icon: Icon, soon }) => (
+            {rest.map(({ href, labelKey, icon: Icon, soon }) => (
               <Link
                 key={href}
                 href={href}
@@ -136,8 +140,8 @@ function BottomBar({ isActive }: { isActive: (href: string) => boolean }) {
                 ].join(' ')}
               >
                 <Icon size={18} className={isActive(href) ? 'text-brand' : 'text-secondary'} />
-                <span className="flex-1">{label}</span>
-                {soon && <span className="text-caption text-tertiary">скоро</span>}
+                <span className="flex-1">{t(labelKey)}</span>
+                {soon && <span className="text-caption text-tertiary">{t('common.soon')}</span>}
               </Link>
             ))}
           </div>
@@ -149,8 +153,8 @@ function BottomBar({ isActive }: { isActive: (href: string) => boolean }) {
         className="glass fixed inset-x-0 bottom-0 z-sticky mx-auto mb-[max(12px,env(safe-area-inset-bottom))] flex w-[calc(100%-24px)] max-w-md items-stretch justify-around rounded-2xl p-1.5 shadow-lg md:hidden"
         style={{ left: 12, right: 12 }}
       >
-        {primary.map(({ href, label, icon: Icon }) => (
-          <Tab key={href} href={href} label={label} Icon={Icon} active={isActive(href)} />
+        {primary.map(({ href, labelKey, icon: Icon }) => (
+          <Tab key={href} href={href} label={t(labelKey)} Icon={Icon} active={isActive(href)} />
         ))}
         <button
           onClick={() => setSheet(true)}
@@ -160,7 +164,7 @@ function BottomBar({ isActive }: { isActive: (href: string) => boolean }) {
           ].join(' ')}
         >
           <MoreHorizontal size={20} />
-          <span className="text-caption font-medium">Ещё</span>
+          <span className="text-caption font-medium">{t('nav.more')}</span>
         </button>
       </nav>
     </>

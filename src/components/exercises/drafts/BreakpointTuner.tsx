@@ -1,46 +1,39 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Check } from 'lucide-react';
+import { Slider } from '@/components/ui/Slider';
 
 /**
- * DRAFT exercise — "breakpoint-tuner": a resizable viewport preview. The learner
- * drags a width handle (320–960px); the card grid inside reflows from 1 column
- * to 2 once the width crosses a breakpoint. Task: set the width to exactly the
- * point where a single column starts to feel too wide (the target breakpoint,
- * with tolerance) — so the switch is chosen by eye, not memorised. Correct when
- * within tolerance. Self-contained; own state.
+ * DRAFT exercise — "breakpoint-tuner". The learner widens a preview viewport
+ * (320–960px); inside, a single column of cards holds a line of text. The point
+ * of the exercise is the *reason* a breakpoint exists: a single column works
+ * until its content line grows past a comfortable reading measure — then you
+ * split into 2 columns so each element stays narrow again.
+ *
+ * So the "why" is made visible: a dashed guide marks the comfortable measure
+ * (≈ MEASURE px). While the column is narrower than that, one column reads fine.
+ * Once the text line overshoots the guide, the line is too long — that's the
+ * breakpoint. Feedback is directional (too narrow / here / too wide) rather than
+ * a hidden magic number. Uses the design-system Slider. Self-contained.
  */
 
 const MIN = 320;
 const MAX = 960;
-const TARGET = 640; // where 1-col line length gets uncomfortable
-const TOL = 30;
+const MEASURE = 640; // comfortable max line length for one column
+const TOL = 30; // how close counts as "found the breakpoint"
 
 export function BreakpointTuner() {
-  const trackRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(360);
 
-  const twoCol = width >= TARGET;
-  const solved = Math.abs(width - TARGET) <= TOL;
+  // The learner tunes a SINGLE column and watches its text line grow toward a
+  // comfort guide. Solved when the line's end lands on the guide (±TOL). Past it
+  // the line is too long — that's exactly why one would break to 2 columns.
+  const solved = Math.abs(width - MEASURE) <= TOL;
+  const tooNarrow = width < MEASURE - TOL;
 
-  function startDrag(e: React.PointerEvent) {
-    e.preventDefault();
-    const track = trackRef.current?.getBoundingClientRect();
-    if (!track) return;
-    const move = (ev: PointerEvent) => {
-      const ratio = (ev.clientX - track.left) / track.width;
-      setWidth(Math.round(Math.max(MIN, Math.min(MAX, MIN + ratio * (MAX - MIN)))));
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  }
-
-  const pct = ((width - MIN) / (MAX - MIN)) * 100;
+  // How far the text line overshoots the comfort guide, as % of the column.
+  const overshoot = Math.max(0, ((width - MEASURE) / width) * 100);
 
   return (
     <div className="w-full max-w-[640px] rounded-2xl border border-border bg-surface p-5">
@@ -48,7 +41,7 @@ export function BreakpointTuner() {
         <div>
           <p className="text-caption font-semibold uppercase tracking-wide text-tertiary">Задание</p>
           <p className="mt-1 text-callout font-semibold text-primary">
-            Найди ширину, где раскладка должна перейти на 2 колонки
+            Расширяй колонку, пока строка не станет слишком длинной для чтения — там и стоит перейти на 2 колонки
           </p>
         </div>
         <span
@@ -62,51 +55,71 @@ export function BreakpointTuner() {
         </span>
       </div>
 
-      {/* Viewport preview — the card container is exactly `width` px wide. */}
+      {/* Viewport preview — one column, exactly `width` px wide, with a comfort
+          guide the learner is tuning the text line up to. */}
       <div className="overflow-hidden rounded-xl border border-border bg-canvas p-4">
-        <div className="mx-auto transition-none" style={{ width }}>
-          <div className={twoCol ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-3'}>
-            {Array.from({ length: 4 }).map((_, i) => (
+        <div className="relative mx-auto" style={{ width }}>
+          {/* Comfortable-measure guide (the reading limit). */}
+          <div
+            className="pointer-events-none absolute inset-y-0 z-10 border-r border-dashed border-success/70"
+            style={{ left: Math.min(width, MEASURE) }}
+            aria-hidden
+          />
+          <div className="grid grid-cols-1 gap-3">
+            {Array.from({ length: 2 }).map((_, i) => (
               <div key={i} className="rounded-lg border border-border bg-surface p-3">
-                <div className="mb-2 h-3 w-1/2 rounded-sm bg-brand/60" />
-                <div className="mb-1.5 h-2 w-full rounded-sm bg-tertiary/30" />
-                <div className="h-2 w-4/5 rounded-sm bg-tertiary/25" />
+                <div className="mb-2 h-3 w-1/3 rounded-sm bg-brand/60" />
+                {/* The content line = full column width. The part spilling past
+                    the comfort guide is tinted, so "too long" is literal. */}
+                <div className="relative h-2 w-full overflow-hidden rounded-sm bg-tertiary/30">
+                  {overshoot > 0 && (
+                    <div
+                      className="absolute inset-y-0 right-0 bg-warning/70"
+                      style={{ width: `${overshoot}%` }}
+                    />
+                  )}
+                </div>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Width drag track */}
-      <div className="mt-5">
-        <div ref={trackRef} className="relative h-2 w-full rounded-full bg-muted">
-          {/* Target zone */}
-          <div
-            className="absolute inset-y-0 rounded-full bg-success/25"
-            style={{
-              left: `${((TARGET - TOL - MIN) / (MAX - MIN)) * 100}%`,
-              width: `${((2 * TOL) / (MAX - MIN)) * 100}%`,
-            }}
-          />
-          <div className="absolute inset-y-0 rounded-full bg-brand" style={{ width: `${pct}%` }} />
-          <button
-            type="button"
-            onPointerDown={startDrag}
-            aria-label="Тянуть ширину экрана"
-            className="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-border bg-elevated shadow-sm"
-            style={{ left: `${pct}%` }}
-          />
+      {/* Payoff: once found, show what the breakpoint buys — 2 tidy columns. */}
+      {solved && (
+        <div className="mt-3 rounded-xl border border-success/30 bg-success/10 p-3">
+          <div className="grid grid-cols-2 gap-3">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="rounded-lg border border-border bg-surface p-3">
+                <div className="mb-2 h-3 w-1/2 rounded-sm bg-brand/60" />
+                <div className="h-2 w-full rounded-sm bg-tertiary/30" />
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-caption text-success">
+            ↑ На этой ширине разбиваем на 2 колонки — каждая строка снова короткая.
+          </p>
         </div>
-        <div className="mt-2 flex justify-between text-caption tabular-nums text-tertiary">
-          <span>{MIN}px</span>
-          <span>{MAX}px</span>
-        </div>
+      )}
+
+      <div className="mt-6">
+        <Slider
+          value={width}
+          min={MIN}
+          max={MAX}
+          step={10}
+          unit="px"
+          celebrate={solved}
+          onChange={setWidth}
+        />
       </div>
 
-      <p className="mt-4 text-footnote text-secondary">
+      <p className="mt-2 text-footnote text-secondary">
         {solved
-          ? `Верно — около ${TARGET}px строка в одну колонку становится слишком длинной, пора делить.`
-          : `Подсказка: цель ≈ ${TARGET}px (±${TOL}). Сейчас ${width}px — ${twoCol ? '2 колонки' : '1 колонка'}.`}
+          ? `Здесь строка в одну колонку дошла до предела комфортной длины (≈${MEASURE}px). Дальше её лучше разбить на 2 колонки — так каждый элемент снова узкий и читаемый.`
+          : tooNarrow
+            ? 'Пока узко — одна колонка ещё читается спокойно. Тяни шире, пока строка не начнёт «переливаться» за пунктирную границу.'
+            : 'Уже широко — строка растянулась за границу комфорта (жёлтая зона). Именно поэтому здесь пора на 2 колонки; можно чуть назад, к точке перехода.'}
       </p>
     </div>
   );

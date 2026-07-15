@@ -1,4 +1,5 @@
-import { Trophy, Lock } from 'lucide-react';
+import { Trophy } from 'lucide-react';
+import { CrystalGem } from '@/components/achievements/CrystalGem';
 import { getLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
 import { totalLessons } from '@/content/curriculum';
@@ -52,20 +53,17 @@ export default async function AchievementsPage() {
             <div
               key={a.id}
               className={[
-                'flex items-start gap-4 rounded-xl border p-5 transition-base',
-                done ? 'border-brand bg-brand/10' : 'border-border bg-surface opacity-60',
+                'flex items-center gap-4 rounded-2xl border p-5 transition-base',
+                done ? 'border-brand/40 bg-brand/[0.06]' : 'border-border bg-surface',
               ].join(' ')}
             >
-              <span
-                className={[
-                  'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl',
-                  done ? 'bg-brand/10' : 'bg-muted grayscale',
-                ].join(' ')}
-              >
-                {done ? a.emoji : <Lock size={18} className="text-tertiary" />}
+              <span className="shrink-0">
+                <CrystalGem tone={a.tone} locked={!done} size={64} />
               </span>
               <div>
-                <p className="text-callout font-semibold text-primary">{a.title}</p>
+                <p className={['text-callout font-semibold', done ? 'text-primary' : 'text-secondary'].join(' ')}>
+                  {a.title}
+                </p>
                 <p className="mt-1 text-footnote text-tertiary">{a.description}</p>
               </div>
             </div>

@@ -27,6 +27,7 @@ import { ScaleRamp } from '@/components/exercises/drafts/ScaleRamp';
 import { Hotspot } from '@/components/exercises/drafts/Hotspot';
 import { TrimZone } from '@/components/exercises/TrimZone';
 import { NestedRadius } from '@/components/exercises/NestedRadius';
+import { CritiqueEditorVariants } from '@/components/admin/critique/CritiqueEditorVariants';
 import { StatesLab } from '@/components/exercises/drafts/StatesLab';
 import { SpotDiff } from '@/components/exercises/drafts/SpotDiff';
 import { TapTarget } from '@/components/exercises/drafts/TapTarget';
@@ -390,6 +391,10 @@ export default function DesignSystemPage() {
 
       <Section title="Screen-critique — поставь диагноз сам («screen-critique»)">
         <ScreenCritique />
+      </Section>
+
+      <Section title="Screen-critique · редактор критериев для учителя — 3 варианта на выбор">
+        <CritiqueEditorVariants />
       </Section>
 
       <Section title="Spot-diff — найди несогласованность («spot-diff»)">

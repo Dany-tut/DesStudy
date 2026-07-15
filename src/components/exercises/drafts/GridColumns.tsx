@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Check, RotateCcw } from 'lucide-react';
 import { Stepper } from '@/components/ui/Stepper';
-import { Slider } from '@/components/ui/Slider';
 
 /**
  * DRAFT exercise — "grid-columns": match a target layout grid. The learner sets
@@ -83,10 +82,22 @@ export function GridColumns() {
       {/* Controls */}
       <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-8">
         <Stepper label="Колонки" value={cols} unit="" min={MIN_COLS} max={MAX_COLS} step={1} onChange={setCols} />
-        <div className="min-w-0 flex-1">
-          <p className="mb-1.5 text-footnote text-secondary">Гаттер</p>
-          <Slider value={gutter} min={MIN_GUTTER} max={MAX_GUTTER} step={2} unit="px" onChange={setGutter} />
-        </div>
+        <label className="block min-w-0 flex-1">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-footnote text-secondary">Гаттер</span>
+            <span className="text-footnote text-tertiary tabular-nums">{gutter}px</span>
+          </div>
+          <input
+            type="range"
+            min={MIN_GUTTER}
+            max={MAX_GUTTER}
+            step={2}
+            value={gutter}
+            onChange={(e) => setGutter(Number(e.target.value))}
+            className="ui-slider ui-slider--chunky"
+            style={{ '--pct': `${((gutter - MIN_GUTTER) / (MAX_GUTTER - MIN_GUTTER)) * 100}%` } as React.CSSProperties}
+          />
+        </label>
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">

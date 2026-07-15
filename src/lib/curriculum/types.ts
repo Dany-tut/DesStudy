@@ -472,6 +472,8 @@ export type CritiqueDefectId =
   | 'contrast'
   | 'alignment'
   | 'consistency'
+  | 'typography'
+  | 'spacing'
   | 'none';
 
 /** One reconstruction option for a zone's defect; exactly one is `correct`. */

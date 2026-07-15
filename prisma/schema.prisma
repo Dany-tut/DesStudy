@@ -20,6 +20,10 @@ model Learner {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
+  // ФИ — captured on the first step of the entry assessment (grading test).
+  // Null until the learner introduces themselves; "letit prepodu" via /admin/results.
+  name String?
+
   // Gamification / retention (PRD §8, §13)
   xp           Int      @default(0)
   streak       Int      @default(0)
@@ -29,6 +33,46 @@ model Learner {
   progress    LessonProgress[]
   skills      SkillStat[]
   submissions Submission[]
+  assessments Assessment[]
+  enrollments Enrollment[]
+}
+
+/// A purchasable course. Seeded manually for the MVP (no course-authoring UI yet);
+/// the teacher attaches one to a learner via Enrollment to track their progress.
+model Course {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  createdAt DateTime @default(now())
+
+  enrollments Enrollment[]
+}
+
+/// Teacher-assigned link between a learner and a course they bought.
+model Enrollment {
+  learner   Learner  @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  learnerId String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  courseId  String
+  createdAt DateTime @default(now())
+
+  @@id([learnerId, courseId])
+}
+
+/// One completed run of the entry grading test. Per-skill levels and category
+/// grades are stored as JSON strings (same pattern as ContentBlock.payload) so
+/// the 25-skill taxonomy lives in one place — src/lib/assessment/taxonomy.ts —
+/// not as columns to migrate on every taxonomy tweak.
+model Assessment {
+  id             String   @id @default(cuid())
+  learner        Learner  @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  learnerId      String
+  grade          String // 'junior' | 'middle' | 'senior'
+  scores         String // JSON: Record<skillId, 1..4>
+  categoryGrades String // JSON: Record<category, { grade, avg }>
+  createdAt      DateTime @default(now())
+
+  @@index([learnerId])
 }
 
 /// One recorded attempt at one exercise (PRD §7: Attempts, Average Score).

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Palette, Accessibility } from 'lucide-react';
+import { Palette, Accessibility, Languages } from 'lucide-react';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Switch } from '@/components/ui/Switch';
 import {
@@ -12,8 +12,11 @@ import {
   saveSettings,
   applySettings,
 } from '@/lib/settings';
+import { LOCALES, LOCALE_NAMES, type Locale } from '@/lib/i18n/config';
+import { useI18n } from '@/lib/i18n/client';
 
 export default function SettingsPage() {
+  const { t, locale, setLocale } = useI18n();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [ready, setReady] = useState(false);
 

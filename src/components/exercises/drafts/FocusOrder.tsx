@@ -77,7 +77,7 @@ export function FocusOrder() {
         </span>
       </div>
 
-      <div className="relative h-64 w-full overflow-hidden rounded-xl border border-border bg-canvas">
+      <div className="relative h-40 w-full overflow-hidden rounded-xl border border-border bg-canvas">
         {FIELDS.map((f) => {
           const idx = seq.indexOf(f.id);
           const done = idx !== -1;
