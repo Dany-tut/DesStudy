@@ -375,3 +375,23 @@ export const QUESTIONS: Question[] = [
 if (QUESTIONS.length !== 25) {
   throw new Error(`Assessment must have 25 questions, got ${QUESTIONS.length}`);
 }
+
+export const QUESTION_BY_SKILL: Record<string, Question> = Object.fromEntries(
+  QUESTIONS.map((q) => [q.skillId, q]),
+);
+
+/**
+ * The descriptor of a given level for a skill — i.e. the answer option text at
+ * that level. This is what the FormFactor "grade card" spells out per cell; we
+ * already carry it as the option label, so the result screen reuses it as
+ * "what your level means" without a duplicated descriptor table.
+ */
+export function levelDescriptor(skillId: string, level: number): string | undefined {
+  return QUESTION_BY_SKILL[skillId]?.options[level - 1]?.label;
+}
+
+/** The next level up (the growth target), or undefined at the ceiling. */
+export function nextLevelDescriptor(skillId: string, level: number): string | undefined {
+  if (level >= 4) return undefined;
+  return QUESTION_BY_SKILL[skillId]?.options[level]?.label;
+}

@@ -14,7 +14,8 @@ function validatePayload(kind: string, payload: Record<string, unknown>) {
 
 /** Append a new block at the end of the lesson. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id: lessonId } = await params;
   let body: Record<string, unknown>;
   try {
@@ -51,7 +52,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
 /** Reorder — body: { order: string[] } — block ids in the desired final order. */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id: lessonId } = await params;
   let body: Record<string, unknown>;
   try {

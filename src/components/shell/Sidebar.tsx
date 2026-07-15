@@ -12,6 +12,8 @@ import {
   Palette,
   Trophy,
   Settings,
+  BookOpen,
+  BarChart3,
   MoreHorizontal,
   X,
 } from 'lucide-react';
@@ -20,6 +22,7 @@ import { useT } from '@/lib/i18n/client';
 /** Nav entries carry a translation key; the label is resolved at render. */
 type NavItem = { href: string; labelKey: string; icon: typeof Home; soon?: boolean };
 
+/** Learner-facing chrome. */
 const NAV: NavItem[] = [
   { href: '/', labelKey: 'nav.home', icon: Home },
   { href: '/learn', labelKey: 'nav.learn', icon: GraduationCap },
@@ -30,16 +33,28 @@ const NAV: NavItem[] = [
   { href: '/design-system', labelKey: 'nav.designSystem', icon: Palette },
 ];
 
+/** Teacher/admin chrome — deliberately not the learner sections. */
+const ADMIN_NAV: NavItem[] = [
+  { href: '/admin', labelKey: 'nav.teacherLessons', icon: BookOpen },
+  { href: '/admin/results', labelKey: 'nav.teacherResults', icon: BarChart3 },
+];
+
 /** Primary destinations for the mobile bottom bar; the rest live under "Ещё". */
 const PRIMARY = ['/', '/learn', '/dashboard', '/design-system'];
 
+/** Hrefs that should only match exactly, so a child route doesn't light the parent. */
+const EXACT = new Set(['/', '/admin']);
+
 function useIsActive() {
   const pathname = usePathname();
-  return (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+  return (href: string) => (EXACT.has(href) ? pathname === href : pathname.startsWith(href));
 }
 
 export function Sidebar() {
+  const pathname = usePathname();
   const isActive = useIsActive();
+  const isAdmin = pathname.startsWith('/admin');
+  const items = isAdmin ? ADMIN_NAV : NAV;
 
   return (
     <>
@@ -47,10 +62,10 @@ export function Sidebar() {
       <aside className="sticky top-0 hidden h-screen w-[272px] shrink-0 p-3 md:block">
         <div className="glass flex h-full flex-col rounded-2xl p-3 shadow-xl">
           <div className="mb-7 px-2 pt-2">
-            <Brand />
+            <Brand isAdmin={isAdmin} />
           </div>
           <nav className="flex flex-col gap-1">
-            {NAV.map((item) => (
+            {items.map((item) => (
               <SidebarLink key={item.href} item={item} active={isActive(item.href)} />
             ))}
           </nav>
@@ -64,7 +79,7 @@ export function Sidebar() {
       </aside>
 
       {/* Mobile bottom floating bar */}
-      <BottomBar isActive={isActive} />
+      <BottomBar isActive={isActive} items={items} isAdmin={isAdmin} />
     </>
   );
 }
@@ -96,15 +111,22 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
   );
 }
 
-function BottomBar({ isActive }: { isActive: (href: string) => boolean }) {
+function BottomBar({
+  isActive,
+  items,
+  isAdmin,
+}: {
+  isActive: (href: string) => boolean;
+  items: NavItem[];
+  isAdmin: boolean;
+}) {
   const { t } = useT();
   const [sheet, setSheet] = useState(false);
-  const primary = NAV.filter((i) => PRIMARY.includes(i.href));
-  const rest = NAV.filter((i) => !PRIMARY.includes(i.href)).concat({
-    href: '/settings',
-    labelKey: 'nav.settings',
-    icon: Settings,
-  });
+  const settings: NavItem = { href: '/settings', labelKey: 'nav.settings', icon: Settings };
+  // Teacher chrome is short enough to sit fully in the bar; only the learner set
+  // overflows into the "Ещё" sheet.
+  const primary = isAdmin ? items : items.filter((i) => PRIMARY.includes(i.href));
+  const rest = isAdmin ? [settings] : items.filter((i) => !PRIMARY.includes(i.href)).concat(settings);
   const moreActive = rest.some((i) => isActive(i.href));
 
   return (
@@ -196,9 +218,9 @@ function Tab({
   );
 }
 
-function Brand() {
+function Brand({ isAdmin = false }: { isAdmin?: boolean }) {
   return (
-    <Link href="/" className="flex items-center gap-2">
+    <Link href={isAdmin ? '/admin' : '/'} className="flex items-center gap-2">
       <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-on-brand">
         <GraduationCap size={18} />
       </span>

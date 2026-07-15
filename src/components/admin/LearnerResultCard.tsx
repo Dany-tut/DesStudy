@@ -5,8 +5,10 @@ import { GraduationCap, Plus, Check } from 'lucide-react';
 import { RadarChart } from '@/components/assessment/RadarChart';
 import { DotBar } from '@/components/assessment/ResultScreen';
 import { CATEGORIES, SKILL_BY_ID, type SkillLevel } from '@/lib/assessment/taxonomy';
-import { computeGrade, growthSkills, type Scores } from '@/lib/assessment/grade';
+import { computeGrade, growthSkills, SALARY_BANDS, type Scores } from '@/lib/assessment/grade';
+import { nextLevelDescriptor } from '@/lib/assessment/questions';
 import { recommendationFor } from '@/lib/assessment/recommendations';
+import type { Grade } from '@/lib/assessment/taxonomy';
 
 export interface CourseOption {
   id: string;
@@ -67,6 +69,11 @@ export function LearnerResultCard({
             <p className="text-caption text-tertiary">
               грейд <span className="capitalize text-brand">{grade}</span> · {takenAt}
             </p>
+            {SALARY_BANDS[grade as Grade] && (
+              <p className="mt-0.5 text-caption tabular-nums text-tertiary">
+                вилка {SALARY_BANDS[grade as Grade].min}–{SALARY_BANDS[grade as Grade].max}к ₽
+              </p>
+            )}
           </div>
           <RadarChart
             axes={CATEGORIES.map((c) => ({
@@ -75,6 +82,7 @@ export function LearnerResultCard({
             }))}
             size={200}
             animate={false}
+            showLabels={false}
           />
         </div>
 
@@ -100,15 +108,16 @@ export function LearnerResultCard({
               <p className="text-footnote text-tertiary">Слабых навыков нет — крепкий профиль.</p>
             )}
             {growth.map((skillId) => {
-              const rec = recommendationFor(skillId);
+              const level = (scores[skillId] ?? 1) as SkillLevel;
+              const target = nextLevelDescriptor(skillId, level) ?? recommendationFor(skillId).lessons[0]?.title;
               return (
                 <div key={skillId} className="flex items-center justify-between gap-3">
-                  <span className="text-footnote text-primary">{SKILL_BY_ID[skillId].label}</span>
+                  <span className="shrink-0 text-footnote text-primary">{SKILL_BY_ID[skillId].label}</span>
                   <div className="flex items-center gap-3">
-                    <span className="max-w-[220px] truncate text-caption text-tertiary">
-                      {rec.lessons[0]?.title ?? rec.video?.title ?? '—'}
+                    <span className="max-w-[260px] truncate text-caption text-tertiary" title={target}>
+                      → {target ?? '—'}
                     </span>
-                    <DotBar level={(scores[skillId] ?? 1) as SkillLevel} />
+                    <DotBar level={level} />
                   </div>
                 </div>
               );

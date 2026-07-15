@@ -29,8 +29,8 @@ export function RadarChart({
 }) {
   const cx = size / 2;
   const cy = size / 2;
-  // Leave room for labels around the plot.
-  const radius = size / 2 - (showLabels ? size * 0.16 : size * 0.04);
+  // Leave room for labels around the plot (they sit outside the last ring).
+  const radius = size / 2 - (showLabels ? size * 0.2 : size * 0.04);
   const n = axes.length;
 
   // Angle for axis i, starting at the top (−90°) and going clockwise.
@@ -112,7 +112,7 @@ export function RadarChart({
       {/* axis labels */}
       {showLabels &&
         axes.map((a, i) => {
-          const p = pointAt(i, radius + size * 0.085);
+          const p = pointAt(i, radius + size * 0.055);
           const anchor =
             Math.abs(p.x - cx) < 4 ? 'middle' : p.x > cx ? 'start' : 'end';
           return (

@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { Check, X } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 // Default hotspot zone, expressed in % relative to the mockup container.
 // The tiny primary button sits in the bottom-right corner — that's the problem.
@@ -26,6 +27,7 @@ export function Hotspot({
   disabled?: boolean;
   onChange?: (point: { x: number; y: number }) => void;
 } = {}) {
+  const { t } = useT();
   const controlled = onChange !== undefined;
   const ZONE = zone;
   const [internalMarker, setInternalMarker] = useState<Marker | null>(null);
@@ -59,9 +61,9 @@ export function Hotspot({
     <div className={controlled ? '' : 'rounded-xl border border-border bg-surface p-5'}>
       {!controlled && (
         <div className="mb-4">
-          <h3 className="text-title3 text-primary">Найди проблему</h3>
+          <h3 className="text-title3 text-primary">{t('exercises.hotspot.title')}</h3>
           <p className="mt-1 text-footnote text-secondary">
-            Где нарушена доступность тапа? Кликни по проблемному месту.
+            {t('exercises.hotspot.subtitle')}
           </p>
         </div>
       )}
@@ -75,7 +77,7 @@ export function Hotspot({
       >
         {/* Header bar */}
         <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-4">
-          <span className="text-callout font-semibold text-primary">Профиль</span>
+          <span className="text-callout font-semibold text-primary">{t('exercises.hotspot.profile')}</span>
           <div className="flex gap-2">
             <div className="h-2 w-2 rounded-full bg-muted" />
             <div className="h-2 w-2 rounded-full bg-muted" />
@@ -85,7 +87,11 @@ export function Hotspot({
 
         {/* List rows */}
         <div className="flex flex-col">
-          {['Уведомления', 'Приватность', 'Внешний вид'].map((row) => (
+          {[
+            t('exercises.hotspot.rowNotifications'),
+            t('exercises.hotspot.rowPrivacy'),
+            t('exercises.hotspot.rowAppearance'),
+          ].map((row) => (
             <div
               key={row}
               className="flex items-center gap-3 border-b border-border px-4 py-4"
@@ -166,15 +172,15 @@ export function Hotspot({
           )}
           <span className="text-footnote">
             {marker.correct
-              ? 'Верно — цель слишком мелкая (меньше 44px)'
-              : 'Не тут — посмотри на элементы действия'}
+              ? t('exercises.hotspot.correct')
+              : t('exercises.hotspot.wrong')}
           </span>
         </div>
       )}
 
       {!controlled && !marker && (
         <p className="mt-4 text-caption text-tertiary">
-          Подсказка: минимальный размер тап-цели — 44×44px.
+          {t('exercises.hotspot.hint')}
         </p>
       )}
     </div>

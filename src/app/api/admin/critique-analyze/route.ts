@@ -14,7 +14,8 @@ const ALLOWED: CritiqueImageMediaType[] = [
 
 /** Admin-only: analyze an uploaded screen and propose critique zones. */
 export async function POST(req: NextRequest) {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   let body: {
     imageBase64?: string;

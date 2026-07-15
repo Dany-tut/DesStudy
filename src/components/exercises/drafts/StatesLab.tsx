@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Check } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 type StateKey = 'default' | 'hover' | 'active' | 'focus' | 'disabled';
 
@@ -13,27 +14,28 @@ const STATES: { key: StateKey; label: string }[] = [
   { key: 'disabled', label: 'Disabled' },
 ];
 
-/** Token recipe per state — what changes relative to the resting button. */
+/** Token recipe per state — what changes relative to the resting button.
+ *  `note` holds a translation key resolved at render via t(). */
 const RECIPES: Record<StateKey, { tokens: string[]; note: string }> = {
   default: {
     tokens: ['bg-brand', 'text-on-brand', 'rounded-lg'],
-    note: 'Базовое состояние — цвет бренда, читаемый текст.',
+    note: 'exercises.statesLab.noteDefault',
   },
   hover: {
     tokens: ['bg-brand-hover', 'cursor-pointer'],
-    note: 'Курсор наведён — фон чуть темнее, сигнал «кликабельно».',
+    note: 'exercises.statesLab.noteHover',
   },
   active: {
     tokens: ['bg-pressed', 'scale-95'],
-    note: 'Нажатие — самый тёмный фон и лёгкое сжатие.',
+    note: 'exercises.statesLab.noteActive',
   },
   focus: {
     tokens: ['ring-2 ring-brand', 'outline-none'],
-    note: 'Фокус с клавиатуры — кольцо вокруг кнопки для доступности.',
+    note: 'exercises.statesLab.noteFocus',
   },
   disabled: {
     tokens: ['opacity-50', 'cursor-not-allowed'],
-    note: 'Недоступно — приглушённый вид, действие заблокировано.',
+    note: 'exercises.statesLab.noteDisabled',
   },
 };
 
@@ -51,6 +53,7 @@ export function StatesLab({
   disabled?: boolean;
   onChange?: (visited: string[]) => void;
 } = {}) {
+  const { t } = useT();
   const controlled = onChange !== undefined;
   // Which state the learner forced via the pill row.
   const [forced, setForced] = useState<StateKey>('default');
@@ -101,9 +104,9 @@ export function StatesLab({
     <div className="flex flex-col gap-6 rounded-xl border border-border bg-surface p-5 sm:rounded-2xl lg:rounded-3xl">
       {/* Header */}
       <div>
-        <h3 className="text-callout font-semibold text-primary">Лаборатория состояний</h3>
+        <h3 className="text-callout font-semibold text-primary">{t('exercises.statesLab.title')}</h3>
         <p className="mt-1 text-footnote text-secondary">
-          Кнопка должна ясно отвечать на действия. Переключай состояния и сверяй рецепт токенов.
+          {t('exercises.statesLab.subtitle')}
         </p>
       </div>
 
@@ -134,7 +137,7 @@ export function StatesLab({
               ].join(' ')}
               style={{ transform: liveState === 'active' ? 'scale(0.95)' : 'scale(1)' }}
             >
-              Продолжить
+              {t('exercises.statesLab.continueBtn')}
             </button>
           </div>
 
@@ -164,7 +167,7 @@ export function StatesLab({
           </div>
 
           <p className="text-caption text-tertiary">
-            Наведи и нажми кнопку в режиме Default — она реагирует вживую.
+            {t('exercises.statesLab.liveHint')}
           </p>
         </div>
 
@@ -173,13 +176,13 @@ export function StatesLab({
           <div className="rounded-lg border border-border bg-elevated p-4 sm:rounded-xl lg:rounded-2xl">
             <div className="flex items-center justify-between">
               <span className="text-footnote font-semibold text-primary">
-                Рецепт: {STATES.find((s) => s.key === liveState)?.label}
+                {t('exercises.statesLab.recipe', { label: STATES.find((s) => s.key === liveState)?.label ?? '' })}
               </span>
               <span className="rounded-full bg-brand/10 px-2 py-1 text-caption font-medium text-brand">
                 {liveState}
               </span>
             </div>
-            <p className="mt-2 min-h-[2.5rem] text-caption text-secondary">{recipe.note}</p>
+            <p className="mt-2 min-h-[2.5rem] text-caption text-secondary">{t(recipe.note)}</p>
             <ul className="mt-3 flex min-h-[6.75rem] flex-col gap-1">
               {recipe.tokens.map((t) => (
                 <li
@@ -196,7 +199,7 @@ export function StatesLab({
           {/* Checklist / проверка */}
           <div className="rounded-lg border border-border bg-elevated p-4 sm:rounded-xl lg:rounded-2xl">
             <div className="flex items-center justify-between">
-              <span className="text-footnote font-semibold text-primary">Проверка состояний</span>
+              <span className="text-footnote font-semibold text-primary">{t('exercises.statesLab.statesCheck')}</span>
               <span
                 className={[
                   'text-caption font-semibold tabular-nums',
@@ -245,7 +248,7 @@ export function StatesLab({
                   : 'bg-muted text-tertiary',
               ].join(' ')}
             >
-              {allSeen ? 'Все 5 состояний различимы ✓' : 'Осмотри каждое состояние, чтобы закрыть проверку.'}
+              {allSeen ? t('exercises.statesLab.allDistinct') : t('exercises.statesLab.inspectEach')}
             </div>
           </div>
         </div>

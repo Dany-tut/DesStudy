@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Check, RotateCcw } from 'lucide-react';
 import { SPOT_ROUNDS, SPOT_TILES } from '@/lib/curriculum/spotDiff';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * "spot-diff" exercise: a row of near-identical UI tiles, one of which quietly
@@ -27,6 +28,7 @@ export function SpotDiff({
   disabled?: boolean;
   onChange?: (picked: number) => void;
 } = {}) {
+  const { t } = useT();
   const controlled = onChange != null;
   const [internalRound, setInternalRound] = useState(0);
   const [internalPicked, setInternalPicked] = useState<number | null>(null);
@@ -52,9 +54,9 @@ export function SpotDiff({
     <div className="w-full max-w-[520px] rounded-2xl border border-border bg-surface p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <p className="text-caption font-semibold uppercase tracking-wide text-tertiary">Задание</p>
+          <p className="text-caption font-semibold uppercase tracking-wide text-tertiary">{t('exercises.spotDiff.taskLabel')}</p>
           <p className="mt-1 text-callout font-semibold text-primary">
-            Найди плитку, которая выбивается из системы
+            {t('exercises.spotDiff.prompt')}
           </p>
         </div>
         <span
@@ -64,7 +66,7 @@ export function SpotDiff({
           ].join(' ')}
         >
           <Check size={13} strokeWidth={3} />
-          {solved ? 'Готово' : 'В процессе'}
+          {solved ? t('exercises.spotDiff.done') : t('exercises.spotDiff.inProgress')}
         </span>
       </div>
 
@@ -105,10 +107,10 @@ export function SpotDiff({
       <div className="mt-4 flex items-center justify-between gap-3">
         <p className="min-w-0 text-footnote text-secondary">
           {solved
-            ? `Верно — ${round.flaw}.`
+            ? t('exercises.spotDiff.correct', { flaw: round.flaw })
             : wrong
-              ? 'Не эта — приглядись к радиусам, оттенкам и полям.'
-              : 'Три плитки одинаковы, одна — нет.'}
+              ? t('exercises.spotDiff.wrong')
+              : t('exercises.spotDiff.hint')}
         </p>
         {!controlled && (
           <button
@@ -116,7 +118,7 @@ export function SpotDiff({
             onClick={next}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
           >
-            <RotateCcw size={13} /> Другой набор
+            <RotateCcw size={13} /> {t('exercises.spotDiff.otherSet')}
           </button>
         )}
       </div>

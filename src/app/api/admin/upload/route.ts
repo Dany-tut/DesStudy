@@ -22,7 +22,8 @@ function safeFilename(originalName: string) {
  * before deploying to a serverless/multi-instance runtime.
  */
 export async function POST(req: NextRequest) {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   const form = await req.formData();
   const file = form.get('file');

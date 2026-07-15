@@ -2,6 +2,7 @@
 
 import { useState, useRef, useLayoutEffect } from 'react';
 import { Check, RotateCcw } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 import type { MatchPair } from '@/lib/curriculum/types';
 
 /**
@@ -44,6 +45,7 @@ export function MatchPairs({
   disabled?: boolean;
   onChange?: (matched: string[]) => void;
 } = {}) {
+  const { t } = useT();
   const controlled = onChange !== undefined;
   const PAIRS: Pair[] = pairsProp
     ? pairsProp.map((p) => ({ id: p.id, token: p.left, value: p.right }))
@@ -123,7 +125,7 @@ export function MatchPairs({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-footnote font-semibold text-secondary tabular-nums">
-          {done} / {total} сопоставлено
+          {t('exercises.matchPairs.matchedCount', { done, total })}
         </p>
         {!controlled && (
           <button
@@ -131,7 +133,7 @@ export function MatchPairs({
             className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-medium text-secondary transition-fast hover:border-border-strong hover:text-primary active:bg-pressed"
           >
             <RotateCcw size={14} />
-            Сбросить
+            {t('exercises.matchPairs.reset')}
           </button>
         )}
       </div>
@@ -243,7 +245,7 @@ export function MatchPairs({
       {allDone && !controlled && (
         <div className="flex items-center gap-2 rounded-lg border border-success bg-success/10 px-3 py-3 text-callout font-medium text-success">
           <Check size={18} className="shrink-0" />
-          Все пары сопоставлены — отлично!
+          {t('exercises.matchPairs.allMatched')}
         </div>
       )}
 

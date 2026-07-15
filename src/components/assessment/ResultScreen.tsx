@@ -11,8 +11,9 @@ import {
   type Grade,
   type SkillLevel,
 } from '@/lib/assessment/taxonomy';
-import { growthSkills, type GradeResult, type Scores } from '@/lib/assessment/grade';
+import { growthSkills, SALARY_BANDS, type GradeResult, type Scores } from '@/lib/assessment/grade';
 import { SKILL_BY_ID } from '@/lib/assessment/taxonomy';
+import { levelDescriptor, nextLevelDescriptor } from '@/lib/assessment/questions';
 import { recommendationFor } from '@/lib/assessment/recommendations';
 import { Confetti } from './Confetti';
 import { RadarChart } from './RadarChart';
@@ -58,7 +59,10 @@ export function ResultScreen({
         <h1 className="mt-1 text-display font-bold capitalize text-primary">
           {GRADE_LABEL[result.grade]}
         </h1>
-        <p className="mt-2 max-w-[420px] text-body text-secondary">
+        <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/5 px-3.5 py-1.5 text-footnote font-medium text-brand tabular-nums">
+          вилка {SALARY_BANDS[result.grade].min}–{SALARY_BANDS[result.grade].max}к ₽
+        </span>
+        <p className="mt-3 max-w-[420px] text-body text-secondary">
           {GRADE_TAGLINE[result.grade]}
         </p>
       </motion.div>
@@ -67,7 +71,7 @@ export function ResultScreen({
       <div className="mt-10 flex justify-center">
         <RadarChart
           axes={CATEGORIES.map((c) => ({
-            label: c.title,
+            label: c.short,
             value: result.radar.find((r) => r.category === c.id)?.value ?? 0,
           }))}
           size={340}
@@ -113,12 +117,27 @@ export function ResultScreen({
             {growth.map((skillId) => {
               const skill = SKILL_BY_ID[skillId];
               const rec = recommendationFor(skillId);
+              const level = (scores[skillId] ?? 1) as SkillLevel;
+              const current = levelDescriptor(skillId, level);
+              const target = nextLevelDescriptor(skillId, level);
               return (
                 <div key={skillId} className="rounded-xl border border-border bg-surface p-5">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <h3 className="text-callout font-semibold text-primary">{skill.label}</h3>
-                    <DotBar level={(scores[skillId] ?? 1) as SkillLevel} />
+                    <DotBar level={level} />
                   </div>
+                  {target && (
+                    <div className="mb-4 grid gap-2 sm:grid-cols-2">
+                      <div className="rounded-lg bg-muted px-3 py-2">
+                        <p className="text-caption uppercase tracking-wide text-tertiary">Сейчас</p>
+                        <p className="mt-0.5 text-footnote text-secondary">{current}</p>
+                      </div>
+                      <div className="rounded-lg border border-brand/30 bg-brand/5 px-3 py-2">
+                        <p className="text-caption uppercase tracking-wide text-brand">Следующий уровень</p>
+                        <p className="mt-0.5 text-footnote text-primary">{target}</p>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     {rec.lessons.map((l) => (
                       <Link

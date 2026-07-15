@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Check, Play, Pause } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * DRAFT exercise — "easing-curve": drag the two Bézier control points to match a
@@ -17,12 +18,13 @@ const TOL = 0.12; // per-axis tolerance on control-point match
 
 type Pt = { x: number; y: number }; // 0..1 in easing space (y can overshoot a bit)
 
+// `note` holds a translation key resolved at render via t().
 type Target = { name: string; p1: Pt; p2: Pt; note?: string };
 
 const TARGETS: Target[] = [
-  { name: 'ease-out', p1: { x: 0, y: 0 }, p2: { x: 0.58, y: 1 }, note: 'быстрый старт, мягкая посадка — для входящих элементов' },
-  { name: 'ease-in', p1: { x: 0.42, y: 0 }, p2: { x: 1, y: 1 }, note: 'плавный разгон, резкий уход — для исчезающих' },
-  { name: 'ease-in-out', p1: { x: 0.42, y: 0 }, p2: { x: 0.58, y: 1 }, note: 'симметрично — для перемещений внутри экрана' },
+  { name: 'ease-out', p1: { x: 0, y: 0 }, p2: { x: 0.58, y: 1 }, note: 'exercises.easingCurve.noteEaseOut' },
+  { name: 'ease-in', p1: { x: 0.42, y: 0 }, p2: { x: 1, y: 1 }, note: 'exercises.easingCurve.noteEaseIn' },
+  { name: 'ease-in-out', p1: { x: 0.42, y: 0 }, p2: { x: 0.58, y: 1 }, note: 'exercises.easingCurve.noteEaseInOut' },
 ];
 
 /** easing-space (x right, y up) → svg pixels (y down). */
@@ -48,6 +50,7 @@ export function EasingCurve({
   disabled?: boolean;
   onChange?: (v: EasingValue) => void;
 } = {}) {
+  const { t } = useT();
   const controlled = onChange != null;
   const svgRef = useRef<SVGSVGElement>(null);
   const [targetIdx, setTargetIdx] = useState(0);
@@ -104,9 +107,9 @@ export function EasingCurve({
     <div className="w-full max-w-[560px] rounded-2xl border border-border bg-surface p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <p className="text-caption font-semibold uppercase tracking-wide text-tertiary">Задание</p>
+          <p className="text-caption font-semibold uppercase tracking-wide text-tertiary">{t('exercises.easingCurve.taskLabel')}</p>
           <p className="mt-1 text-callout font-semibold text-primary">
-            Собери кривую <code className="rounded bg-muted px-1.5 py-0.5 text-footnote">{target.name}</code>
+            {t('exercises.easingCurve.buildCurve')} <code className="rounded bg-muted px-1.5 py-0.5 text-footnote">{target.name}</code>
           </p>
         </div>
         <span
@@ -116,7 +119,7 @@ export function EasingCurve({
           ].join(' ')}
         >
           <Check size={13} strokeWidth={3} />
-          {solved ? 'Готово' : 'Подгоняй'}
+          {solved ? t('exercises.easingCurve.done') : t('exercises.easingCurve.tuning')}
         </span>
       </div>
 
@@ -185,11 +188,11 @@ export function EasingCurve({
             >
               {playing ? (
                 <>
-                  <Pause size={13} /> Пауза
+                  <Pause size={13} /> {t('exercises.easingCurve.pause')}
                 </>
               ) : (
                 <>
-                  <Play size={13} /> Проиграть
+                  <Play size={13} /> {t('exercises.easingCurve.play')}
                 </>
               )}
             </button>
@@ -199,7 +202,7 @@ export function EasingCurve({
                 onClick={next}
                 className="shrink-0 whitespace-nowrap rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
               >
-                Другая цель
+                {t('exercises.easingCurve.otherGoal')}
               </button>
             )}
           </div>
@@ -207,7 +210,9 @@ export function EasingCurve({
       </div>
 
       <p className="mt-4 text-footnote text-secondary">
-        {solved ? `Это ${target.name}: ${target.note}.` : 'Совмести сплошную кривую с пунктирной целью.'}
+        {solved
+          ? t('exercises.easingCurve.solvedNote', { name: target.name, note: target.note ? t(target.note) : '' })
+          : t('exercises.easingCurve.hint')}
       </p>
     </div>
   );

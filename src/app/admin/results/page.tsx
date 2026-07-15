@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft, ShieldAlert } from 'lucide-react';
 import { prisma } from '@/lib/db';
-import { requireAdmin } from '@/lib/admin/auth';
+import { requireTeacher } from '@/lib/auth';
 import { LearnerResultCard } from '@/components/admin/LearnerResultCard';
 import type { Scores } from '@/lib/assessment/grade';
 
@@ -14,7 +14,7 @@ function formatDate(d: Date): string {
 /** Teacher view — latest grading-test result per learner, with radar, growth
  *  points and course attachment. */
 export default async function AdminResultsPage() {
-  requireAdmin();
+  await requireTeacher();
 
   const [assessments, courses] = await Promise.all([
     prisma.assessment.findMany({

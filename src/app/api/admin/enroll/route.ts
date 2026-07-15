@@ -13,7 +13,8 @@ interface EnrollBody {
 
 /** Teacher attaches (or detaches) a purchased course to a learner. */
 export async function POST(req: NextRequest) {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
 
   let body: EnrollBody;
   try {

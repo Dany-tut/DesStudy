@@ -15,6 +15,47 @@ datasource db {
   directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
+/// Staff roles. BOSS = platform creator (single, seeded from env); TEACHER =
+/// invited educator who authors lessons/assignments for their own learners.
+/// Learners are NOT Users — they stay cookie-anonymous (see src/lib/learner.ts).
+enum Role {
+  BOSS
+  TEACHER
+}
+
+/// An authenticated staff member (boss or teacher). Email + password credentials
+/// (bcrypt hash); session is a signed JWT cookie — see src/lib/auth/. Distinct
+/// from Learner on purpose: staff log in, learners are anonymous by cookie.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         Role     @default(TEACHER)
+  createdAt    DateTime @default(now())
+
+  invitesCreated Invite[] @relation("InvitesCreated")
+  inviteUsed     Invite?  @relation("InviteUsed")
+}
+
+/// A single-use registration link the boss (or a teacher, later) hands out.
+/// Consuming it creates a User with this `role`. Optional `email` pins the
+/// invite to one address; optional `expiresAt` time-limits it.
+model Invite {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  role        Role      @default(TEACHER)
+  email       String? // optional: restrict/pre-fill the registrant's email
+  createdBy   User      @relation("InvitesCreated", fields: [createdById], references: [id], onDelete: Cascade)
+  createdById String
+  usedBy      User?     @relation("InviteUsed", fields: [usedById], references: [id], onDelete: SetNull)
+  usedById    String?   @unique
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([createdById])
+}
+
 /// An anonymous or (later) authenticated learner. Identified by a cookie for now.
 model Learner {
   id        String   @id @default(cuid())

@@ -7,7 +7,8 @@ export const runtime = 'nodejs';
 
 /** Body: { published: boolean }. Publishing re-validates the full lesson shape first. */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id } = await params;
   let body: Record<string, unknown>;
   try {

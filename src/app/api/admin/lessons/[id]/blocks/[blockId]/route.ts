@@ -16,7 +16,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; blockId: string }> },
 ) {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id: lessonId, blockId } = await params;
   const existing = await prisma.contentBlock.findFirst({ where: { id: blockId, lessonId } });
   if (!existing) return NextResponse.json({ error: 'not_found' }, { status: 404 });
@@ -48,7 +49,8 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; blockId: string }> },
 ) {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id: lessonId, blockId } = await params;
   await prisma.contentBlock.deleteMany({ where: { id: blockId, lessonId } });
   return NextResponse.json({ ok: true });

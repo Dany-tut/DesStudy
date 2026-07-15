@@ -137,6 +137,85 @@ body {
   }
 }
 
+/* Internal glow core + floor caustic breathe together, as if the stone is lit
+ * from within. Used by both the core ellipse and the caustic pool. */
+.gem-core {
+  animation: gem-breathe 3.6s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+@keyframes gem-breathe {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+/* Sparkles wink on and off, scaling from nothing to a bright four-point star. */
+.gem-twinkle {
+  animation: gem-twinkle 2.8s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+@keyframes gem-twinkle {
+  0%,
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(0.2) rotate(0deg);
+  }
+  82% {
+    opacity: 0.95;
+    transform: scale(1) rotate(45deg);
+  }
+}
+
+/* Rare/legendary gems sweep a slow rotating light beam through the body. */
+.gem-beam {
+  animation: gem-beam 5.5s linear infinite;
+  will-change: transform;
+}
+@keyframes gem-beam {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Legendary halo drifts and pulses behind the crown. */
+.gem-halo {
+  animation: gem-halo 4.5s ease-in-out infinite;
+  will-change: opacity, transform;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes gem-halo {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.04);
+  }
+}
+
+/* Locked "sleeping ore" shows a faint breath of colour, brighter on hover —
+ * a hint that the gem is about to wake. */
+.gem-locked-hint {
+  opacity: 0.06;
+  transition: opacity 0.5s ease;
+}
+.gem-wrap:hover .gem-locked-hint {
+  opacity: 0.16;
+}
+
 /*
  * Accessibility preferences (see src/lib/settings.ts). Applied as data-attrs
  * on <html> so they cascade to the whole app.

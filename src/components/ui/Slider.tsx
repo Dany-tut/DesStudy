@@ -140,10 +140,12 @@ function TrackParticles({ fillW, height }: { fillW: number; height: number }) {
       // track so the stream reads as full immediately.
       p.x = initial ? rnd() * canvas.width : canvas.width - 2 * dpr;
       p.y = midY() + (rnd() - 0.5) * canvas.height * 0.55;
-      // Constant leftward drift (no decay) — travel = speed × lifetime spans the
-      // full width. Faster sparks streak ahead of slower ones for a layered feel.
-      p.vx = -(9 + rnd() * 7) * dpr;
-      p.vy = (rnd() - 0.5) * 0.15 * dpr;
+      // Gentle leftward drift (no decay) — travel = speed × lifetime spans the
+      // full width. Slower than before so the stream reads as a soft glide rather
+      // than buckshot; faster sparks still streak ahead for a layered feel.
+      p.vx = -(3.2 + rnd() * 3) * dpr;
+      // Real vertical spread so sparks fan out sideways, not just along the track.
+      p.vy = (rnd() - 0.5) * 0.5 * dpr;
       p.r = (0.8 + rnd() * 1.8) * dpr;
     };
 

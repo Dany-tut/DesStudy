@@ -692,6 +692,8 @@ function CritiqueScreen({
   verdicts: Record<Region, { role?: Verdict; defect?: Verdict; worst?: Verdict }>;
   checked: boolean;
 }) {
+  const { t } = useT();
+  const S = 'exercises.screenCritique.screen';
   // Ring colour for a region: worst verdict after check, brand while selecting.
   const regionStyle = (r: Region): React.CSSProperties => {
     const wv = verdicts[r]?.worst;
@@ -752,9 +754,9 @@ function CritiqueScreen({
         <div className="flex items-start justify-between">
           <div>
             <p className="text-[11px]" style={{ color: APP.textDim }}>
-              Название карты
+              {t(`${S}.cardName`)}
             </p>
-            <p className="text-[15px] font-semibold">Премиум карта</p>
+            <p className="text-[15px] font-semibold">{t(`${S}.cardTitle`)}</p>
           </div>
           <p className="mr-3 mt-3 text-[13px] font-normal tabular-nums" style={{ color: APP.textDim }}>
             980 000 ₽
@@ -793,9 +795,9 @@ function CritiqueScreen({
       >
         <Badge r="actions" />
         {[
-          { icon: CreditCard, label: 'Оплатить', radius: 'rounded-2xl', ml: 0 },
-          { icon: Plus, label: 'Пополнить', radius: 'rounded-none', ml: 6 },
-          { icon: ArrowLeftRight, label: 'Перевести', radius: 'rounded-full', ml: 14 },
+          { icon: CreditCard, label: t(`${S}.payAction`), radius: 'rounded-2xl', ml: 0 },
+          { icon: Plus, label: t(`${S}.topupAction`), radius: 'rounded-none', ml: 6 },
+          { icon: ArrowLeftRight, label: t(`${S}.transferAction`), radius: 'rounded-full', ml: 14 },
         ].map(({ icon: Icon, label, radius, ml }) => (
           <div
             key={label}
@@ -825,14 +827,14 @@ function CritiqueScreen({
           className="max-w-[70%] text-[15px] font-bold leading-tight"
           style={{ color: 'rgba(255,255,255,0.42)' }}
         >
-          Откройте вклад с увеличенной ставкой до 18%
+          {t(`${S}.promo`)}
         </p>
       </div>
 
       {/* Bonuses — DEFECT: заголовок секции слишком мелкий и тусклый, не читается
           как заголовок (сломана иерархия). */}
       <p className="relative z-10 mt-3 text-[10px] font-normal" style={{ color: APP.textDim }}>
-        Бонусы по карте
+        {t(`${S}.bonusesTitle`)}
       </p>
       {/* DEFECT: две карточки рассогласованы — разные поля и скругления, «5%» только
           на одной; сетка не держит систему. */}
@@ -843,8 +845,8 @@ function CritiqueScreen({
       >
         <Badge r="bonuses" />
         {[
-          { icon: Utensils, text: 'Кэшбэк за бронирование ресторанов', pct: '5%', pad: 'p-3', radius: 'rounded-2xl' },
-          { icon: Hotel, text: 'Кэшбэк за бронирование туров и отелей', pct: '', pad: 'p-1.5', radius: 'rounded-md' },
+          { icon: Utensils, text: t(`${S}.bonusRestaurants`), pct: '5%', pad: 'p-3', radius: 'rounded-2xl' },
+          { icon: Hotel, text: t(`${S}.bonusHotels`), pct: '', pad: 'p-1.5', radius: 'rounded-md' },
         ].map(({ icon: Icon, text, pct, pad, radius }) => (
           <div
             key={text}

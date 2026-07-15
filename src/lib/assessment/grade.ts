@@ -36,6 +36,13 @@ export interface GradeResult {
   radar: { category: Category; value: number }[];
 }
 
+/** Salary bands (тыс ₽/мес) per grade, from the FormFactor grade card. */
+export const SALARY_BANDS: Record<Grade, { min: number; max: number }> = {
+  junior: { min: 60, max: 120 },
+  middle: { min: 120, max: 200 },
+  senior: { min: 200, max: 300 },
+};
+
 export function gradeFromAvg(avg: number): Grade {
   if (avg >= GRADE_THRESHOLDS.senior) return 'senior';
   if (avg >= GRADE_THRESHOLDS.middle) return 'middle';

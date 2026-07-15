@@ -6,7 +6,8 @@ import { parseLessonMeta, isValidSlug, ValidationError } from '@/lib/admin/schem
 export const runtime = 'nodejs';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id } = await params;
   const lesson = await prisma.authoredLesson.findUnique({
     where: { id },
@@ -22,7 +23,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id } = await params;
   let body: Record<string, unknown>;
   try {
@@ -76,7 +78,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const { id } = await params;
   await prisma.authoredLesson.delete({ where: { id } }).catch(() => null);
   return NextResponse.json({ ok: true });

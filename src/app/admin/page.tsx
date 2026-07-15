@@ -1,43 +1,75 @@
 import Link from 'next/link';
-import { ShieldAlert } from 'lucide-react';
 import { prisma } from '@/lib/db';
+import { requireTeacher } from '@/lib/auth';
 import { CreateLessonForm } from '@/components/admin/CreateLessonForm';
 import { LessonRow } from '@/components/admin/LessonRow';
+import { InvitesPanel, type InviteRow } from '@/components/admin/InvitesPanel';
+import { SignOutButton } from '@/components/auth/SignOutButton';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Admin — lesson list. No login gate yet (see src/lib/admin/auth.ts):
- * anyone with the URL can reach this. Fine for the current single-teacher MVP;
- * the banner below is the only thing standing in for real access control.
+ * Admin / staff home. Real auth now (middleware guards /admin, this page
+ * resolves the typed user). Lesson authoring is shown to all staff; the
+ * teacher-invite panel is BOSS-only. A dedicated /teacher cabinet comes later.
  */
 export default async function AdminPage() {
-  const rows = await prisma.authoredLesson.findMany({
-    orderBy: { updatedAt: 'desc' },
-    include: { _count: { select: { blocks: true } } },
-  });
+  const user = await requireTeacher();
+  const isBoss = user.role === 'BOSS';
+
+  const [rows, invites] = await Promise.all([
+    prisma.authoredLesson.findMany({
+      orderBy: { updatedAt: 'desc' },
+      include: { _count: { select: { blocks: true } } },
+    }),
+    isBoss
+      ? prisma.invite.findMany({
+          orderBy: { createdAt: 'desc' },
+          include: { usedBy: { select: { email: true } } },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const inviteRows: InviteRow[] = invites.map((i) => ({
+    id: i.id,
+    token: i.token,
+    email: i.email,
+    used: !!i.usedById,
+    usedByEmail: i.usedBy?.email ?? null,
+    expiresAt: i.expiresAt?.toISOString() ?? null,
+    createdAt: i.createdAt.toISOString(),
+  }));
 
   return (
     <main className="mx-auto max-w-[1200px] px-8 py-12">
-      <div className="mb-8 flex items-center gap-2 rounded-lg bg-warning/10 px-4 py-3 text-footnote text-warning">
-        <ShieldAlert size={16} className="shrink-0" />
-        Без защиты входа — временно, пока препод один. Не делись этой ссылкой.
-      </div>
-
       <div className="mb-8 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-title1 font-bold text-primary">Уроки препода</h1>
+          <h1 className="text-title1 font-bold text-primary">
+            {isBoss ? 'Админка' : 'Кабинет преподавателя'}
+          </h1>
           <p className="mt-1 text-footnote text-secondary">
             Собери урок из блоков — теория, видео, задания — и опубликуй его для учеников.
           </p>
         </div>
-        <Link
-          href="/admin/results"
-          className="shrink-0 rounded-lg border border-border bg-surface px-4 py-2.5 text-footnote font-medium text-primary transition-base hover:border-brand"
-        >
-          Результаты теста на грейд →
-        </Link>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="rounded-full border border-border px-3 py-1 text-caption text-secondary">
+            {user.name || user.email} · {isBoss ? 'админ' : 'препод'}
+          </span>
+          <Link
+            href="/admin/results"
+            className="rounded-lg border border-border bg-surface px-4 py-2.5 text-footnote font-medium text-primary transition-base hover:border-brand"
+          >
+            Результаты теста на грейд →
+          </Link>
+          <SignOutButton />
+        </div>
       </div>
+
+      {isBoss && (
+        <div className="mb-10">
+          <InvitesPanel initial={inviteRows} />
+        </div>
+      )}
 
       <div className="mt-8">
         <CreateLessonForm />

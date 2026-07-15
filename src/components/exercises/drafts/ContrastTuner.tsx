@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Check, X } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 function channelToLinear(c: number): number {
   const s = c / 255;
@@ -37,6 +38,7 @@ export function ContrastTuner({
   disabled?: boolean;
   onChange?: (v: { textL: number; bgL: number }) => void;
 } = {}) {
+  const { t } = useT();
   const controlled = onChange !== undefined;
   const [internal, setInternal] = useState({ textL: 38, bgL: 96 });
   const textL = controlled ? value?.textL ?? 38 : internal.textL;
@@ -61,9 +63,9 @@ export function ContrastTuner({
   const bgColor = greyHex(bgL);
 
   const badges = [
-    { key: 'aa', label: 'AA', hint: 'обычный', pass: passAA },
-    { key: 'aa-l', label: 'AA Large', hint: 'крупный', pass: passAALarge },
-    { key: 'aaa', label: 'AAA', hint: 'усиленный', pass: passAAA },
+    { key: 'aa', label: 'AA', hint: t('exercises.contrastTuner.hintNormal'), pass: passAA },
+    { key: 'aa-l', label: 'AA Large', hint: t('exercises.contrastTuner.hintLarge'), pass: passAALarge },
+    { key: 'aaa', label: 'AAA', hint: t('exercises.contrastTuner.hintEnhanced'), pass: passAAA },
   ];
 
   const reached = ratio >= targetRatio;
@@ -72,9 +74,9 @@ export function ContrastTuner({
     <div className={controlled ? '' : 'rounded-xl border border-border bg-surface p-5'}>
       {!controlled && (
         <div className="mb-4">
-          <h3 className="text-title3 text-primary">Тюнинг контраста</h3>
+          <h3 className="text-title3 text-primary">{t('exercises.contrastTuner.title')}</h3>
           <p className="text-footnote text-secondary mt-1">
-            Добейся минимум AA — 4.5:1
+            {t('exercises.contrastTuner.subtitle')}
           </p>
         </div>
       )}
@@ -85,16 +87,16 @@ export function ContrastTuner({
         style={{ backgroundColor: bgColor }}
       >
         <div className="text-title2" style={{ color: textColor }}>
-          Пример текста
+          {t('exercises.contrastTuner.sampleTitle')}
         </div>
         <p className="text-body mt-2" style={{ color: textColor }}>
-          Хороший контраст делает интерфейс читаемым для всех.
+          {t('exercises.contrastTuner.sampleBody')}
         </p>
       </div>
 
       {/* Ratio readout */}
       <div className="mt-4 flex items-center justify-between rounded-lg bg-elevated border border-border px-4 py-3">
-        <span className="text-footnote text-secondary">Контраст</span>
+        <span className="text-footnote text-secondary">{t('exercises.contrastTuner.contrast')}</span>
         <span
           className={`text-title3 tabular-nums ${passAA ? 'text-success' : 'text-danger'}`}
         >
@@ -128,7 +130,7 @@ export function ContrastTuner({
       <div className="mt-5 flex flex-col gap-5">
         <label className="block">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-footnote text-secondary">Светлота текста</span>
+            <span className="text-footnote text-secondary">{t('exercises.contrastTuner.textLightness')}</span>
             <span className="text-footnote text-tertiary tabular-nums">{textL}</span>
           </div>
           <input
@@ -145,7 +147,7 @@ export function ContrastTuner({
 
         <label className="block">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-footnote text-secondary">Светлота фона</span>
+            <span className="text-footnote text-secondary">{t('exercises.contrastTuner.bgLightness')}</span>
             <span className="text-footnote text-tertiary tabular-nums">{bgL}</span>
           </div>
           <input
@@ -164,13 +166,13 @@ export function ContrastTuner({
       {!controlled && passAA && (
         <div className="mt-4 flex items-center gap-2 text-success">
           <Check size={16} strokeWidth={2.5} />
-          <span className="text-footnote">Отлично — контраст проходит AA</span>
+          <span className="text-footnote">{t('exercises.contrastTuner.passesAA')}</span>
         </div>
       )}
       {controlled && reached && (
         <div className="mt-4 flex items-center gap-2 text-success">
           <Check size={16} strokeWidth={2.5} />
-          <span className="text-footnote">Цель {targetRatio}:1 достигнута</span>
+          <span className="text-footnote">{t('exercises.contrastTuner.goalReached', { ratio: targetRatio })}</span>
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, CircleHelp, Lightbulb } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 import type { CritiqueZone, CritiqueImage } from '@/lib/curriculum/types';
 import type { Verdict } from '@/lib/curriculum/screenCritique';
 
@@ -42,10 +43,11 @@ export function ImageScene({
   checked?: boolean;
   interactive?: boolean;
 }) {
+  const { t } = useT();
   return (
     <div className="relative w-[320px] shrink-0 overflow-hidden rounded-2xl border border-border shadow-lg">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={image.url} alt="Экран для разбора" className="block w-full" />
+      <img src={image.url} alt={t('exercises.imageScene.alt')} className="block w-full" />
 
       {zones.map((z) => {
         if (!z.rect) return null;

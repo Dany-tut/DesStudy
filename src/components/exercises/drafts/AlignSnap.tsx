@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Move, Check } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 import type { AlignAnswer } from '@/lib/curriculum/types';
 
 const FRAME_H = 260;
@@ -20,23 +21,13 @@ type Goal = {
   title: string;
 };
 
+// `title` holds a translation key resolved at render via t().
 const GOALS: Goal[] = [
-  { x: 'center', y: 'middle', title: 'Выровняй карточку по центру' },
-  { x: 'left', y: 'top', title: 'Прижми карточку к левому верхнему углу' },
-  { x: 'right', y: 'bottom', title: 'Прижми карточку к правому нижнему углу' },
-  { x: 'right', y: 'top', title: 'Выровняй карточку по правому верхнему краю' },
+  { x: 'center', y: 'middle', title: 'exercises.alignSnap.goalCenter' },
+  { x: 'left', y: 'top', title: 'exercises.alignSnap.goalTopLeft' },
+  { x: 'right', y: 'bottom', title: 'exercises.alignSnap.goalBottomRight' },
+  { x: 'right', y: 'top', title: 'exercises.alignSnap.goalTopRight' },
 ];
-
-const X_LABEL: Record<Exclude<XAlign, null>, string> = {
-  left: 'по левому краю',
-  center: 'по центру',
-  right: 'по правому краю',
-};
-const Y_LABEL: Record<Exclude<YAlign, null>, string> = {
-  top: 'по верху',
-  middle: 'посередине',
-  bottom: 'по низу',
-};
 
 /** Left-edge x-positions of the box for each x guide (given frame width). */
 function xCandidates(w: number) {
@@ -75,6 +66,17 @@ export function AlignSnap({
   disabled?: boolean;
   onChange?: (align: { x: string | null; y: string | null }) => void;
 } = {}) {
+  const { t } = useT();
+  const X_LABEL: Record<Exclude<XAlign, null>, string> = {
+    left: t('exercises.alignSnap.xLeft'),
+    center: t('exercises.alignSnap.xCenter'),
+    right: t('exercises.alignSnap.xRight'),
+  };
+  const Y_LABEL: Record<Exclude<YAlign, null>, string> = {
+    top: t('exercises.alignSnap.yTop'),
+    middle: t('exercises.alignSnap.yMiddle'),
+    bottom: t('exercises.alignSnap.yBottom'),
+  };
   const controlled = onChange !== undefined;
   const frameRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
@@ -160,8 +162,8 @@ export function AlignSnap({
       {!controlled && (
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <p className="text-caption font-semibold uppercase tracking-wide text-tertiary">Задание</p>
-            <p className="mt-1 text-callout font-semibold text-primary">{goal.title}</p>
+            <p className="text-caption font-semibold uppercase tracking-wide text-tertiary">{t('exercises.alignSnap.taskLabel')}</p>
+            <p className="mt-1 text-callout font-semibold text-primary">{t(goal.title)}</p>
           </div>
           <span
             className={[
@@ -170,7 +172,7 @@ export function AlignSnap({
             ].join(' ')}
           >
             <Check size={13} strokeWidth={3} />
-            {solved ? 'Готово' : 'В процессе'}
+            {solved ? t('exercises.alignSnap.done') : t('exercises.alignSnap.inProgress')}
           </span>
         </div>
       )}
@@ -214,7 +216,7 @@ export function AlignSnap({
         <div
           role="button"
           tabIndex={0}
-          aria-label="Перетащи карточку"
+          aria-label={t('exercises.alignSnap.dragCard')}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -227,7 +229,7 @@ export function AlignSnap({
           style={{ left: pos.left, top: pos.top, width: BOX_W, height: BOX_H }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-footnote font-semibold text-primary">Карточка</span>
+            <span className="text-footnote font-semibold text-primary">{t('exercises.alignSnap.card')}</span>
             <Move size={14} className="text-tertiary" />
           </div>
           <div className="h-1 w-10 rounded-full bg-border-strong" />
@@ -249,10 +251,10 @@ export function AlignSnap({
                 ? `${X_LABEL[xAlign][0].toUpperCase()}${X_LABEL[xAlign].slice(1)}`
                 : yAlign
                   ? `${Y_LABEL[yAlign][0].toUpperCase()}${Y_LABEL[yAlign].slice(1)}`
-                  : 'Свободно'}
+                  : t('exercises.alignSnap.free')}
           </p>
           <p className="mt-1 text-caption tabular-nums text-tertiary">
-            x {Math.round(pos.left)} · y {Math.round(pos.top)} · сетка 8pt
+            {t('exercises.alignSnap.readout', { x: Math.round(pos.left), y: Math.round(pos.top) })}
           </p>
         </div>
         {!controlled && (
@@ -261,7 +263,7 @@ export function AlignSnap({
             onClick={nextGoal}
             className="shrink-0 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-semibold text-secondary transition-fast hover:bg-hover active:bg-pressed"
           >
-            Другая цель
+            {t('exercises.alignSnap.otherGoal')}
           </button>
         )}
       </div>

@@ -6,7 +6,8 @@ import { parseLessonMeta, isValidSlug, ValidationError } from '@/lib/admin/schem
 export const runtime = 'nodejs';
 
 export async function GET() {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
   const rows = await prisma.authoredLesson.findMany({
     orderBy: { updatedAt: 'desc' },
     include: { _count: { select: { blocks: true } } },
@@ -24,7 +25,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  requireAdmin();
+  const denied = await requireAdmin();
+  if (denied) return denied;
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;

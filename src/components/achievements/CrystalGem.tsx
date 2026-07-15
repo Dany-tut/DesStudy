@@ -1,16 +1,28 @@
+'use client';
+
+import { useRef, useState } from 'react';
 import { Lock } from 'lucide-react';
 
 /**
  * A faceted, hand-cut crystal rendered in pure SVG — no raster assets. Each
  * achievement family gets its own gem `tone`; locked gems render as a dark,
- * low-contrast rough stone with a lock so the unlock reads as "it comes alive".
+ * "sleeping ore" with a faint hint of their native colour and a lock, so the
+ * unlock reads as "it comes alive".
  *
  * The cut is a hexagonal crystal seen at 3/4: a pointed termination on top,
  * three visible prism faces below, plus specular glints and a floor reflection
  * so it feels like a studio-lit gem rather than a flat icon.
+ *
+ * Richness comes in seven layers: (1) an internal glow core that pulses,
+ * (2) chromatic dispersion along two ridges, (3) a coloured caustic pooled on
+ * the floor, (4) twinkling sparkles, (5) rarity expressed as material — a
+ * rotating light beam for rare/legendary and a floating halo for legendary,
+ * (6) a colour-hinted sleeping state when locked, and (7) a cursor-driven 3D
+ * parallax tilt.
  */
 
 export type GemTone = 'sapphire' | 'ember' | 'amethyst' | 'emerald' | 'gold';
+type Rarity = 'common' | 'rare' | 'legendary';
 
 interface Palette {
   /** brightest catch-light face */ hi: string;
@@ -33,6 +45,29 @@ const LOCKED: Palette = {
   hi: '#4A4F57', light: '#3A3F47', mid: '#2A2E34', dark: '#20242A', deep: '#15181C', glow: '#000000',
 };
 
+/** Rarity drives how much "material" a gem shows — beams, extra sparkle, a halo. */
+const RARITY: Record<GemTone, Rarity> = {
+  sapphire: 'common',
+  amethyst: 'common',
+  ember: 'common',
+  emerald: 'rare',
+  gold: 'legendary',
+};
+
+const prefersReducedMotion = () =>
+  typeof document !== 'undefined' && document.documentElement.getAttribute('data-motion') === 'reduced';
+
+/** A tiny 4-point twinkle centred at (cx,cy) with arm length r. */
+function sparklePath(cx: number, cy: number, r: number) {
+  const w = r * 0.28; // waist thickness
+  return (
+    `M${cx},${cy - r} C${cx + w},${cy - w} ${cx + w},${cy - w} ${cx + r},${cy} ` +
+    `C${cx + w},${cy + w} ${cx + w},${cy + w} ${cx},${cy + r} ` +
+    `C${cx - w},${cy + w} ${cx - w},${cy + w} ${cx - r},${cy} ` +
+    `C${cx - w},${cy - w} ${cx - w},${cy - w} ${cx},${cy - r} Z`
+  );
+}
+
 export function CrystalGem({
   tone,
   locked = false,
@@ -43,131 +78,284 @@ export function CrystalGem({
   size?: number;
 }) {
   const p = locked ? LOCKED : PALETTES[tone];
+  const t = PALETTES[tone]; // native colour, used to hint the locked "sleeping ore"
+  const rarity = RARITY[tone];
   const uid = `${tone}-${locked ? 'off' : 'on'}`;
 
+  // (7) cursor-driven parallax tilt
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+
+  const onMove = (e: React.PointerEvent) => {
+    if (prefersReducedMotion()) return;
+    const el = wrapRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const dx = (e.clientX - (r.left + r.width / 2)) / r.width;
+    const dy = (e.clientY - (r.top + r.height / 2)) / r.height;
+    setTilt({ x: -dy * 8, y: dx * 8 });
+  };
+  const onLeave = () => setTilt({ x: 0, y: 0 });
+
+  const showBeam = !locked && rarity !== 'common';
+  const showHalo = !locked && rarity === 'legendary';
+  // sparkle seeds: [cx, cy, r, delay]
+  const sparkles: [number, number, number, number][] =
+    rarity === 'legendary'
+      ? [
+          [36, 24, 4, 0],
+          [66, 46, 3.2, 0.9],
+          [50, 74, 3.6, 1.7],
+          [30, 60, 2.6, 2.4],
+        ]
+      : rarity === 'rare'
+        ? [
+            [36, 26, 3.6, 0],
+            [64, 52, 3, 1.2],
+          ]
+        : [[38, 28, 3, 0.4]];
+
   return (
-    <svg
-      viewBox="0 0 100 108"
-      width={size}
-      height={(size * 108) / 100}
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="gem-lift"
-      aria-hidden
+    <div
+      ref={wrapRef}
+      onPointerMove={onMove}
+      onPointerLeave={onLeave}
+      style={{ perspective: '460px', display: 'inline-block', lineHeight: 0 }}
     >
-      <defs>
-        <radialGradient id={`glow-${uid}`} cx="50%" cy="42%" r="52%">
-          <stop offset="0%" stopColor={p.glow} stopOpacity={locked ? 0 : 0.5} />
-          <stop offset="100%" stopColor={p.glow} stopOpacity="0" />
-        </radialGradient>
-        {/* per-face gradients for depth */}
-        <linearGradient id={`fTermL-${uid}`} x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0%" stopColor={p.hi} />
-          <stop offset="100%" stopColor={p.light} />
-        </linearGradient>
-        <linearGradient id={`fTermC-${uid}`} x1="0.5" y1="0" x2="0.5" y2="1">
-          <stop offset="0%" stopColor={p.light} />
-          <stop offset="100%" stopColor={p.mid} />
-        </linearGradient>
-        <linearGradient id={`fTermR-${uid}`} x1="1" y1="0" x2="0.6" y2="1">
-          <stop offset="0%" stopColor={p.mid} />
-          <stop offset="100%" stopColor={p.dark} />
-        </linearGradient>
-        <linearGradient id={`fLeft-${uid}`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={p.light} />
-          <stop offset="100%" stopColor={p.mid} />
-        </linearGradient>
-        <linearGradient id={`fFront-${uid}`} x1="0.5" y1="0" x2="0.5" y2="1">
-          <stop offset="0%" stopColor={p.mid} />
-          <stop offset="100%" stopColor={p.deep} />
-        </linearGradient>
-        <linearGradient id={`fRight-${uid}`} x1="1" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={p.dark} />
-          <stop offset="100%" stopColor={p.deep} />
-        </linearGradient>
-        <linearGradient id={`refl-${uid}`} x1="0.5" y1="0" x2="0.5" y2="1">
-          <stop offset="0%" stopColor={p.glow} stopOpacity={locked ? 0 : 0.32} />
-          <stop offset="100%" stopColor={p.glow} stopOpacity="0" />
-        </linearGradient>
-        <linearGradient id={`sweep-${uid}`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
-          <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.9" />
-          <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-        </linearGradient>
-        {/* clip the shimmer band to the stone's silhouette */}
-        <clipPath id={`clip-${uid}`}>
-          <polygon points="50,6 76,30 76,82 58,90 42,88 24,82 24,30" />
-        </clipPath>
-      </defs>
-
-      {/* ambient bloom */}
-      <circle cx="50" cy="44" r="48" fill={`url(#glow-${uid})`} />
-
-      {/* floor reflection — a faded, squashed echo of the stone */}
-      <g opacity={locked ? 0.18 : 0.4}>
-        <polygon points="42,92 58,92 54,104 46,104" fill={`url(#refl-${uid})`} />
-        <ellipse cx="50" cy="98" rx="26" ry="5" fill={`url(#refl-${uid})`} />
-      </g>
-
-      {/* ── termination (pointed crown) ── */}
-      <polygon points="50,6 24,30 42,36" fill={`url(#fTermL-${uid})`} />
-      <polygon points="50,6 42,36 58,36" fill={`url(#fTermC-${uid})`} />
-      <polygon points="50,6 58,36 76,30" fill={`url(#fTermR-${uid})`} />
-
-      {/* ── prism body (three visible faces) ── */}
-      <polygon points="24,30 42,36 42,88 24,82" fill={`url(#fLeft-${uid})`} />
-      <polygon points="42,36 58,36 58,90 42,88" fill={`url(#fFront-${uid})`} />
-      <polygon points="58,36 76,30 76,82 58,90" fill={`url(#fRight-${uid})`} />
-
-      {/* facet edges — thin bright cut-lines */}
-      <g
-        stroke={locked ? '#3A3F47' : p.hi}
-        strokeWidth="0.8"
-        strokeOpacity={locked ? 0.4 : 0.5}
-        strokeLinejoin="round"
+      <svg
+        viewBox="0 0 100 116"
+        width={size}
+        height={(size * 116) / 100}
         fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="gem-lift"
+        style={{
+          transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+          transition: 'transform 0.25s cubic-bezier(0.2,0.7,0.3,1)',
+          transformStyle: 'preserve-3d',
+        }}
+        aria-hidden
       >
-        {/* silhouette */}
-        <polygon points="50,6 76,30 76,82 58,90 42,88 24,82 24,30" />
-        {/* termination ridges */}
-        <path d="M50,6 42,36 M50,6 58,36" />
-        {/* girdle */}
-        <path d="M24,30 42,36 58,36 76,30" />
-        {/* vertical prism edges */}
-        <path d="M42,36 42,88 M58,36 58,90" />
-      </g>
+        <defs>
+          <radialGradient id={`glow-${uid}`} cx="50%" cy="40%" r="52%">
+            <stop offset="0%" stopColor={p.glow} stopOpacity={locked ? 0 : 0.5} />
+            <stop offset="100%" stopColor={p.glow} stopOpacity="0" />
+          </radialGradient>
 
-      {/* specular glints */}
-      {!locked && (
-        <g fill="#FFFFFF">
-          <polygon points="50,11 40,26 47,29" fillOpacity="0.7" />
-          <polygon points="44,42 47,42 46,72 44,70" fillOpacity="0.22" />
-          <circle cx="34" cy="30" r="1.4" fillOpacity="0.85" />
-        </g>
-      )}
+          {/* (1) internal glow core — light pooled low in the body */}
+          <radialGradient id={`core-${uid}`} cx="50%" cy="70%" r="42%">
+            <stop offset="0%" stopColor={p.hi} stopOpacity={locked ? 0 : 0.95} />
+            <stop offset="42%" stopColor={p.glow} stopOpacity={locked ? 0 : 0.55} />
+            <stop offset="100%" stopColor={p.glow} stopOpacity="0" />
+          </radialGradient>
 
-      {/* specular band that sweeps across on hover */}
-      {!locked && (
-        <g clipPath={`url(#clip-${uid})`}>
-          <rect
-            className="gem-sweep"
-            x="-4"
-            y="0"
-            width="20"
-            height="108"
-            fill={`url(#sweep-${uid})`}
-            transform="skewX(-14)"
+          {/* per-face gradients for depth */}
+          <linearGradient id={`fTermL-${uid}`} x1="0" y1="0" x2="0.4" y2="1">
+            <stop offset="0%" stopColor={p.hi} />
+            <stop offset="100%" stopColor={p.light} />
+          </linearGradient>
+          <linearGradient id={`fTermC-${uid}`} x1="0.5" y1="0" x2="0.5" y2="1">
+            <stop offset="0%" stopColor={p.light} />
+            <stop offset="100%" stopColor={p.mid} />
+          </linearGradient>
+          <linearGradient id={`fTermR-${uid}`} x1="1" y1="0" x2="0.6" y2="1">
+            <stop offset="0%" stopColor={p.mid} />
+            <stop offset="100%" stopColor={p.dark} />
+          </linearGradient>
+          <linearGradient id={`fLeft-${uid}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={p.light} />
+            <stop offset="100%" stopColor={p.mid} />
+          </linearGradient>
+          <linearGradient id={`fFront-${uid}`} x1="0.5" y1="0" x2="0.5" y2="1">
+            <stop offset="0%" stopColor={p.mid} />
+            <stop offset="100%" stopColor={p.deep} />
+          </linearGradient>
+          <linearGradient id={`fRight-${uid}`} x1="1" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={p.dark} />
+            <stop offset="100%" stopColor={p.deep} />
+          </linearGradient>
+          <linearGradient id={`refl-${uid}`} x1="0.5" y1="0" x2="0.5" y2="1">
+            <stop offset="0%" stopColor={p.glow} stopOpacity={locked ? 0 : 0.32} />
+            <stop offset="100%" stopColor={p.glow} stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id={`sweep-${uid}`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
+            <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+          </linearGradient>
+
+          {/* (2) chromatic dispersion — a rainbow slide for ridge cut-lines */}
+          <linearGradient id={`disp-${uid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#FFFFFF" />
+            <stop offset="45%" stopColor="#7CF9FF" />
+            <stop offset="72%" stopColor="#C6A0FF" />
+            <stop offset="100%" stopColor="#FF9BC7" />
+          </linearGradient>
+
+          {/* (5) rotating light beam for rare/legendary */}
+          <linearGradient id={`beam-${uid}`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
+            <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+          </linearGradient>
+
+          {/* (3) blur for the floor caustic */}
+          <filter id={`blur-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="3.2" />
+          </filter>
+
+          {/* clip everything interior to the stone's silhouette */}
+          <clipPath id={`clip-${uid}`}>
+            <polygon points="50,6 76,30 76,82 58,90 42,88 24,82 24,30" />
+          </clipPath>
+        </defs>
+
+        {/* ambient bloom */}
+        <circle cx="50" cy="44" r="48" fill={`url(#glow-${uid})`} />
+
+        {/* (3) coloured caustic pooled on the floor */}
+        {!locked && (
+          <ellipse
+            cx="50"
+            cy="99"
+            rx="30"
+            ry="7"
+            fill={p.glow}
+            opacity="0.45"
+            filter={`url(#blur-${uid})`}
+            className="gem-core"
           />
-        </g>
-      )}
+        )}
 
-      {locked && (
-        <foreignObject x="39" y="47" width="22" height="22">
-          <div className="flex h-full w-full items-center justify-center">
-            <Lock size={16} className="text-tertiary" />
-          </div>
-        </foreignObject>
-      )}
-    </svg>
+        {/* floor reflection — a faded, squashed echo of the stone */}
+        <g opacity={locked ? 0.18 : 0.4}>
+          <polygon points="42,92 58,92 54,104 46,104" fill={`url(#refl-${uid})`} />
+          <ellipse cx="50" cy="98" rx="26" ry="5" fill={`url(#refl-${uid})`} />
+        </g>
+
+        {/* (5) legendary halo — a soft floating ring behind the crown */}
+        {showHalo && (
+          <circle
+            cx="50"
+            cy="44"
+            r="40"
+            fill="none"
+            stroke={p.hi}
+            strokeWidth="0.9"
+            strokeOpacity="0.5"
+            className="gem-halo"
+          />
+        )}
+
+        {/* ── termination (pointed crown) ── */}
+        <polygon points="50,6 24,30 42,36" fill={`url(#fTermL-${uid})`} />
+        <polygon points="50,6 42,36 58,36" fill={`url(#fTermC-${uid})`} />
+        <polygon points="50,6 58,36 76,30" fill={`url(#fTermR-${uid})`} />
+
+        {/* ── prism body (three visible faces) ── */}
+        <polygon points="24,30 42,36 42,88 24,82" fill={`url(#fLeft-${uid})`} />
+        <polygon points="42,36 58,36 58,90 42,88" fill={`url(#fFront-${uid})`} />
+        <polygon points="58,36 76,30 76,82 58,90" fill={`url(#fRight-${uid})`} />
+
+        {/* (6) sleeping ore — a faint breath of native colour under the lock */}
+        {locked && (
+          <g clipPath={`url(#clip-${uid})`}>
+            <ellipse cx="50" cy="66" rx="20" ry="26" fill={t.glow} className="gem-locked-hint" />
+          </g>
+        )}
+
+        {/* (1) internal glow core — screen-blended so it reads as light, not paint */}
+        {!locked && (
+          <g clipPath={`url(#clip-${uid})`} style={{ mixBlendMode: 'screen' }}>
+            <ellipse cx="50" cy="70" rx="24" ry="30" fill={`url(#core-${uid})`} className="gem-core" />
+          </g>
+        )}
+
+        {/* (5) rotating light beam, clipped to the stone */}
+        {showBeam && (
+          <g clipPath={`url(#clip-${uid})`} style={{ mixBlendMode: 'screen' }}>
+            <rect
+              x="46"
+              y="4"
+              width="8"
+              height="90"
+              fill={`url(#beam-${uid})`}
+              className="gem-beam"
+              style={{ transformBox: 'fill-box', transformOrigin: 'center', opacity: rarity === 'legendary' ? 0.9 : 0.6 }}
+            />
+          </g>
+        )}
+
+        {/* facet edges — thin bright cut-lines */}
+        <g
+          stroke={locked ? '#3A3F47' : p.hi}
+          strokeWidth="0.8"
+          strokeOpacity={locked ? 0.4 : 0.5}
+          strokeLinejoin="round"
+          fill="none"
+        >
+          {/* silhouette */}
+          <polygon points="50,6 76,30 76,82 58,90 42,88 24,82 24,30" />
+          {/* termination ridges */}
+          <path d="M50,6 42,36 M50,6 58,36" />
+          {/* girdle */}
+          <path d="M24,30 42,36 58,36 76,30" />
+          {/* vertical prism edges */}
+          <path d="M42,36 42,88 M58,36 58,90" />
+        </g>
+
+        {/* (2) chromatic dispersion painted over two ridges */}
+        {!locked && (
+          <g stroke={`url(#disp-${uid})`} strokeWidth="1.1" strokeOpacity="0.75" fill="none" strokeLinecap="round">
+            <path d="M50,7 58,36" />
+            <path d="M58,37 58,89" />
+          </g>
+        )}
+
+        {/* specular glints */}
+        {!locked && (
+          <g fill="#FFFFFF">
+            <polygon points="50,11 40,26 47,29" fillOpacity="0.7" />
+            <polygon points="44,42 47,42 46,72 44,70" fillOpacity="0.22" />
+            <circle cx="34" cy="30" r="1.4" fillOpacity="0.85" />
+          </g>
+        )}
+
+        {/* (4) twinkling sparkles */}
+        {!locked &&
+          sparkles.map(([cx, cy, r, delay], i) => (
+            <path
+              key={i}
+              d={sparklePath(cx, cy, r)}
+              fill="#FFFFFF"
+              className="gem-twinkle"
+              style={{ animationDelay: `${delay}s`, transformBox: 'fill-box', transformOrigin: 'center' }}
+            />
+          ))}
+
+        {/* specular band that sweeps across on hover */}
+        {!locked && (
+          <g clipPath={`url(#clip-${uid})`}>
+            <rect
+              className="gem-sweep"
+              x="-4"
+              y="0"
+              width="20"
+              height="108"
+              fill={`url(#sweep-${uid})`}
+              transform="skewX(-14)"
+            />
+          </g>
+        )}
+
+        {locked && (
+          <foreignObject x="39" y="47" width="22" height="22">
+            <div className="flex h-full w-full items-center justify-center">
+              <Lock size={16} className="text-tertiary" />
+            </div>
+          </foreignObject>
+        )}
+      </svg>
+    </div>
   );
 }

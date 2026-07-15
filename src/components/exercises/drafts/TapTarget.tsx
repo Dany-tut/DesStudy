@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Check } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * DRAFT exercise — "tap-target": drag the button's corner handle to grow it past
@@ -32,6 +33,7 @@ export function TapTarget({
   disabled?: boolean;
   onChange?: (v: Size) => void;
 } = {}) {
+  const { t } = useT();
   const areaRef = useRef<HTMLDivElement>(null);
   const [internal, setInternal] = useState<Size>({ w: 30, h: 28 });
   const size = value ?? internal;
@@ -63,9 +65,9 @@ export function TapTarget({
     <div className="w-full max-w-[420px] rounded-2xl border border-border bg-surface p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <p className="text-caption font-semibold uppercase tracking-wide text-tertiary">Задание</p>
+          <p className="text-caption font-semibold uppercase tracking-wide text-tertiary">{t('exercises.tapTarget.taskLabel')}</p>
           <p className="mt-1 text-callout font-semibold text-primary">
-            Увеличь кнопку до безопасной тап-цели (≥44px)
+            {t('exercises.tapTarget.prompt')}
           </p>
         </div>
         <span
@@ -75,7 +77,7 @@ export function TapTarget({
           ].join(' ')}
         >
           <Check size={13} strokeWidth={3} />
-          {ok ? 'Готово' : 'Мелко'}
+          {ok ? t('exercises.tapTarget.done') : t('exercises.tapTarget.tooSmall')}
         </span>
       </div>
 
@@ -98,14 +100,14 @@ export function TapTarget({
           <button
             type="button"
             onPointerDown={startDrag}
-            aria-label="Тянуть размер кнопки"
+            aria-label={t('exercises.tapTarget.dragHandle')}
             className="absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize rounded-full border border-border bg-elevated shadow-sm"
           />
         </div>
       </div>
 
       <p className="mt-4 text-caption tabular-nums text-tertiary">
-        {size.w}×{size.h}px {ok ? '· палец попадёт уверенно' : `· нужно ≥ ${min}×${min}px`}
+        {size.w}×{size.h}px {ok ? t('exercises.tapTarget.hitConfident') : t('exercises.tapTarget.needMin', { min })}
       </p>
     </div>
   );

@@ -28,15 +28,17 @@ export interface CategoryDef {
   id: Category;
   /** heading on the result screen, e.g. "ui design" */
   title: string;
+  /** compact form for tight spots like radar axis labels */
+  short: string;
   /** one-line description under the heading */
   blurb: string;
 }
 
 export const CATEGORIES: CategoryDef[] = [
-  { id: 'ui', title: 'UI design', blurb: 'Визуал, верстка, композиция, система' },
-  { id: 'ux', title: 'UX design', blurb: 'Сценарии, тексты, состояния, адаптивы' },
-  { id: 'product', title: 'Product', blurb: 'Данные, гипотезы, исследования' },
-  { id: 'career', title: 'Career', blurb: 'Кейсы, отклики, собесы, опыт' },
+  { id: 'ui', title: 'UI design', short: 'UI', blurb: 'Визуал, верстка, композиция, система' },
+  { id: 'ux', title: 'UX design', short: 'UX', blurb: 'Сценарии, тексты, состояния, адаптивы' },
+  { id: 'product', title: 'Product', short: 'Product', blurb: 'Данные, гипотезы, исследования' },
+  { id: 'career', title: 'Career', short: 'Career', blurb: 'Кейсы, отклики, собесы, опыт' },
 ];
 
 /** Ordered exactly as the 25 questions appear (order === array index + 1). */
