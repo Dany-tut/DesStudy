@@ -24,10 +24,20 @@ export default async function AdminPage() {
         Без защиты входа — временно, пока препод один. Не делись этой ссылкой.
       </div>
 
-      <h1 className="text-title1 font-bold text-primary">Уроки препода</h1>
-      <p className="mt-1 text-footnote text-secondary">
-        Собери урок из блоков — теория, видео, задания — и опубликуй его для учеников.
-      </p>
+      <div className="mb-8 flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-title1 font-bold text-primary">Уроки препода</h1>
+          <p className="mt-1 text-footnote text-secondary">
+            Собери урок из блоков — теория, видео, задания — и опубликуй его для учеников.
+          </p>
+        </div>
+        <Link
+          href="/admin/results"
+          className="shrink-0 rounded-lg border border-border bg-surface px-4 py-2.5 text-footnote font-medium text-primary transition-base hover:border-brand"
+        >
+          Результаты теста на грейд →
+        </Link>
+      </div>
 
       <div className="mt-8">
         <CreateLessonForm />

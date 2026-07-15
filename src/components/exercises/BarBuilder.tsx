@@ -24,6 +24,7 @@ import type {
   BarVariant,
   BarPartKey,
 } from '@/lib/curriculum/types';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Production control for the `bar-build` exercise. The learner assembles a
@@ -35,30 +36,30 @@ import type {
 
 const PLACEMENTS: {
   key: BarPlacement;
-  label: string;
+  labelKey: string;
   icon: typeof Pin;
-  hint: string;
+  hintKey: string;
 }[] = [
-  { key: 'static', label: 'Статичный', icon: Layers, hint: 'едет вместе со страницей' },
-  { key: 'fixedTop', label: 'Фиксированный', icon: Pin, hint: 'прилипает к верху' },
-  { key: 'floatTop', label: 'Плавающий сверху', icon: Wind, hint: 'парит с отступом и тенью' },
-  { key: 'floatBottom', label: 'Плавающий снизу', icon: PanelBottom, hint: 'плашка у нижнего края' },
-  { key: 'sidebarLeft', label: 'Боковой слева', icon: PanelLeft, hint: 'вертикальный список' },
-  { key: 'sidebarRight', label: 'Боковой справа', icon: PanelRight, hint: 'вертикальный список' },
+  { key: 'static', labelKey: 'placementStatic', icon: Layers, hintKey: 'placementStaticHint' },
+  { key: 'fixedTop', labelKey: 'placementFixedTop', icon: Pin, hintKey: 'placementFixedTopHint' },
+  { key: 'floatTop', labelKey: 'placementFloatTop', icon: Wind, hintKey: 'placementFloatTopHint' },
+  { key: 'floatBottom', labelKey: 'placementFloatBottom', icon: PanelBottom, hintKey: 'placementFloatBottomHint' },
+  { key: 'sidebarLeft', labelKey: 'placementSidebarLeft', icon: PanelLeft, hintKey: 'placementSidebarLeftHint' },
+  { key: 'sidebarRight', labelKey: 'placementSidebarRight', icon: PanelRight, hintKey: 'placementSidebarRightHint' },
 ];
 
-const VARIANTS: { key: BarVariant; label: string; icon: typeof Menu }[] = [
-  { key: 'full', label: 'Полный', icon: Layers },
-  { key: 'burger', label: 'Бургер', icon: Menu },
-  { key: 'mini', label: 'Мини', icon: Minimize2 },
+const VARIANTS: { key: BarVariant; labelKey: string; icon: typeof Menu }[] = [
+  { key: 'full', labelKey: 'variantFull', icon: Layers },
+  { key: 'burger', labelKey: 'variantBurger', icon: Menu },
+  { key: 'mini', labelKey: 'variantMini', icon: Minimize2 },
 ];
 
-const PARTS: { key: BarPartKey; label: string }[] = [
-  { key: 'logo', label: 'Логотип' },
-  { key: 'nav', label: 'Навигация' },
-  { key: 'search', label: 'Поиск' },
-  { key: 'cta', label: 'Кнопка CTA' },
-  { key: 'avatar', label: 'Профиль' },
+const PARTS: { key: BarPartKey; labelKey: string }[] = [
+  { key: 'logo', labelKey: 'partLogo' },
+  { key: 'nav', labelKey: 'partNav' },
+  { key: 'search', labelKey: 'partSearch' },
+  { key: 'cta', labelKey: 'partCta' },
+  { key: 'avatar', labelKey: 'partAvatar' },
 ];
 
 const isSidebar = (p: BarPlacement) => p === 'sidebarLeft' || p === 'sidebarRight';
@@ -73,6 +74,7 @@ export function BarBuilder({
   disabled?: boolean;
   onChange: (next: BarBuildAnswer) => void;
 }) {
+  const { t } = useT();
   const { placement, variant, parts, navAlign } = value;
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -118,9 +120,9 @@ export function BarBuilder({
       {/* ── Controls ─────────────────────────────────────────── */}
       <fieldset disabled={disabled} className="flex flex-col gap-5 disabled:opacity-60">
         <div>
-          <p className="mb-2 text-footnote font-medium text-secondary">Как бар сидит на странице</p>
+          <p className="mb-2 text-footnote font-medium text-secondary">{t('exercises.barBuilder.placementHeading')}</p>
           <div className="flex flex-col gap-2">
-            {PLACEMENTS.map(({ key, label, icon: Icon, hint }) => {
+            {PLACEMENTS.map(({ key, labelKey, icon: Icon, hintKey }) => {
               const active = placement === key;
               return (
                 <button
@@ -143,8 +145,8 @@ export function BarBuilder({
                     <Icon size={16} />
                   </span>
                   <span className="flex-1">
-                    <span className="block text-callout font-medium text-primary">{label}</span>
-                    <span className="block text-caption text-tertiary">{hint}</span>
+                    <span className="block text-callout font-medium text-primary">{t(`exercises.barBuilder.${labelKey}`)}</span>
+                    <span className="block text-caption text-tertiary">{t(`exercises.barBuilder.${hintKey}`)}</span>
                   </span>
                   {active && <Check size={16} className="text-brand" />}
                 </button>
@@ -154,9 +156,9 @@ export function BarBuilder({
         </div>
 
         <div>
-          <p className="mb-2 text-footnote font-medium text-secondary">Вид бара</p>
+          <p className="mb-2 text-footnote font-medium text-secondary">{t('exercises.barBuilder.variantHeading')}</p>
           <div className="inline-flex w-full rounded-lg bg-muted p-1">
-            {VARIANTS.map(({ key, label, icon: Icon }) => (
+            {VARIANTS.map(({ key, labelKey, icon: Icon }) => (
               <button
                 key={key}
                 type="button"
@@ -167,16 +169,16 @@ export function BarBuilder({
                 ].join(' ')}
               >
                 <Icon size={14} />
-                {label}
+                {t(`exercises.barBuilder.${labelKey}`)}
               </button>
             ))}
           </div>
         </div>
 
         <div>
-          <p className="mb-2 text-footnote font-medium text-secondary">Из чего собрать</p>
+          <p className="mb-2 text-footnote font-medium text-secondary">{t('exercises.barBuilder.partsHeading')}</p>
           <EdgeFadeRow>
-            {PARTS.map(({ key, label }) => {
+            {PARTS.map(({ key, labelKey }) => {
               const on = parts[key];
               return (
                 <button
@@ -191,7 +193,7 @@ export function BarBuilder({
                   ].join(' ')}
                 >
                   {on ? <Check size={14} /> : <Plus size={14} />}
-                  {label}
+                  {t(`exercises.barBuilder.${labelKey}`)}
                 </button>
               );
             })}
@@ -199,15 +201,15 @@ export function BarBuilder({
         </div>
 
         <div>
-          <p className="mb-2 text-footnote font-medium text-secondary">Навигация</p>
+          <p className="mb-2 text-footnote font-medium text-secondary">{t('exercises.barBuilder.navHeading')}</p>
           <div className="inline-flex rounded-lg bg-muted p-1">
             {[
-              { v: 'left' as const, label: 'Слева' },
-              { v: 'center' as const, label: 'По центру' },
-              { v: 'right' as const, label: 'Справа' },
-            ].map(({ v, label }) => (
+              { v: 'left' as const, labelKey: 'navLeft' },
+              { v: 'center' as const, labelKey: 'navCenter' },
+              { v: 'right' as const, labelKey: 'navRight' },
+            ].map(({ v, labelKey }) => (
               <button
-                key={label}
+                key={v}
                 type="button"
                 onClick={() => set({ navAlign: v })}
                 className={[
@@ -215,7 +217,7 @@ export function BarBuilder({
                   navAlign === v ? 'bg-brand text-on-brand' : 'text-secondary hover:text-primary',
                 ].join(' ')}
               >
-                {label}
+                {t(`exercises.barBuilder.${labelKey}`)}
               </button>
             ))}
           </div>
@@ -228,7 +230,7 @@ export function BarBuilder({
             className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-footnote font-medium text-primary transition-fast hover:bg-hover"
           >
             <Play size={14} />
-            Проиграть режим
+            {t('exercises.barBuilder.playMode')}
           </button>
         </div>
       </fieldset>

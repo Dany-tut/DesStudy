@@ -80,23 +80,26 @@ export function GridColumns() {
       </div>
 
       {/* Controls */}
-      <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-end sm:gap-8">
+      <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-8">
         <Stepper label="Колонки" value={cols} unit="" min={MIN_COLS} max={MAX_COLS} step={1} onChange={setCols} />
         <label className="block min-w-0 flex-1">
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-1.5 flex items-center justify-between">
             <span className="text-footnote text-secondary">Гаттер</span>
             <span className="text-footnote text-tertiary tabular-nums">{gutter}px</span>
           </div>
-          <input
-            type="range"
-            min={MIN_GUTTER}
-            max={MAX_GUTTER}
-            step={2}
-            value={gutter}
-            onChange={(e) => setGutter(Number(e.target.value))}
-            className="ui-slider ui-slider--chunky"
-            style={{ '--pct': `${((gutter - MIN_GUTTER) / (MAX_GUTTER - MIN_GUTTER)) * 100}%` } as React.CSSProperties}
-          />
+          {/* Match the stepper pill height (h-9 + p-1 = 44px) and center the track within it */}
+          <div className="flex h-11 items-center">
+            <input
+              type="range"
+              min={MIN_GUTTER}
+              max={MAX_GUTTER}
+              step={2}
+              value={gutter}
+              onChange={(e) => setGutter(Number(e.target.value))}
+              className="ui-slider ui-slider--chunky"
+              style={{ '--pct': `${((gutter - MIN_GUTTER) / (MAX_GUTTER - MIN_GUTTER)) * 100}%` } as React.CSSProperties}
+            />
+          </div>
         </label>
       </div>
 

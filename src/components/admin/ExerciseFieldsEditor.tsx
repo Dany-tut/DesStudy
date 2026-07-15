@@ -1,7 +1,7 @@
 'use client';
 
 import { Plus, X } from 'lucide-react';
-import type { CritiqueZone } from '@/lib/curriculum/types';
+import type { CritiqueZone, CritiqueImage } from '@/lib/curriculum/types';
 import { ScreenCritiqueFields } from './ScreenCritiqueFields';
 
 /**
@@ -36,6 +36,7 @@ export interface ExerciseDraft {
   scene: string;
   screenTitle: string;
   zones: CritiqueZone[];
+  image?: CritiqueImage;
 }
 
 const inputClass =

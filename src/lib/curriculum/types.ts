@@ -504,14 +504,32 @@ export interface CritiqueZone {
   // ── Reconstruction ──
   /** Candidate fixes (one `correct`). Omit for a clean zone. */
   fixes?: CritiqueFixOption[];
+  /**
+   * Bounding box in % of the screen (0..100), top-left → bottom-right. Used only
+   * by the `image` scene to place the clickable overlay; DOM scenes ignore it.
+   */
+  rect?: { x0: number; y0: number; x1: number; y1: number };
+}
+
+/**
+ * For the `image` scene: an uploaded "broken" screen the learner critiques, and
+ * an optional "good" version. When present, reconstructing a zone correctly
+ * reveals that zone's region from the good screen — the broken screen visibly
+ * morphs toward the good one.
+ */
+export interface CritiqueImage {
+  url: string;
+  goodUrl?: string;
 }
 
 export interface ScreenCritiqueExercise {
   id: string;
   type: 'screen-critique';
   prompt: string;
-  /** Registry key of the built-in scene to render, e.g. 'premium-card'. */
+  /** Scene to render: a built-in DOM key ('premium-card') or 'image'. */
   scene: string;
+  /** Uploaded screens — required when `scene === 'image'`. */
+  image?: CritiqueImage;
   /** Screen description passed to the AI for fix-coaching context. */
   screenTitle: string;
   zones: CritiqueZone[];

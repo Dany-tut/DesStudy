@@ -22,6 +22,7 @@ import {
 } from '@/lib/curriculum/screenCritique';
 import type { FixReply } from '@/lib/ai/mentor';
 import { PremiumCardScene } from './scenes/PremiumCardScene';
+import { ImageScene } from './scenes/ImageScene';
 
 const VERDICT_UI: Record<Verdict, { ring: string; label: string; icon: typeof Check; text: string; bg: string }> = {
   right: { ring: '#3FB950', label: 'Верно', icon: Check, text: 'text-[#3FB950]', bg: 'bg-[#3FB950]/10' },
@@ -200,16 +201,29 @@ export function ScreenCritiqueExercise({
 
   return (
     <div className="grid gap-8 lg:grid-cols-[300px_minmax(0,1fr)]">
-      {/* LEFT — the (morphing) screen */}
+      {/* LEFT — the (morphing) screen: uploaded image or built-in DOM scene */}
       <div className="flex justify-center lg:justify-start">
-        <PremiumCardScene
-          fixed={fixedSet}
-          selected={selected}
-          onSelect={setSelected}
-          verdicts={checked ? worstByZone : undefined}
-          checked={checked}
-          interactive={!checked}
-        />
+        {exercise.scene === 'image' && exercise.image ? (
+          <ImageScene
+            image={exercise.image}
+            zones={zones}
+            fixed={fixedSet}
+            selected={selected}
+            onSelect={setSelected}
+            verdicts={checked ? worstByZone : undefined}
+            checked={checked}
+            interactive={!checked}
+          />
+        ) : (
+          <PremiumCardScene
+            fixed={fixedSet}
+            selected={selected}
+            onSelect={setSelected}
+            verdicts={checked ? worstByZone : undefined}
+            checked={checked}
+            interactive={!checked}
+          />
+        )}
       </div>
 
       {/* RIGHT — diagnose/reconstruct panel, then results */}

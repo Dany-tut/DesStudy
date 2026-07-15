@@ -4,10 +4,12 @@ import { useMemo, useState } from 'react';
 import { Clock, Target, Trophy, CheckCircle2, BookOpen } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Lesson } from '@/lib/curriculum/types';
+import { useT } from '@/lib/i18n/client';
 import { ExampleVisual } from '@/components/examples/ExampleVisual';
 import { LectureVisual } from '@/components/examples/LectureVisual';
 import { ExercisePlayer } from '@/components/exercises/ExercisePlayer';
 import { VideoEmbed } from '@/components/lesson/VideoEmbed';
+import { ConfettiBurst } from '@/components/lesson/ConfettiBurst';
 
 /**
  * All the interactive bits of the lesson page (progress state, ExercisePlayer
@@ -18,6 +20,7 @@ import { VideoEmbed } from '@/components/lesson/VideoEmbed';
 const READ_EXERCISE_ID = '__read__';
 
 export function LessonPageClient({ lesson }: { lesson: Lesson }) {
+  const { t: tr } = useT();
   const isLecture = lesson.kind === 'lecture';
   const allExercises = useMemo(
     () => [...lesson.exercises, ...(lesson.masteryChallenge ? [lesson.masteryChallenge] : [])],
@@ -240,8 +243,9 @@ export function LessonPageClient({ lesson }: { lesson: Lesson }) {
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-10 rounded-xl bg-brand/10 p-6 text-center"
+          className="relative mt-10 overflow-hidden rounded-xl bg-brand/10 p-6 text-center"
         >
+          <ConfettiBurst />
           <Trophy size={28} className="mx-auto mb-2 text-brand" />
           <p className="text-title3 font-semibold text-primary">
             {isLecture ? 'Лекция пройдена 🎉' : 'Урок пройден 🎉'}

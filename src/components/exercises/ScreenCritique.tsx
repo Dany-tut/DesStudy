@@ -228,11 +228,19 @@ const FIX_UI: Record<FixReply['verdict'], { label: string; text: string }> = {
   breaks: { label: 'Сломала бы', text: 'text-[#F85149]' },
 };
 
+/** The three compact steps inside a selected-region panel. */
+const CRITIQUE_STEPS = [
+  { label: 'Роль', title: 'Какая это роль на экране?' },
+  { label: 'Что не так', title: 'Что здесь не так?' },
+  { label: 'Правка', title: 'Что бы ты здесь поправил?' },
+] as const;
+
 export function ScreenCritique() {
   const [assignments, setAssignments] = useState<Assignments>({});
   const [defectPicks, setDefectPicks] = useState<Partial<Record<Region, DefectId>>>({});
   const [fixes, setFixes] = useState<Fixes>({});
   const [selected, setSelected] = useState<Region | null>(null);
+  const [step, setStep] = useState(0);
   const [checked, setChecked] = useState(false);
   const [fixReplies, setFixReplies] = useState<Partial<Record<Region, FixReply>>>({});
   const [fixLoading, setFixLoading] = useState(false);
@@ -257,6 +265,11 @@ export function ScreenCritique() {
     ...(Object.keys(assignments) as Region[]),
     ...(Object.keys(defectPicks) as Region[]),
   ]).size;
+
+  function selectRegion(r: Region) {
+    setSelected(r);
+    setStep(0);
+  }
 
   function assignRole(role: RoleId) {
     if (!selected) return;
@@ -312,6 +325,7 @@ export function ScreenCritique() {
     setDefectPicks({});
     setFixes({});
     setSelected(null);
+    setStep(0);
     setChecked(false);
     setFixReplies({});
     setFixLoading(false);
@@ -342,7 +356,7 @@ export function ScreenCritique() {
         <div className="flex justify-center lg:justify-start">
           <CritiqueScreen
             selected={selected}
-            onSelect={setSelected}
+            onSelect={selectRegion}
             assignments={assignments}
             defectPicks={defectPicks}
             verdicts={verdicts}
@@ -369,39 +383,63 @@ export function ScreenCritique() {
                         </span>
                       </div>
                     </div>
-                    <p className="mb-3 text-caption text-tertiary">Какая это роль на экране?</p>
-                    <div className="flex flex-col gap-2">
-                      {ROLES.map((role) => {
-                        const active = assignments[selected] === role.id;
-                        return (
+                    {/* Step header — dots + "Шаг N из 3 · <label>" */}
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-caption text-tertiary">
+                        Шаг {step + 1} из {CRITIQUE_STEPS.length} ·{' '}
+                        <span className="text-secondary">{CRITIQUE_STEPS[step].title}</span>
+                        {step === 2 && <span className="text-tertiary/70"> (необязательно)</span>}
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        {CRITIQUE_STEPS.map((s, i) => (
                           <button
-                            key={role.id}
+                            key={s.label}
                             type="button"
-                            onClick={() => assignRole(role.id)}
+                            aria-label={s.label}
+                            onClick={() => setStep(i)}
                             className={[
-                              'flex flex-col items-start rounded-lg border px-3 py-2 text-left transition-fast',
-                              active
-                                ? 'border-brand bg-brand/10'
-                                : 'border-border bg-surface hover:border-brand/40',
+                              'h-1.5 rounded-full transition-fast',
+                              i === step ? 'w-5 bg-brand' : 'w-1.5 bg-border hover:bg-brand/40',
                             ].join(' ')}
-                          >
-                            <span
-                              className={[
-                                'text-footnote font-medium',
-                                active ? 'text-brand' : 'text-primary',
-                              ].join(' ')}
-                            >
-                              {role.label}
-                            </span>
-                            <span className="text-caption text-tertiary">{role.hint}</span>
-                          </button>
-                        );
-                      })}
+                          />
+                        ))}
+                      </div>
                     </div>
 
-                    {/* Defect picker — what's WRONG in this region. */}
-                    <div className="mt-4 border-t border-border pt-4">
-                      <p className="mb-3 text-caption text-tertiary">Что здесь не так?</p>
+                    {/* Step 0 — role */}
+                    {step === 0 && (
+                      <div className="flex flex-col gap-2">
+                        {ROLES.map((role) => {
+                          const active = assignments[selected] === role.id;
+                          return (
+                            <button
+                              key={role.id}
+                              type="button"
+                              onClick={() => assignRole(role.id)}
+                              className={[
+                                'flex flex-col items-start rounded-lg border px-3 py-2 text-left transition-fast',
+                                active
+                                  ? 'border-brand bg-brand/10'
+                                  : 'border-border bg-surface hover:border-brand/40',
+                              ].join(' ')}
+                            >
+                              <span
+                                className={[
+                                  'text-footnote font-medium',
+                                  active ? 'text-brand' : 'text-primary',
+                                ].join(' ')}
+                              >
+                                {role.label}
+                              </span>
+                              <span className="text-caption text-tertiary">{role.hint}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Step 1 — defect */}
+                    {step === 1 && (
                       <div className="grid grid-cols-2 gap-2">
                         {DEFECTS.map((d) => {
                           const active = defectPicks[selected] === d.id;
@@ -423,22 +461,42 @@ export function ScreenCritique() {
                           );
                         })}
                       </div>
-                    </div>
+                    )}
 
-                    {/* Optional fix note */}
-                    <div className="mt-4 border-t border-border pt-4">
-                      <label className="mb-2 block text-caption text-tertiary">
-                        Что бы ты здесь поправил? (необязательно)
-                      </label>
+                    {/* Step 2 — free-text fix */}
+                    {step === 2 && (
                       <textarea
                         value={fixes[selected] ?? ''}
                         onChange={(e) =>
                           setFixes((f) => ({ ...f, [selected]: e.target.value }))
                         }
-                        rows={2}
+                        rows={3}
                         placeholder="Например: слишком крупный радиус, конкурирует с картой…"
                         className="w-full resize-none rounded-lg border border-border bg-surface px-3 py-2 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
                       />
+                    )}
+
+                    {/* Step nav */}
+                    <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setStep((s) => Math.max(0, s - 1))}
+                        disabled={step === 0}
+                        className="rounded-lg border border-border px-3 py-2 text-footnote font-medium text-secondary transition-fast hover:bg-hover disabled:cursor-not-allowed disabled:opacity-30"
+                      >
+                        Назад
+                      </button>
+                      {step < CRITIQUE_STEPS.length - 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => setStep((s) => Math.min(CRITIQUE_STEPS.length - 1, s + 1))}
+                          className="rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand transition-fast hover:opacity-90"
+                        >
+                          Далее
+                        </button>
+                      ) : (
+                        <span className="text-caption text-tertiary">Зона размечена</span>
+                      )}
                     </div>
                   </>
                 ) : (
@@ -466,7 +524,7 @@ export function ScreenCritique() {
                       <button
                         key={r}
                         type="button"
-                        onClick={() => setSelected(r)}
+                        onClick={() => selectRegion(r)}
                         className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-caption text-secondary transition-fast hover:border-brand/40"
                       >
                         <span className="font-medium text-primary">{REGION_TITLE[r]}</span>

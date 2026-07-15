@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { UploadCloud, FileCheck2, X, Loader2 } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Drag-and-drop (or click-to-browse) upload for file-upload exercises.
@@ -25,6 +26,7 @@ export function FileUploadZone({
   disabled?: boolean;
   onChange: (url: string | null) => void;
 }) {
+  const { t } = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -33,7 +35,7 @@ export function FileUploadZone({
   async function upload(file: File) {
     setError(null);
     if (file.size > maxSizeMB * 1024 * 1024) {
-      setError(`Файл больше ${maxSizeMB}МБ — сожми и попробуй снова.`);
+      setError(t('exercises.fileUpload.tooLarge', { size: maxSizeMB }));
       return;
     }
     setUploading(true);
@@ -47,7 +49,7 @@ export function FileUploadZone({
       const { url } = (await res.json()) as { url: string };
       onChange(url);
     } catch {
-      setError('Не получилось загрузить файл — попробуй ещё раз.');
+      setError(t('exercises.fileUpload.uploadFailed'));
     } finally {
       setUploading(false);
     }
@@ -70,7 +72,7 @@ export function FileUploadZone({
           <button
             type="button"
             onClick={() => onChange(null)}
-            aria-label="Убрать файл"
+            aria-label={t('exercises.fileUpload.removeFile')}
             className="shrink-0 text-tertiary transition-fast hover:text-primary"
           >
             <X size={16} />
@@ -108,9 +110,9 @@ export function FileUploadZone({
           <UploadCloud size={22} className="text-tertiary" />
         )}
         <p className="text-callout text-secondary">
-          {uploading ? 'Загружаю…' : 'Перетащи файл сюда или нажми, чтобы выбрать'}
+          {uploading ? t('exercises.fileUpload.uploading') : t('exercises.fileUpload.dropHint')}
         </p>
-        <p className="text-caption text-tertiary">до {maxSizeMB}МБ</p>
+        <p className="text-caption text-tertiary">{t('exercises.fileUpload.maxSize', { size: maxSizeMB })}</p>
         <input
           ref={inputRef}
           type="file"

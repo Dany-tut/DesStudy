@@ -11,6 +11,7 @@
  */
 
 import type { Locale, PluralForms } from './config';
+import { exercisesRu, exercisesEn } from './dictionaries/exercises';
 
 export const dictionaries = {
   ru: {
@@ -126,6 +127,7 @@ export const dictionaries = {
       description:
         'Mobbin-подобная галерея: экраны, потоки, паттерны, дизайн-системы — с поиском по платформе, индустрии и компоненту.',
     },
+    exercises: exercisesRu,
   },
 
   en: {
@@ -239,6 +241,7 @@ export const dictionaries = {
       description:
         'A Mobbin-style gallery: screens, flows, patterns, design systems — searchable by platform, industry, and component.',
     },
+    exercises: exercisesEn,
   },
 } as const;
 

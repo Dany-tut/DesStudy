@@ -2,6 +2,7 @@
 
 import { Figma, Check, ExternalLink } from 'lucide-react';
 import { FIGMA_URL_PATTERN } from '@/lib/curriculum/validate';
+import { useT } from '@/lib/i18n/client';
 
 /** URL input for figma-link exercises — live-validates the shape while typing. */
 export function FigmaLinkSubmit({
@@ -13,6 +14,7 @@ export function FigmaLinkSubmit({
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {
+  const { t } = useT();
   const valid = FIGMA_URL_PATTERN.test(value.trim());
   const showState = value.trim().length > 0;
 
@@ -32,7 +34,7 @@ export function FigmaLinkSubmit({
         <input
           type="url"
           inputMode="url"
-          placeholder="https://figma.com/design/..."
+          placeholder={t('exercises.figmaLink.placeholder')}
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
@@ -45,7 +47,7 @@ export function FigmaLinkSubmit({
             target="_blank"
             rel="noreferrer"
             className="shrink-0 text-tertiary transition-fast hover:text-primary"
-            aria-label="Открыть ссылку"
+            aria-label={t('exercises.figmaLink.openLink')}
           >
             <ExternalLink size={15} />
           </a>
@@ -53,7 +55,7 @@ export function FigmaLinkSubmit({
       </div>
       {showState && !valid && (
         <p className="mt-2 text-footnote text-tertiary">
-          Похоже, это не ссылка на файл Figma — скопируй через Share → Copy link.
+          {t('exercises.figmaLink.invalid')}
         </p>
       )}
     </div>

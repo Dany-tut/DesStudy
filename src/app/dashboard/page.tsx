@@ -28,6 +28,7 @@ export default async function DashboardPage() {
       <main className="mx-auto max-w-[1200px] px-8 py-16">
         <h1 className="text-title1 font-bold text-primary">{t('dashboard.title')}</h1>
         <p className="mt-3 text-body text-secondary">{t('dashboard.emptySubtitle')}</p>
+        <AssessmentCTA />
         <StartLink slug={ALL_LESSONS[0]?.slug} label={t('dashboard.continueLearning')} />
       </main>
     );
@@ -59,6 +60,8 @@ export default async function DashboardPage() {
     <main className="mx-auto max-w-[1200px] px-8 py-16">
       <h1 className="text-title1 font-bold text-primary">{t('dashboard.title')}</h1>
       <p className="mt-2 text-body text-secondary">{t('dashboard.subtitle')}</p>
+
+      <AssessmentCTA />
 
       {/* Stat tiles */}
       <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -206,6 +209,26 @@ function SkillList({
         ))}
       </ul>
     </div>
+  );
+}
+
+/** Entry-test banner — everyone who lands on the platform is invited to take it. */
+function AssessmentCTA() {
+  return (
+    <Link
+      href="/assessment"
+      className="mt-6 flex items-center justify-between gap-4 rounded-xl border border-brand/40 bg-brand/5 p-5 transition-base hover:border-brand"
+    >
+      <div>
+        <p className="text-callout font-semibold text-primary">Пройти тест на грейд</p>
+        <p className="mt-0.5 text-footnote text-secondary">
+          25 вопросов · радар навыков и персональные точки роста
+        </p>
+      </div>
+      <span className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2.5 text-footnote font-medium text-on-brand">
+        Начать <ArrowRight size={15} />
+      </span>
+    </Link>
   );
 }
 

@@ -15,6 +15,7 @@ import type {
   TapTargetAnswer,
 } from '@/lib/curriculum/types';
 import { validate, contrastRatio } from '@/lib/curriculum/validate';
+import { useT } from '@/lib/i18n/client';
 import type { MentorReply } from '@/lib/ai/mentor';
 import { AutoLayoutCanvas } from './AutoLayoutCanvas';
 import { BarBuilder } from './BarBuilder';
@@ -88,6 +89,7 @@ export function ExercisePlayer({
   lessonTotal?: number;
   onSolved?: (attempts: number) => void;
 }) {
+  const { t, tp } = useT();
   const initialChoice: Answer =
     exercise.type === 'build'
       ? { gap: exercise.min, padding: exercise.min }
@@ -150,7 +152,7 @@ export function ExercisePlayer({
         return exercise.options.find((o) => o.id === value)?.label ?? String(value);
       case 'build': {
         const v = value as BuildAnswer;
-        return `отступ ${v.gap}px, поля ${v.padding}px`;
+        return t('exercises.player.buildAnswer', { gap: v.gap, padding: v.padding });
       }
       case 'order': {
         const ids = value as string[];
@@ -158,80 +160,73 @@ export function ExercisePlayer({
         return ids.map((id) => byId.get(id) ?? id).join(' → ');
       }
       case 'figma-link':
-        return 'ссылка на Figma';
+        return t('exercises.player.figmaLink');
       case 'file-upload':
-        return 'прикреплённый файл';
+        return t('exercises.player.fileUpload');
       case 'tune':
         return `${value}${exercise.unitLabel}`;
       case 'bar-build': {
         const v = value as BarBuildAnswer;
-        const placementRu: Record<BarBuildAnswer['placement'], string> = {
-          static: 'статичный',
-          fixedTop: 'фиксированный',
-          floatTop: 'плавающий сверху',
-          floatBottom: 'плавающий снизу',
-          sidebarLeft: 'боковой слева',
-          sidebarRight: 'боковой справа',
-        };
-        const variantRu: Record<BarBuildAnswer['variant'], string> = {
-          full: 'полный',
-          burger: 'бургер',
-          mini: 'мини',
-        };
-        return `${placementRu[v.placement]}, ${variantRu[v.variant]}`;
+        return `${t(`exercises.player.placement.${v.placement}`)}, ${t(`exercises.player.variant.${v.variant}`)}`;
       }
       case 'match': {
         const ids = (value as string[]) ?? [];
-        return `сопоставлено ${ids.length} из ${exercise.pairs.length} пар`;
+        return tp('exercises.player.matched', exercise.pairs.length, { done: ids.length });
       }
       case 'states': {
         const ids = (value as string[]) ?? [];
-        return `осмотрено ${ids.length} из 5 состояний`;
+        return t('exercises.player.inspected', { count: ids.length });
       }
       case 'hotspot': {
         const p = value as HotspotAnswer | null;
-        return p ? `клик в точке ${Math.round(p.x)}%, ${Math.round(p.y)}%` : 'нет клика';
+        return p
+          ? t('exercises.player.clickAt', { x: Math.round(p.x), y: Math.round(p.y) })
+          : t('exercises.player.noClick');
       }
       case 'align': {
         const a = value as AlignAnswer;
-        const xl = { left: 'слева', center: 'по центру', right: 'справа' };
-        const yl = { top: 'сверху', middle: 'посередине', bottom: 'снизу' };
-        return a?.x && a?.y ? `${xl[a.x]} · ${yl[a.y]}` : 'не выровнено';
+        return a?.x && a?.y
+          ? `${t(`exercises.player.alignX.${a.x}`)} · ${t(`exercises.player.alignY.${a.y}`)}`
+          : t('exercises.player.notAligned');
       }
       case 'contrast-tune': {
         const v = value as ContrastAnswer;
-        return `контраст ${contrastRatio(v.textL, v.bgL).toFixed(2)}:1`;
+        return t('exercises.player.contrast', {
+          ratio: contrastRatio(v.textL, v.bgL).toFixed(2),
+        });
       }
       case 'scale-ramp': {
         const v = value as ScaleRampAnswer;
         return `${v.base}px × ${v.ratio}`;
       }
       case 'trim-zone':
-        return `срез ${value}px`;
+        return t('exercises.player.trim', { value: value as number });
       case 'nested-radius':
-        return `внутренний радиус ${value}px`;
+        return t('exercises.player.innerRadius', { value: value as number });
       case 'resize-frame':
-        return `ширина ${Math.round(value as number)}px`;
+        return t('exercises.player.width', { value: Math.round(value as number) });
       case 'elevation':
-        return `уровень ${value}`;
+        return t('exercises.player.level', { value: value as number });
       case 'easing': {
         const v = value as EasingAnswer;
         return v
           ? `cubic-bezier(${v.p1.x.toFixed(2)}, ${v.p1.y.toFixed(2)}, ${v.p2.x.toFixed(2)}, ${v.p2.y.toFixed(2)})`
-          : 'кривая не задана';
+          : t('exercises.player.noCurve');
       }
       case 'spot-diff':
-        return value == null ? 'нет клика' : `выбрана плитка ${(value as number) + 1}`;
+        return value == null
+          ? t('exercises.player.noClick')
+          : t('exercises.player.tilePicked', { n: (value as number) + 1 });
       case 'tap-target': {
         const v = value as TapTargetAnswer;
-        return v ? `${v.w}×${v.h}px` : 'нет размера';
+        return v ? `${v.w}×${v.h}px` : t('exercises.player.noSize');
       }
       case 'fix-screen': {
         const solved = fixSolvedCount(value as FixScreenAnswer);
-        return `исправлено ${solved} из 6 нарушений`;
+        return t('exercises.player.fixed', { count: solved });
       }
       case 'screen-critique':
-        return 'разбор экрана';
+        return t('exercises.player.screenReview');
     }
   }
 
@@ -590,17 +585,17 @@ export function ExercisePlayer({
               {awaitingReview ? (
                 <>
                   <Clock size={16} className="text-brand" />
-                  <span className="text-primary">Отправлено на проверку</span>
+                  <span className="text-primary">{t('exercises.player.submittedForReview')}</span>
                 </>
               ) : outcome.correct ? (
                 <>
                   <Check size={16} className="text-success" />
-                  <span className="text-primary">Верно</span>
+                  <span className="text-primary">{t('exercises.player.correct')}</span>
                 </>
               ) : (
                 <>
                   <X size={16} className="text-danger" />
-                  <span className="text-primary">Не совсем</span>
+                  <span className="text-primary">{t('exercises.player.notQuite')}</span>
                 </>
               )}
             </div>
@@ -625,13 +620,13 @@ export function ExercisePlayer({
           >
             <div className="mb-2 flex items-center gap-2 text-footnote font-medium text-brand">
               <Sparkles size={14} />
-              AI-ментор
+              {t('exercises.player.aiMentor')}
               {mentor?.offline && (
-                <span className="text-tertiary">· офлайн-режим</span>
+                <span className="text-tertiary">· {t('exercises.player.offline')}</span>
               )}
             </div>
             {mentorLoading ? (
-              <p className="text-body text-tertiary">Думаю над твоим ответом…</p>
+              <p className="text-body text-tertiary">{t('exercises.player.thinking')}</p>
             ) : mentor ? (
               <div className="space-y-2 text-body text-secondary">
                 <p className="text-primary">{mentor.diagnosis}</p>
@@ -649,21 +644,21 @@ export function ExercisePlayer({
           <Button onClick={outcome ? retry : submit} disabled={!outcome && choice === null}>
             {outcome ? (
               <>
-                <RotateCcw size={16} /> Ещё попытка
+                <RotateCcw size={16} /> {t('exercises.player.retry')}
               </>
             ) : (
-              'Проверить'
+              t('exercises.player.check')
             )}
           </Button>
         ) : awaitingReview ? (
           <span className="flex items-center gap-2 text-footnote text-secondary">
             <Clock size={14} className="text-brand" />
-            Отправлено на проверку
+            {t('exercises.player.submittedForReview')}
           </span>
         ) : (
           <span className="flex items-center gap-2 text-footnote text-secondary">
             <Check size={14} className="text-success" />
-            Решено с {attempts}-й попытки
+            {tp('exercises.player.solvedIn', attempts)}
           </span>
         )}
       </div>
