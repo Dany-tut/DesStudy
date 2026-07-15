@@ -20,6 +20,7 @@ import {
   Globe,
   Code2,
   Pencil,
+  Film,
   Files,
   FileStack,
   Layers,
@@ -216,6 +217,13 @@ const MODES: PickItem[] = [
     label: 'AI Tools',
     icon: Sparkles,
     detail: 'для картинок: Crop, Select area, Remove background, Edit with prompt и другое.',
+  },
+  {
+    id: 'motion',
+    label: 'Motion (Beta)',
+    icon: Film,
+    detail:
+      'новый режим анимаций: связывай состояния и настраивай движение элементов — переходы, тайминги и эффекты прямо на макете.',
   },
 ];
 

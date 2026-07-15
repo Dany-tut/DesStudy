@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, ArrowLeft, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -32,8 +32,31 @@ export function AssessmentPlayer({ initialName }: { initialName: string | null }
 
   const result = useMemo(() => computeGrade(scores), [scores]);
 
+  // Single-select self-assessment steps advance on click; interactive tasks and
+  // multi-answer steps let the learner tweak, so they keep an explicit continue.
+  const autoAdvance = Boolean(q) && !q.interactive && !q.multi;
+
+  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearTimer = () => {
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    advanceTimer.current = null;
+  };
+  useEffect(() => clearTimer, []);
+
+  function advance(finalScores: Scores) {
+    clearTimer();
+    if (idx < total - 1) setIdx((i) => i + 1);
+    else void finish(finalScores);
+  }
+
   function setAnswer(level: SkillLevel) {
-    setScores((prev) => ({ ...prev, [q.skillId]: level }));
+    const nextScores = { ...scores, [q.skillId]: level };
+    setScores(nextScores);
+    if (autoAdvance) {
+      clearTimer();
+      // brief pause so the chosen option's selected state is visible first
+      advanceTimer.current = setTimeout(() => advance(nextScores), 320);
+    }
   }
 
   async function finish(finalScores: Scores) {
@@ -49,14 +72,6 @@ export function AssessmentPlayer({ initialName }: { initialName: string | null }
     } finally {
       setSubmitting(false);
       setPhase('result');
-    }
-  }
-
-  function next() {
-    if (idx < total - 1) {
-      setIdx((i) => i + 1);
-    } else {
-      void finish(scores);
     }
   }
 

@@ -2,13 +2,14 @@ import Link from 'next/link';
 import { ArrowRight, Zap, Flame, PlayCircle, Clock, Lock, Check } from 'lucide-react';
 import { getLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
-import { PATHS, availableLessons } from '@/content/curriculum';
+import { getPaths, availableLessons } from '@/content/curriculum';
 import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const { t, tp } = await getT();
+  const { t, tp, locale } = await getT();
+  const PATHS = getPaths(locale);
   const learner = await getLearner();
   const progress = learner
     ? await prisma.lessonProgress.findMany({ where: { learnerId: learner.id } })

@@ -133,7 +133,7 @@ export function rebuiltCount(ex: ScreenCritiqueExercise, answer: CritiqueAnswer)
 // ── Built-in scene content ───────────────────────────────────────────────────
 
 /** Scene keys the player knows how to render: built-in DOM scenes + 'image'. */
-export const CRITIQUE_SCENES = ['premium-card', 'image'] as const;
+export const CRITIQUE_SCENES = ['premium-card', 'image', 'svg'] as const;
 
 export const PREMIUM_CARD_SCREEN_TITLE =
   'Экран банковской «Премиум карты» — баланс, действия, промо и бонусы';

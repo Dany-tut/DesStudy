@@ -10,6 +10,7 @@ import type {
   CritiqueImage,
 } from '@/lib/curriculum/types';
 import { CRITIQUE_ROLES, CRITIQUE_DEFECTS, CRITIQUE_SCENES } from '@/lib/curriculum/screenCritique';
+import { SvgBuilder } from './critique/SvgBuilder';
 
 /**
  * Admin editor for a screen-critique exercise.
@@ -49,21 +50,28 @@ export function ScreenCritiqueFields({
   screenTitle,
   zones,
   image,
+  svg,
   onScene,
   onScreenTitle,
   onZones,
   onImage,
+  onSvg,
 }: {
   scene: string;
   screenTitle: string;
   zones: CritiqueZone[];
   image?: CritiqueImage;
+  svg?: string;
   onScene: (v: string) => void;
   onScreenTitle: (v: string) => void;
   onZones: (v: CritiqueZone[]) => void;
   onImage: (v: CritiqueImage | undefined) => void;
+  onSvg: (v: string | undefined) => void;
 }) {
   const isImage = scene === 'image';
+  const isSvg = scene === 'svg';
+  // 'image' and 'svg' both carry teacher-authored, freely-editable zone geometry.
+  const isFreeform = isImage || isSvg;
   const [analyzing, setAnalyzing] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   // Cache the analyzable bytes of the broken/good uploads.
@@ -194,7 +202,11 @@ export function ScreenCritiqueFields({
           <select className={inputClass} value={scene} onChange={(e) => onScene(e.target.value)}>
             {CRITIQUE_SCENES.map((s) => (
               <option key={s} value={s}>
-                {s === 'image' ? 'Загруженный экран (image)' : s}
+                {s === 'image'
+                  ? 'Загруженный экран (image)'
+                  : s === 'svg'
+                    ? 'Конструктор экрана (svg)'
+                    : s}
               </option>
             ))}
           </select>
@@ -233,9 +245,15 @@ export function ScreenCritiqueFields({
         </div>
       )}
 
+      {isSvg && (
+        <SvgBuilder svg={svg} zones={zones} onSvg={onSvg} onZones={onZones} />
+      )}
+
       <div className="space-y-3">
         <p className="text-caption text-secondary">
-          Зоны экрана ({zones.length}){!isImage && ' — id зон заданы сценой'}
+          Зоны экрана ({zones.length})
+          {!isFreeform && ' — id зон заданы сценой'}
+          {isSvg && ' — отмечай слои кнопкой «Сделать зоной» выше'}
         </p>
         {zones.map((z, i) => (
           <div key={z.id} className="rounded-lg border border-border bg-surface p-3">
@@ -247,14 +265,14 @@ export function ScreenCritiqueFields({
                 placeholder="Название зоны"
                 onChange={(e) => patchZone(i, { label: e.target.value })}
               />
-              {isImage && (
+              {isFreeform && (
                 <button type="button" onClick={() => removeZone(i)} className="shrink-0 text-tertiary hover:text-danger">
                   <X size={15} />
                 </button>
               )}
             </div>
 
-            {isImage && z.rect && (
+            {isFreeform && z.rect && (
               <div className="mb-3 grid grid-cols-4 gap-2">
                 {(['x0', 'y0', 'x1', 'y1'] as const).map((k) => (
                   <div key={k}>

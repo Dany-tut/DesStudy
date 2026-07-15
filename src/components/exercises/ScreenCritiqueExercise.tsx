@@ -23,6 +23,7 @@ import {
 import type { FixReply } from '@/lib/ai/mentor';
 import { PremiumCardScene } from './scenes/PremiumCardScene';
 import { ImageScene } from './scenes/ImageScene';
+import { SvgScene } from './scenes/SvgScene';
 import { useT } from '@/lib/i18n/client';
 
 const VERDICT_UI: Record<Verdict, { ring: string; icon: typeof Check; text: string; bg: string }> = {
@@ -210,6 +211,17 @@ export function ScreenCritiqueExercise({
         {exercise.scene === 'image' && exercise.image ? (
           <ImageScene
             image={exercise.image}
+            zones={zones}
+            fixed={fixedSet}
+            selected={selected}
+            onSelect={setSelected}
+            verdicts={checked ? worstByZone : undefined}
+            checked={checked}
+            interactive={!checked}
+          />
+        ) : exercise.scene === 'svg' && exercise.svg ? (
+          <SvgScene
+            svg={exercise.svg}
             zones={zones}
             fixed={fixedSet}
             selected={selected}

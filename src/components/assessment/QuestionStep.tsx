@@ -34,10 +34,10 @@ export function QuestionStep({
       {interactive ? (
         <>
           {question.interactive === 'color-contrast' && (
-            <ColorContrastTask value={value} onLevel={onChange} />
+            <ColorContrastTask onLevel={onChange} />
           )}
           {question.interactive === 'component-states' && (
-            <ComponentStatesTask value={value} onLevel={onChange} />
+            <ComponentStatesTask onLevel={onChange} />
           )}
           <button
             type="button"
@@ -65,6 +65,9 @@ function SelfAssessment({
   value: SkillLevel | undefined;
   onChange: (level: SkillLevel) => void;
 }) {
+  if (question.multi) {
+    return <MultiSelect question={question} onChange={onChange} />;
+  }
   if (question.present === 'segmented') {
     return (
       <div className="flex flex-wrap">
@@ -84,6 +87,52 @@ function SelfAssessment({
           label={o.label}
           selected={value === o.level}
           onClick={() => onChange(o.level)}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Multi-answer question: several independent options can be picked. The resolved
+ * level lifted to the player is the highest picked (the hardest thing you can do
+ * defines your level). The first option ("ничего") is exclusive — picking it
+ * clears the rest, and picking anything else clears it.
+ */
+function MultiSelect({
+  question,
+  onChange,
+}: {
+  question: Question;
+  onChange: (level: SkillLevel) => void;
+}) {
+  const [picked, setPicked] = useState<Set<SkillLevel>>(new Set());
+  const noneLevel = question.options[0].level; // "Больше ничего"
+
+  const toggle = (level: SkillLevel) => {
+    const next = new Set(picked);
+    if (next.has(level)) {
+      next.delete(level);
+    } else if (level === noneLevel) {
+      next.clear();
+      next.add(level);
+    } else {
+      next.delete(noneLevel);
+      next.add(level);
+    }
+    setPicked(next);
+    const max = next.size ? (Math.max(...next) as SkillLevel) : noneLevel;
+    onChange(max);
+  };
+
+  return (
+    <div className="grid gap-2.5">
+      {question.options.map((o) => (
+        <ChoiceCard
+          key={o.level}
+          label={o.label}
+          selected={picked.has(o.level)}
+          onClick={() => toggle(o.level)}
         />
       ))}
     </div>
@@ -113,10 +162,8 @@ function levelFromRatio(ratio: number): SkillLevel {
 const BG_VALUE = 0.16; // #292929 sample card
 
 function ColorContrastTask({
-  value,
   onLevel,
 }: {
-  value: SkillLevel | undefined;
   onLevel: (level: SkillLevel) => void;
 }) {
   const [lightness, setLightness] = useState(45); // 0..100 text grey value
@@ -150,17 +197,9 @@ function ColorContrastTask({
           onLevel(levelFromRatio(contrastRatio(n / 100, BG_VALUE)));
         }}
       />
-      <div className="mt-4 flex items-center justify-between text-footnote">
+      <div className="mt-4 text-footnote">
         <span className="tabular-nums text-secondary">Контраст {ratio.toFixed(1)}:1</span>
-        <span className={pass ? 'font-medium text-success' : 'text-danger'}>
-          {ratio >= 7 ? 'AAA — отлично' : pass ? 'AA — норма' : ratio >= 3 ? 'только для крупного' : 'не читается'}
-        </span>
       </div>
-      {value && (
-        <p className="mt-3 flex items-center gap-1.5 text-footnote text-tertiary">
-          <Sparkles size={13} className="text-brand" /> Оценка навыка: уровень {value}/4
-        </p>
-      )}
     </div>
   );
 }
@@ -196,10 +235,8 @@ function levelFromStates(selected: Set<string>): SkillLevel {
 }
 
 function ComponentStatesTask({
-  value,
   onLevel,
 }: {
-  value: SkillLevel | undefined;
   onLevel: (level: SkillLevel) => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -239,11 +276,6 @@ function ComponentStatesTask({
           );
         })}
       </div>
-      {value && (
-        <p className="mt-4 flex items-center gap-1.5 text-footnote text-tertiary">
-          <Sparkles size={13} className="text-brand" /> Оценка навыка: уровень {value}/4
-        </p>
-      )}
     </div>
   );
 }

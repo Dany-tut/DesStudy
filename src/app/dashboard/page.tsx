@@ -11,16 +11,15 @@ import {
 } from 'lucide-react';
 import { getLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
-import { PATHS } from '@/content/curriculum';
+import { getPaths, type LessonEntry } from '@/content/curriculum';
 import { getT } from '@/lib/i18n/server';
 import type { Translator } from '@/lib/i18n/translator';
 
 export const dynamic = 'force-dynamic';
 
-const ALL_LESSONS = PATHS.flatMap((p) => p.lessons);
-
 export default async function DashboardPage() {
-  const { t, tp } = await getT();
+  const { t, tp, locale } = await getT();
+  const ALL_LESSONS = getPaths(locale).flatMap((p) => p.lessons);
   const learner = await getLearner();
 
   if (!learner) {
@@ -137,7 +136,7 @@ export default async function DashboardPage() {
                   <XCircle size={16} className="shrink-0 text-danger" />
                 )}
                 <span className="flex-1 text-body text-primary">
-                  {lessonTitle(a.lessonSlug)}
+                  {lessonTitle(a.lessonSlug, ALL_LESSONS)}
                   <span className="ml-2 text-footnote text-tertiary">{a.skill}</span>
                 </span>
                 <span className="text-footnote tabular-nums text-tertiary">
@@ -157,8 +156,8 @@ export default async function DashboardPage() {
   );
 }
 
-function lessonTitle(slug: string): string {
-  return ALL_LESSONS.find((l) => l.slug === slug)?.title ?? slug;
+function lessonTitle(slug: string, all: LessonEntry[]): string {
+  return all.find((l) => l.slug === slug)?.title ?? slug;
 }
 
 function formatWhen(date: Date, t: Translator['t']): string {

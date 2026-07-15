@@ -96,7 +96,10 @@ function ValueBubble({ text }: { text: string }) {
 
 // The particle overlay extends this far above/below the track so sparks can fly
 // clear of it in every direction — the celebration isn't clipped to the slider.
-const PARTICLE_PAD = 64; // px of vertical overflow on each side
+// Sparks are tuned (via drag) to fade out well within this margin, so they never
+// reach the canvas edge and get hard-clipped.
+const PARTICLE_PAD = 84; // px of vertical overflow on each side
+const PARTICLE_DRAG = 0.9; // per-frame velocity retention (lower = shorter reach)
 
 /**
  * A burst of glowing sparks that erupt from the thumb and fly outward in every
@@ -152,16 +155,19 @@ function TrackParticles({
     const spawn = (p: P, initial = false) => {
       const ox = thumbRef.current * dpr; // thumb center in canvas px
       const ang = rnd() * Math.PI * 2; // full 360° spray
-      const spd = (2.4 + rnd() * 6.2) * dpr; // energetic, varied
+      const spd = (1.6 + rnd() * 3.4) * dpr; // energetic pop, then drag reins it in
       p.vx = Math.cos(ang) * spd;
-      p.vy = Math.sin(ang) * spd - 1.1 * dpr; // slight upward bias
+      p.vy = Math.sin(ang) * spd - 0.8 * dpr; // slight upward bias
       p.r = (0.7 + rnd() * 2.1) * dpr;
-      p.max = 46 + rnd() * 74;
+      p.max = 38 + rnd() * 36;
       p.life = initial ? rnd() * p.max : 0;
-      // Offset an initial particle along its own trajectory so the first frame
-      // already shows a full, in-flight burst rather than a point.
-      p.x = ox + p.vx * p.life;
-      p.y = midY() + p.vy * p.life;
+      // Offset an initial particle along its trajectory so the first frame already
+      // shows a full, in-flight burst rather than a point. Use the drag-integrated
+      // displacement (∑ vx·DRAG^k) so it lands where physics would actually put it
+      // — a naive vx·life would fling it far past the canvas and clip.
+      const reach = (1 - Math.pow(PARTICLE_DRAG, p.life)) / (1 - PARTICLE_DRAG);
+      p.x = ox + p.vx * reach;
+      p.y = midY() + p.vy * reach;
     };
 
     const ps: P[] = Array.from({ length: N }, () => {
@@ -202,8 +208,11 @@ function TrackParticles({
         p.life += 1;
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.035 * dpr; // gentle gravity → arcing trajectories
-        p.vx *= 0.99; // mild air drag
+        p.vy += 0.04 * dpr; // gentle gravity → arcing trajectories
+        // Strong drag: sparks burst out fast, then settle and fade in place — so
+        // their reach stays well inside the canvas and never hard-clips at the edge.
+        p.vx *= PARTICLE_DRAG;
+        p.vy *= PARTICLE_DRAG;
         // Quick fade-in off the thumb, then a long fade out over the lifetime.
         const t = p.life / p.max;
         const a = Math.max(0, Math.min(1, t < 0.1 ? t / 0.1 : 1 - (t - 0.1) / 0.9)) * 0.9;

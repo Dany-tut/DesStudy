@@ -37,6 +37,8 @@ export interface ExerciseDraft {
   screenTitle: string;
   zones: CritiqueZone[];
   image?: CritiqueImage;
+  /** Teacher-authored mockup markup for the 'svg' scene (visual builder). */
+  svg?: string;
 }
 
 const inputClass =
@@ -233,10 +235,12 @@ export function ExerciseFieldsEditor({
           screenTitle={draft.screenTitle}
           zones={draft.zones}
           image={draft.image}
+          svg={draft.svg}
           onScene={(v) => set('scene', v)}
           onScreenTitle={(v) => set('screenTitle', v)}
           onZones={(v) => set('zones', v)}
           onImage={(v) => set('image', v)}
+          onSvg={(v) => set('svg', v)}
         />
       )}
 

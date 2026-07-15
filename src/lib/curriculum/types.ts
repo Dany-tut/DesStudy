@@ -509,6 +509,12 @@ export interface CritiqueZone {
    * by the `image` scene to place the clickable overlay; DOM scenes ignore it.
    */
   rect?: { x0: number; y0: number; x1: number; y1: number };
+  /**
+   * Source layer this zone was promoted from, in the `svg` scene's visual
+   * builder. Links a zone back to its `data-layer-id` node so the editor can
+   * highlight it and refresh `rect` if the layer moves. Ignored by the player.
+   */
+  layerId?: string;
 }
 
 /**
@@ -526,10 +532,17 @@ export interface ScreenCritiqueExercise {
   id: string;
   type: 'screen-critique';
   prompt: string;
-  /** Scene to render: a built-in DOM key ('premium-card') or 'image'. */
+  /** Scene to render: a built-in DOM key ('premium-card'), 'image', or 'svg'. */
   scene: string;
   /** Uploaded screens — required when `scene === 'image'`. */
   image?: CritiqueImage;
+  /**
+   * Teacher-authored mockup markup — required when `scene === 'svg'`. Produced by
+   * the visual builder (imported SVG + inspector edits); every layer node carries
+   * a `data-layer-id`. The player renders it verbatim and overlays the clickable
+   * zones by their `rect`, exactly like the `image` scene.
+   */
+  svg?: string;
   /** Screen description passed to the AI for fix-coaching context. */
   screenTitle: string;
   zones: CritiqueZone[];

@@ -45,7 +45,7 @@ function attrOrStyle(el: Element, name: string): string | undefined {
   return styleProp(el, name);
 }
 
-function num(v: string | undefined): number | undefined {
+function num(v: string | null | undefined): number | undefined {
   if (v == null) return undefined;
   const n = parseFloat(v);
   return Number.isFinite(n) ? n : undefined;

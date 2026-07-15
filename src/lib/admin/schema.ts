@@ -174,6 +174,7 @@ export function parseExercise(data: Record<string, unknown>): Exercise {
           defectNote: text(z.defectNote),
           fixes: fixes.length ? fixes : undefined,
           rect,
+          layerId: optionalStr(z.layerId),
         };
       });
       if (zones.length === 0) throw new ValidationError('screen-critique: нужна хотя бы одна зона');
@@ -185,12 +186,20 @@ export function parseExercise(data: Record<string, unknown>): Exercise {
           throw new ValidationError('image-сцена: у каждой зоны должна быть рамка (rect)');
         }
       }
+      let svg: string | undefined;
+      if (scene === 'svg') {
+        svg = str(data.svg, 'svg');
+        if (zones.some((z) => !z.rect)) {
+          throw new ValidationError('svg-сцена: у каждой зоны должна быть рамка (rect)');
+        }
+      }
       return {
         id,
         type: 'screen-critique',
         prompt,
         scene,
         image,
+        svg,
         screenTitle: text(data.screenTitle),
         zones,
         explanation,

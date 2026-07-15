@@ -34,6 +34,13 @@ export interface Question {
   present: QuestionPresentation;
   /** when set, the step renders an interactive mini-task before the options */
   interactive?: Interaction;
+  /**
+   * When true, several options can be picked at once (independent skills, not a
+   * single progressive ladder). The resolved level is the highest picked — the
+   * hardest thing you can do defines your level. Multi questions never
+   * auto-advance; the learner confirms with a "Далее".
+   */
+  multi?: boolean;
   options: [Option, Option, Option, Option];
 }
 
@@ -101,7 +108,7 @@ export const QUESTIONS: Question[] = [
     skillId: 'figma',
     category: 'ui',
     prompt: 'Уровень владения Figma',
-    present: 'segmented',
+    present: 'choice',
     options: [
       o(1, 'Фреймы, группы, стили'),
       o(2, 'Автолейауты, компоненты, варианты, плагины'),
@@ -283,8 +290,9 @@ export const QUESTIONS: Question[] = [
     order: 19,
     skillId: 'more-research',
     category: 'product',
-    prompt: 'Какие ещё виды исследований умеете?',
+    prompt: 'Какие ещё виды исследований умеете? Отметьте всё, что делали',
     present: 'choice',
+    multi: true,
     options: [
       o(1, 'Больше ничего'),
       o(2, 'Коридорки, карточные сортировки'),

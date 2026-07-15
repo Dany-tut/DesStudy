@@ -37,6 +37,7 @@ export function emptyDraft(type: ExerciseDraft['type']): ExerciseDraft {
     scene: 'premium-card',
     screenTitle: '',
     zones: [],
+    svg: undefined,
   };
   if (type === 'choose') {
     const a = rid('opt');
@@ -117,13 +118,16 @@ export function payloadToDraft(payload: Record<string, unknown>): ExerciseDraft 
     d.scene = (payload.scene as string) || 'premium-card';
     d.screenTitle = (payload.screenTitle as string) || PREMIUM_CARD_SCREEN_TITLE;
     const zones = payload.zones as CritiqueZone[] | undefined;
-    d.zones =
-      d.scene === 'image'
-        ? (zones ?? [])
-        : zones && zones.length
-          ? zones
-          : (JSON.parse(JSON.stringify(PREMIUM_CARD_ZONES)) as CritiqueZone[]);
+    // 'image'/'svg' zones are teacher-authored (may be empty); the built-in DOM
+    // scene falls back to its fixed zone set so the grader always has truth.
+    const freeform = d.scene === 'image' || d.scene === 'svg';
+    d.zones = freeform
+      ? (zones ?? [])
+      : zones && zones.length
+        ? zones
+        : (JSON.parse(JSON.stringify(PREMIUM_CARD_ZONES)) as CritiqueZone[]);
     d.image = (payload.image as ExerciseDraft['image']) ?? undefined;
+    d.svg = (payload.svg as string) ?? undefined;
   }
   return d;
 }
@@ -176,6 +180,7 @@ export function draftToPayload(d: ExerciseDraft): Record<string, unknown> {
         screenTitle: d.screenTitle,
         zones: d.zones,
         ...(d.scene === 'image' && d.image ? { image: d.image } : {}),
+        ...(d.scene === 'svg' && d.svg ? { svg: d.svg } : {}),
       };
   }
 }

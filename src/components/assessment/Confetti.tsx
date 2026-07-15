@@ -38,15 +38,18 @@ export function Confetti({ pieces = 90 }: { pieces?: number }) {
   );
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+    // Fixed to the viewport (not the tall result page) so pieces fall the full
+    // screen height and never pile into a mid-page band, and fade to 0 as they
+    // land so the burst disappears once it's done.
+    <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden" aria-hidden>
       {bits.map((b, i) => (
         <motion.span
           key={i}
-          className="absolute top-0 block rounded-[1px]"
+          className="absolute -top-6 block rounded-[1px]"
           style={{ left: `${b.left}%`, width: b.size, height: b.size * 0.6, background: b.color }}
-          initial={{ y: -20, opacity: 0, rotate: 0 }}
-          animate={{ y: '105vh', x: b.drift, opacity: [0, 1, 1, 0.9], rotate: b.rotate }}
-          transition={{ duration: b.duration, delay: b.delay, ease: 'easeIn' }}
+          initial={{ y: 0, opacity: 0, rotate: 0 }}
+          animate={{ y: '110vh', x: b.drift, opacity: [0, 1, 1, 0], rotate: b.rotate }}
+          transition={{ duration: b.duration, delay: b.delay, ease: [0.4, 0.1, 0.7, 1], times: [0, 0.1, 0.8, 1] }}
         />
       ))}
     </div>

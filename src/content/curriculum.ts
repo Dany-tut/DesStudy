@@ -1,44 +1,17 @@
-import {
-  designThinkingIntro,
-  figmaIntro,
-  spacing8pt,
-  radiusScale,
-  typeHierarchy,
-  colorContrast,
-  uxHeuristics,
-  uxHeuristicsControl,
-  uxHeuristicsClarity,
-  uxHeuristicsConsistency,
-  userFlows,
-  userFlowsEdge,
-  informationArchitecture,
-  designTokens,
-  componentsVariants,
-  navBars,
-  forms,
-  formsValidation,
-  formsStructure,
-  emptyStates,
-  microTypography,
-  gridsComposition,
-  figmaComponentsSlots,
-  aiDesignTools,
-  briefResearch,
-  researchMethods,
-  insightsToConcept,
-  paletteElements,
-  responsiveLayout,
-  microcopy,
-} from './lessons';
 import type { Lesson } from '@/lib/curriculum/types';
+import { getLessonsMap } from './lessons/localized';
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/config';
 
 export type Level = 'beginner' | 'medium' | 'advanced';
 
-export const LEVEL_LABEL: Record<Level, string> = {
-  beginner: 'Начальный',
-  medium: 'Средний',
-  advanced: 'Продвинутый',
+/** Human labels per level, by locale. */
+export const LEVEL_LABEL_BY_LOCALE: Record<Locale, Record<Level, string>> = {
+  ru: { beginner: 'Начальный', medium: 'Средний', advanced: 'Продвинутый' },
+  en: { beginner: 'Beginner', medium: 'Intermediate', advanced: 'Advanced' },
 };
+
+/** Back-compat default (Russian) — prefer LEVEL_LABEL_BY_LOCALE[locale]. */
+export const LEVEL_LABEL: Record<Level, string> = LEVEL_LABEL_BY_LOCALE[DEFAULT_LOCALE];
 
 /** A lesson entry in a path — either a built lesson or a planned placeholder. */
 export interface LessonEntry {
@@ -83,70 +56,122 @@ function entry(lesson: Lesson, extra: { emoji: string; popular?: boolean }): Les
   };
 }
 
-export const PATHS: LearningPath[] = [
+/** One lesson slot inside a path: which lesson, its card emoji, popularity. */
+interface PathLessonRef {
+  slug: string;
+  emoji: string;
+  popular?: boolean;
+}
+
+/** Locale-independent path structure + per-locale path descriptions. Path
+ * titles are English brand terms ("UI Foundations") and stay the same in both
+ * languages; only the description is translated. Lesson titles come from the
+ * (localized) lesson objects, resolved by slug at build time. */
+interface PathDef {
+  id: string;
+  title: string;
+  emoji: string;
+  description: Record<Locale, string>;
+  lessons: PathLessonRef[];
+}
+
+const PATH_DEFS: PathDef[] = [
   {
     id: 'ui-foundations',
     title: 'UI Foundations',
-    description: 'Сетки, отступы, иерархия, типографика — база визуального дизайна.',
     emoji: '📐',
+    description: {
+      ru: 'Сетки, отступы, иерархия, типографика — база визуального дизайна.',
+      en: 'Grids, spacing, hierarchy, typography — the base of visual design.',
+    },
     lessons: [
-      entry(designThinkingIntro, { emoji: '🎓' }),
-      entry(figmaIntro, { emoji: '🖌️' }),
-      entry(spacing8pt, { emoji: '📏', popular: true }),
-      entry(radiusScale, { emoji: '⬜' }),
-      entry(typeHierarchy, { emoji: '🔤', popular: true }),
-      entry(colorContrast, { emoji: '🎨' }),
-      entry(microTypography, { emoji: '✍️' }),
-      entry(gridsComposition, { emoji: '🔲', popular: true }),
-      entry(responsiveLayout, { emoji: '📱' }),
-      entry(navBars, { emoji: '🧱' }),
+      { slug: 'design-thinking-intro', emoji: '🎓' },
+      { slug: 'figma-intro', emoji: '🖌️' },
+      { slug: 'spacing-8pt-grid', emoji: '📏', popular: true },
+      { slug: 'radius-scale', emoji: '⬜' },
+      { slug: 'type-hierarchy', emoji: '🔤', popular: true },
+      { slug: 'color-contrast', emoji: '🎨' },
+      { slug: 'micro-typography', emoji: '✍️' },
+      { slug: 'grids-composition', emoji: '🔲', popular: true },
+      { slug: 'responsive-layout', emoji: '📱' },
+      { slug: 'nav-bars', emoji: '🧱' },
     ],
   },
   {
     id: 'ux-foundations',
     title: 'UX Foundations',
-    description: 'Пользовательские потоки, эвристики, продуктовое мышление.',
     emoji: '🧭',
+    description: {
+      ru: 'Пользовательские потоки, эвристики, продуктовое мышление.',
+      en: 'User flows, heuristics, product thinking.',
+    },
     lessons: [
-      entry(uxHeuristics, { emoji: '🔍', popular: true }),
-      entry(uxHeuristicsControl, { emoji: '🛟' }),
-      entry(uxHeuristicsClarity, { emoji: '💬' }),
-      entry(uxHeuristicsConsistency, { emoji: '🧩' }),
-      entry(userFlows, { emoji: '🧭' }),
-      entry(userFlowsEdge, { emoji: '🔀' }),
-      entry(informationArchitecture, { emoji: '🗂️' }),
-      entry(forms, { emoji: '📝' }),
-      entry(formsValidation, { emoji: '⚠️' }),
-      entry(formsStructure, { emoji: '🧱' }),
-      entry(microcopy, { emoji: '✏️' }),
-      entry(emptyStates, { emoji: '🗂️' }),
+      { slug: 'ux-heuristics', emoji: '🔍', popular: true },
+      { slug: 'ux-heuristics-control', emoji: '🛟' },
+      { slug: 'ux-heuristics-clarity', emoji: '💬' },
+      { slug: 'ux-heuristics-consistency', emoji: '🧩' },
+      { slug: 'user-flows', emoji: '🧭' },
+      { slug: 'user-flows-edge', emoji: '🔀' },
+      { slug: 'information-architecture', emoji: '🗂️' },
+      { slug: 'forms', emoji: '📝' },
+      { slug: 'forms-validation', emoji: '⚠️' },
+      { slug: 'forms-structure', emoji: '🧱' },
+      { slug: 'microcopy', emoji: '✏️' },
+      { slug: 'empty-states', emoji: '🗂️' },
     ],
   },
   {
     id: 'design-systems',
     title: 'Design Systems',
-    description: 'Токены, компоненты, варианты, авто-лейаут.',
     emoji: '🧩',
+    description: {
+      ru: 'Токены, компоненты, варианты, авто-лейаут.',
+      en: 'Tokens, components, variants, auto-layout.',
+    },
     lessons: [
-      entry(designTokens, { emoji: '🎛️' }),
-      entry(componentsVariants, { emoji: '🧩' }),
-      entry(figmaComponentsSlots, { emoji: '🧬', popular: true }),
-      entry(aiDesignTools, { emoji: '🤖' }),
+      { slug: 'design-tokens', emoji: '🎛️' },
+      { slug: 'components-variants', emoji: '🧩' },
+      { slug: 'figma-components-slots', emoji: '🧬', popular: true },
+      { slug: 'ai-design-tools', emoji: '🤖' },
     ],
   },
   {
     id: 'design-process',
     title: 'Design Process',
-    description: 'От брифа и исследования до концепции и вайрфреймов — как рождается проект.',
     emoji: '🗺️',
+    description: {
+      ru: 'От брифа и исследования до концепции и вайрфреймов — как рождается проект.',
+      en: 'From brief and research to concept and wireframes — how a project is born.',
+    },
     lessons: [
-      entry(briefResearch, { emoji: '📋', popular: true }),
-      entry(researchMethods, { emoji: '🔬' }),
-      entry(insightsToConcept, { emoji: '💡' }),
-      entry(paletteElements, { emoji: '🎨' }),
+      { slug: 'brief-research', emoji: '📋', popular: true },
+      { slug: 'research-methods', emoji: '🔬' },
+      { slug: 'insights-to-concept', emoji: '💡' },
+      { slug: 'palette-elements', emoji: '🎨' },
     ],
   },
 ];
+
+/** Build the learning paths for a locale, pulling lesson titles/metadata from
+ * the localized lesson objects (English falls back to Russian per lesson). */
+export function getPaths(locale: Locale = DEFAULT_LOCALE): LearningPath[] {
+  const map = getLessonsMap(locale);
+  return PATH_DEFS.map((def) => ({
+    id: def.id,
+    title: def.title,
+    description: def.description[locale],
+    emoji: def.emoji,
+    lessons: def.lessons
+      .map((ref) => {
+        const lesson = map[ref.slug];
+        return lesson ? entry(lesson, { emoji: ref.emoji, popular: ref.popular }) : null;
+      })
+      .filter((e): e is LessonEntry => e !== null),
+  }));
+}
+
+/** Russian paths — back-compat for call sites that haven't threaded a locale. */
+export const PATHS: LearningPath[] = getPaths(DEFAULT_LOCALE);
 
 export const totalLessons = PATHS.reduce((n, p) => n + p.lessons.length, 0);
 export const availableLessons = PATHS.reduce(

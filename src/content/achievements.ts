@@ -9,6 +9,7 @@ export interface AchievementStats {
 }
 
 import type { GemTone } from '@/components/achievements/CrystalGem';
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/config';
 
 export interface Achievement {
   id: string;
@@ -111,3 +112,32 @@ export const ACHIEVEMENTS: Achievement[] = [
     check: (s) => s.firstTryCount >= 5,
   },
 ];
+
+/** English title/description per achievement id — overlaid on the Russian
+ * source (which carries ids, tones, emojis, and the check predicates). */
+const ACHIEVEMENTS_EN: Record<string, { title: string; description: string }> = {
+  'first-steps': { title: 'First steps', description: 'Complete your first lesson' },
+  'five-lessons': { title: 'Five lessons', description: 'Complete 5 lessons' },
+  'full-program': { title: 'Whole program', description: 'Complete the entire program' },
+  'streak-3': { title: 'Warming up', description: 'Study 3 days in a row' },
+  'streak-7': { title: 'A week straight', description: 'Study 7 days in a row' },
+  'streak-30': { title: 'Iron discipline', description: 'Study 30 days in a row' },
+  'xp-100': { title: '100 XP', description: 'Earn 100 experience points' },
+  'xp-500': { title: '500 XP', description: 'Earn 500 experience points' },
+  'xp-1000': { title: '1000 XP', description: 'Earn 1000 experience points' },
+  'skill-master': {
+    title: 'Skill master',
+    description: 'Hold 90%+ accuracy in a skill (5+ attempts)',
+  },
+  'first-try-5': { title: 'First try', description: 'Solve 5 tasks on the first try' },
+};
+
+/** Achievements localized for a locale — English overlays title/description,
+ * falling back to the Russian source for any id missing a translation. */
+export function getAchievements(locale: Locale = DEFAULT_LOCALE): Achievement[] {
+  if (locale !== 'en') return ACHIEVEMENTS;
+  return ACHIEVEMENTS.map((a) => {
+    const en = ACHIEVEMENTS_EN[a.id];
+    return en ? { ...a, title: en.title, description: en.description } : a;
+  });
+}

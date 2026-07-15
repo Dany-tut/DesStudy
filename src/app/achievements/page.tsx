@@ -3,14 +3,15 @@ import { CrystalGem } from '@/components/achievements/CrystalGem';
 import { getLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
 import { totalLessons } from '@/content/curriculum';
-import { ACHIEVEMENTS, type AchievementStats } from '@/content/achievements';
+import { getAchievements, type AchievementStats } from '@/content/achievements';
 import { ComingSoon } from '@/components/shell/ComingSoon';
 import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AchievementsPage() {
-  const { t, tp } = await getT();
+  const { t, tp, locale } = await getT();
+  const ACHIEVEMENTS = getAchievements(locale);
   const learner = await getLearner();
 
   if (!learner) {

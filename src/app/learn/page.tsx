@@ -1,7 +1,7 @@
 import { Flame } from 'lucide-react';
 import { getLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
-import { PATHS, type LessonEntry } from '@/content/curriculum';
+import { getPaths, type LessonEntry } from '@/content/curriculum';
 import { blocksToLesson } from '@/lib/admin/blocksToLesson';
 import { LearnBrowser, type LearnGroup } from '@/components/learn/LearnBrowser';
 import { getT } from '@/lib/i18n/server';
@@ -40,7 +40,8 @@ async function getAuthoredEntries(): Promise<LessonEntry[]> {
 }
 
 export default async function LearnPage() {
-  const { t, tp } = await getT();
+  const { t, tp, locale } = await getT();
+  const PATHS = getPaths(locale);
   const learner = await getLearner();
   const progress = learner
     ? await prisma.lessonProgress.findMany({ where: { learnerId: learner.id } })
