@@ -146,6 +146,9 @@ function walkChildren(el: Element, counter: { n: number }): Layer[] {
     const child = node as Element;
     const tag = localName(child);
     if (SKIP_TAGS.has(tag)) continue;
+    // A frame's own bounds rect is chrome, not a real child — it must never show
+    // up in the layer tree (drawn frames and framified groups both carry one).
+    if (child.getAttribute('data-frame-bg')) continue;
 
     const id = `L${counter.n++}`;
     child.setAttribute('data-layer-id', id);

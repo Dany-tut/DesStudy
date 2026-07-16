@@ -832,6 +832,21 @@ export function EditorCore() {
         clip.appendChild(rect);
         el.insertBefore(clip, el.firstChild);
         el.setAttribute('clip-path', `url(#${clipId})`);
+        // Give the group its own bounds rect — the marker every other subsystem
+        // (frameParentAt drop-targeting, frame chrome, resize) uses to tell a real
+        // frame from a plain group. Without it the framified group snaps to nothing
+        // and reads as a group again. `fill="none"` so it never paints over the
+        // existing content; it exists purely for its geometry.
+        el.querySelectorAll(':scope > rect[data-frame-bg]').forEach((n) => n.remove());
+        const bg = doc.createElementNS(ns, 'rect');
+        bg.setAttribute('x', String(bbox.x));
+        bg.setAttribute('y', String(bbox.y));
+        bg.setAttribute('width', String(bbox.w));
+        bg.setAttribute('height', String(bbox.h));
+        bg.setAttribute('fill', 'none');
+        bg.setAttribute('data-frame-bg', '1');
+        // Behind the content (first graphical child), after the clipPath def.
+        el.insertBefore(bg, clip.nextSibling);
         return {
           ...r,
           svg: new XMLSerializer().serializeToString(doc.documentElement),
@@ -1746,7 +1761,9 @@ export function EditorCore() {
           })()}
           canFramify={(() => {
             const l = findLayer(result.screen.layers, menu.layerId);
-            return !!l && l.type === 'frame' && l.children.length > 0;
+            // Only a plain group (not already a frame) can be framified — once it
+            // is a real frame the option drops away, confirming the conversion.
+            return !!l && l.type === 'frame' && l.children.length > 0 && !l.props.frame;
           })()}
           onFramify={() => {
             framifyGroup(menu.layerId!);
