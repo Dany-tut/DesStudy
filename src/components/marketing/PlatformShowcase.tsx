@@ -314,11 +314,14 @@ function TuneMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
   const [gap, setGap] = useState(6);
   const [padding, setPadding] = useState(12);
 
-  const gapOk = gap > 0 && gap % 8 === 0;
-  const padOk = padding > 0 && padding % 8 === 0;
+  // Valid answers: multiples of 8 within a sensible range — 8, 16, 24.
+  // 32 / 40 count as too much, so they stay "wrong".
+  const onGrid = (v: number) => v >= 8 && v <= 24 && v % 8 === 0;
+  const gapOk = onGrid(gap);
+  const padOk = onGrid(padding);
   const allOk = gapOk && padOk;
 
-  const isOk = (g: number, p: number) => g > 0 && g % 8 === 0 && p > 0 && p % 8 === 0;
+  const isOk = (g: number, p: number) => onGrid(g) && onGrid(p);
 
   function bump(kind: 'gap' | 'pad', v: number) {
     const wasOk = isOk(gap, padding);
@@ -404,7 +407,7 @@ function TuneMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
         <Slider
           value={gap}
           min={0}
-          max={40}
+          max={24}
           step={4}
           unit="px"
           accent={gapOk ? SUCCESS_RGB : undefined}
@@ -423,10 +426,10 @@ function TuneMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
             <div
               className={`h-full rounded-full transition-base ${padOk ? 'bg-success' : 'bg-brand'}`}
-              style={{ width: `${(padding / 40) * 100}%` }}
+              style={{ width: `${(padding / 24) * 100}%` }}
             />
           </div>
-          <StepBtn label="прибавить padding" onClick={() => bump('pad', Math.min(40, padding + 4))}>
+          <StepBtn label="прибавить padding" onClick={() => bump('pad', Math.min(24, padding + 4))}>
             <Plus size={14} />
           </StepBtn>
         </div>

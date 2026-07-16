@@ -31,19 +31,34 @@ export default async function TeacherTestingPage() {
   const where: Prisma.LearnerWhereInput =
     user.role === 'BOSS' ? {} : { teacherId: user.id };
 
-  const [learners, courses] = await Promise.all([
-    prisma.learner.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        assessments: { orderBy: { createdAt: 'desc' }, take: 1 },
-        enrollments: { select: { courseId: true } },
-        applications: { orderBy: { createdAt: 'desc' }, take: 1 },
-      },
-      take: 500,
-    }),
-    prisma.course.findMany({ orderBy: { title: 'asc' } }),
-  ]);
+  // TEMP DIAGNOSTIC — surface the real server error on the page instead of the
+  // opaque "server-side exception" digest. Remove once the root cause is known.
+  let learners: Awaited<ReturnType<typeof prisma.learner.findMany>>;
+  let courses: Awaited<ReturnType<typeof prisma.course.findMany>>;
+  try {
+    [learners, courses] = await Promise.all([
+      prisma.learner.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          assessments: { orderBy: { createdAt: 'desc' }, take: 1 },
+          enrollments: { select: { courseId: true } },
+          applications: { orderBy: { createdAt: 'desc' }, take: 1 },
+        },
+        take: 500,
+      }),
+      prisma.course.findMany({ orderBy: { title: 'asc' } }),
+    ]);
+  } catch (err) {
+    return (
+      <main className="mx-auto max-w-[900px] px-8 py-12">
+        <h1 className="text-title2 font-bold text-red-600">DIAGNOSTIC — DB query failed</h1>
+        <pre className="mt-4 whitespace-pre-wrap break-all rounded-lg bg-black/80 p-4 text-xs text-green-300">
+          {err instanceof Error ? `${err.name}: ${err.message}\n\n${err.stack ?? ''}` : String(err)}
+        </pre>
+      </main>
+    );
+  }
 
   const students: StudentCard[] = learners.map((l) => {
     const latest = l.assessments[0];
