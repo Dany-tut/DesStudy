@@ -3,6 +3,7 @@ import { requireBoss } from '@/lib/auth';
 import { getT } from '@/lib/i18n/server';
 import { AdminDashboard, type AdminData } from '@/components/admin/AdminDashboard';
 import type { InviteRow } from '@/components/admin/InvitesPanel';
+import { loadApplicationRows } from '@/lib/admin/applications';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ export default async function AdminPage() {
     lessonCount,
     teachers,
     invites,
-    applications,
+    applicationRows,
     grades,
   ] = await Promise.all([
     prisma.user.count({ where: { role: 'TEACHER' } }),
@@ -44,23 +45,7 @@ export default async function AdminPage() {
       orderBy: { createdAt: 'desc' },
       include: { usedBy: { select: { email: true } } },
     }),
-    prisma.application.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        learner: {
-          select: {
-            name: true,
-            telegram: true,
-            phone: true,
-            assessments: {
-              orderBy: { createdAt: 'desc' },
-              take: 1,
-              select: { grade: true },
-            },
-          },
-        },
-      },
-    }),
+    loadApplicationRows(),
     prisma.assessment.groupBy({ by: ['grade'], _count: { grade: true } }),
   ]);
 
@@ -87,16 +72,7 @@ export default async function AdminPage() {
       learnerCount: t._count.learners,
     })),
     invites: inviteRows,
-    applications: applications.map((a) => ({
-      id: a.id,
-      name: a.learner.name,
-      telegram: a.learner.telegram,
-      phone: a.learner.phone,
-      plan: a.plan,
-      status: a.status,
-      grade: a.learner.assessments[0]?.grade ?? null,
-      createdAt: a.createdAt.toISOString(),
-    })),
+    applications: applicationRows,
     gradeDistribution: {
       junior: gradeCount('junior'),
       middle: gradeCount('middle'),

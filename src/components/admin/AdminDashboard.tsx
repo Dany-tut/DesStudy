@@ -13,12 +13,13 @@ import {
   Copy,
   Check,
   MessageCircle,
-  Phone,
+  RefreshCw,
   Send,
   X,
 } from 'lucide-react';
 import { InvitesPanel, type InviteRow } from '@/components/admin/InvitesPanel';
 import { useT } from '@/lib/i18n/client';
+import type { ApplicationRowData } from '@/lib/admin/applications';
 
 /**
  * Client shell for the BOSS admin hub. The server page (admin/page.tsx) loads
@@ -38,16 +39,7 @@ export interface TeacherRow {
   learnerCount: number;
 }
 
-export interface ApplicationRow {
-  id: string;
-  name: string | null;
-  telegram: string | null;
-  phone: string | null;
-  plan: string;
-  status: string;
-  grade: string | null;
-  createdAt: string; // ISO
-}
+export type ApplicationRow = ApplicationRowData;
 
 export interface AdminData {
   stats: { teacherCount: number; learnerCount: number; assessmentCount: number; lessonCount: number };
@@ -237,11 +229,35 @@ function UsersTab({ data }: { data: AdminData }) {
 
 // ── Applications tab (leads pipeline) ────────────────────────────────────────
 
+type AppFilter = 'all' | 'unread';
+
 function ApplicationsTab({ initial }: { initial: ApplicationRow[] }) {
   const { t } = useT();
   const [rows, setRows] = useState(initial);
+  const [filter, setFilter] = useState<AppFilter>('all');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const newCount = rows.filter((r) => r.status === 'new').length;
+  // Live inbox: seed from the server, then re-fetch on «Обновить» and on a slow
+  // poll so new leads + inbound replies surface without a full reload. Status
+  // edits are persisted server-side, so a refresh never loses them.
+  const refresh = async (spin = true) => {
+    if (spin) setRefreshing(true);
+    try {
+      const res = await fetch('/api/admin/applications');
+      if (!res.ok) throw new Error('failed');
+      const data = (await res.json()) as { applications: ApplicationRow[] };
+      setRows(data.applications);
+    } catch {
+      /* keep the last good snapshot */
+    } finally {
+      if (spin) setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setInterval(() => refresh(false), 15000);
+    return () => clearInterval(timer);
+  }, []);
 
   async function setStatus(id: string, status: string) {
     const prev = rows;
@@ -258,6 +274,11 @@ function ApplicationsTab({ initial }: { initial: ApplicationRow[] }) {
     }
   }
 
+  const newCount = rows.filter((r) => r.status === 'new').length;
+  const active = rows.filter((r) => r.status === 'new');
+  const processed = rows.filter((r) => r.status !== 'new');
+  const showProcessed = filter === 'all' && processed.length > 0;
+
   if (rows.length === 0) {
     return (
       <EmptyState icon={Inbox} title={t('admin.appsEmptyTitle')} body={t('admin.appsEmptyBody')} />
@@ -266,20 +287,193 @@ function ApplicationsTab({ initial }: { initial: ApplicationRow[] }) {
 
   return (
     <section>
-      <h2 className="mb-4 flex items-center gap-2 text-callout font-semibold text-primary">
-        {t('admin.appsHeading')}
-        {newCount > 0 && (
-          <span className="rounded-full bg-brand/10 px-2 py-0.5 text-caption font-medium text-brand">
-            {t('admin.appsNewBadge', { count: newCount })}
-          </span>
-        )}
-      </h2>
-      <div className="space-y-3">
-        {rows.map((r) => (
-          <ApplicationCard key={r.id} row={r} onStatus={setStatus} />
-        ))}
+      {/* Inbox header: title + unread badge · filter + refresh */}
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="flex items-center gap-2 text-callout font-semibold text-primary">
+          {t('admin.appsHeading')}
+          {newCount > 0 && (
+            <span className="rounded-full bg-brand/10 px-2 py-0.5 text-caption font-medium text-brand">
+              {t('admin.appsNewBadge', { count: newCount })}
+            </span>
+          )}
+        </h2>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-border bg-canvas p-0.5">
+            {(['all', 'unread'] as AppFilter[]).map((f) => {
+              const on = filter === f;
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  aria-pressed={on}
+                  className={[
+                    'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-footnote transition-base',
+                    on ? 'bg-surface font-medium text-primary shadow-sm' : 'text-tertiary hover:text-secondary',
+                  ].join(' ')}
+                >
+                  {f === 'all' ? t('admin.appsFilterAll') : t('admin.appsFilterUnread')}
+                  {f === 'unread' && newCount > 0 && (
+                    <span className="rounded-full bg-brand/10 px-1.5 text-caption font-medium text-brand">
+                      {newCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => refresh()}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-footnote text-secondary transition-base hover:border-border-strong hover:text-primary disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : undefined} />
+            {t('admin.appsRefresh')}
+          </button>
+        </div>
       </div>
+
+      {/* Active (unread) leads — expandable cards with the chat */}
+      <div className="space-y-3">
+        {active.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-border px-5 py-8 text-center text-footnote text-tertiary">
+            {t('admin.appsAllHandled')}
+          </p>
+        ) : (
+          active.map((r) => <ApplicationCard key={r.id} row={r} onStatus={setStatus} />)
+        )}
+      </div>
+
+      {/* Processed leads — compact rows with inline status control */}
+      {showProcessed && (
+        <div className="mt-8">
+          <div className="mb-2 flex items-center gap-2 px-1 text-caption font-medium uppercase tracking-wide text-tertiary">
+            {t('admin.appsProcessed')}
+            <span className="text-tertiary/70">{processed.length}</span>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-border">
+            {processed.map((r, i) => (
+              <ProcessedRow
+                key={r.id}
+                row={r}
+                onStatus={setStatus}
+                divider={i > 0}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </section>
+  );
+}
+
+/** Where the lead can be reached — label + optional link + copy payload. */
+function contactOf(row: ApplicationRow): { label: string; href: string | null; copy: string } | null {
+  if (row.telegram) {
+    const handle = row.telegram.startsWith('@') ? row.telegram : `@${row.telegram}`;
+    const tg = row.telegram.replace(/^@/, '').trim();
+    return { label: handle, href: tg ? `https://t.me/${tg}` : null, copy: handle };
+  }
+  if (row.email) return { label: row.email, href: `mailto:${row.email}`, copy: row.email };
+  if (row.phone) return { label: row.phone, href: `tel:${row.phone}`, copy: row.phone };
+  return null;
+}
+
+const SOURCE_LABEL_KEY: Record<ApplicationRow['source'], string | null> = {
+  telegram: 'admin.sourceTelegram',
+  email: 'admin.sourceEmail',
+  phone: 'admin.sourcePhone',
+  none: null,
+};
+
+/** Contact link + one-tap copy, shared by the card and processed rows. */
+function ContactLine({ row }: { row: ApplicationRow }) {
+  const { t } = useT();
+  const [copied, setCopied] = useState(false);
+  const contact = contactOf(row);
+  if (!contact) return null;
+
+  const copy = () => {
+    navigator.clipboard?.writeText(contact.copy).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {contact.href ? (
+        <a
+          href={contact.href}
+          target={contact.href.startsWith('http') ? '_blank' : undefined}
+          rel="noopener noreferrer"
+          className="truncate text-footnote font-medium text-brand hover:underline"
+        >
+          {contact.label}
+        </a>
+      ) : (
+        <span className="truncate text-footnote font-medium text-secondary">{contact.label}</span>
+      )}
+      <button
+        type="button"
+        onClick={copy}
+        aria-label={t('admin.copyContactAria')}
+        className="shrink-0 rounded p-0.5 text-tertiary transition-base hover:text-secondary"
+      >
+        {copied ? <Check size={13} className="text-brand" /> : <Copy size={13} />}
+      </button>
+    </span>
+  );
+}
+
+/** Segmented status control (Новая · Связались · Готово · Спам). */
+function StatusPills({
+  row,
+  onStatus,
+}: {
+  row: ApplicationRow;
+  onStatus: (id: string, status: string) => void;
+}) {
+  const { t } = useT();
+  return (
+    <div className="flex shrink-0 rounded-lg border border-border bg-canvas p-0.5">
+      {STATUS_FLOW.map((s) => {
+        const active = row.status === s.value;
+        return (
+          <button
+            key={s.value}
+            type="button"
+            onClick={() => onStatus(row.id, s.value)}
+            aria-pressed={active}
+            className={[
+              'rounded-md px-3 py-1.5 text-footnote transition-base',
+              active
+                ? s.value === 'spam'
+                  ? 'bg-danger/10 font-medium text-danger'
+                  : 'bg-surface font-medium text-primary shadow-sm'
+                : 'text-tertiary hover:text-secondary',
+            ].join(' ')}
+          >
+            {t(s.labelKey)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function useAppDate(iso: string) {
+  const { locale } = useT();
+  return useMemo(
+    () =>
+      new Date(iso).toLocaleString(locale, {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    [iso, locale],
   );
 }
 
@@ -290,36 +484,38 @@ function ApplicationCard({
   row: ApplicationRow;
   onStatus: (id: string, status: string) => void;
 }) {
-  const { t, locale } = useT();
-  const [copied, setCopied] = useState(false);
+  const { t } = useT();
   const [chatOpen, setChatOpen] = useState(false);
-  const tg = row.telegram?.replace(/^@/, '').trim() || null;
-  const tgUrl = tg ? `https://t.me/${tg}` : null;
-  const date = useMemo(
-    () =>
-      new Date(row.createdAt).toLocaleString(locale, {
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-    [row.createdAt, locale],
-  );
+  const date = useAppDate(row.createdAt);
+  const sourceKey = SOURCE_LABEL_KEY[row.source];
 
-  function copyTg() {
-    if (!row.telegram) return;
-    navigator.clipboard?.writeText(row.telegram).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  }
+  const preview =
+    row.lastMessage &&
+    (row.lastMessage.direction === 'out'
+      ? `${t('admin.chatYouPrefix')}${row.lastMessage.text}`
+      : row.lastMessage.text);
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-5">
+    <div className="rounded-2xl border border-brand/40 bg-surface p-5 shadow-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-body font-semibold text-primary">{row.name || t('admin.appNoName')}</span>
+            <span
+              className={[
+                'h-2 w-2 shrink-0 rounded-full',
+                row.connected ? 'bg-success' : 'bg-tertiary/50',
+              ].join(' ')}
+              aria-hidden
+            />
+            <span className="text-body font-semibold text-primary">
+              {row.name || t('admin.appNoName')}
+            </span>
+            {sourceKey && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-brand/10 px-1.5 py-0.5 text-caption font-medium text-brand">
+                <MessageCircle size={11} />
+                {t(sourceKey)}
+              </span>
+            )}
             <span className="text-caption text-tertiary">{date}</span>
             <span className="rounded-md bg-muted px-1.5 py-0.5 text-caption text-secondary">
               {PLAN_LABEL_KEY[row.plan] ? t(PLAN_LABEL_KEY[row.plan]) : row.plan}
@@ -331,34 +527,12 @@ function ApplicationCard({
             )}
           </div>
 
-          {row.telegram && (
-            <div className="mt-1.5 flex items-center gap-1.5">
-              <a
-                href={tgUrl ?? '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-footnote font-medium text-brand hover:underline"
-              >
-                {row.telegram.startsWith('@') ? row.telegram : `@${row.telegram}`}
-              </a>
-              <button
-                type="button"
-                onClick={copyTg}
-                aria-label={t('admin.copyTgAria')}
-                className="rounded p-0.5 text-tertiary transition-base hover:text-secondary"
-              >
-                {copied ? <Check size={13} className="text-brand" /> : <Copy size={13} />}
-              </button>
-            </div>
-          )}
-          {row.phone && (
-            <a
-              href={`tel:${row.phone}`}
-              className="mt-1 flex items-center gap-1.5 text-footnote text-secondary hover:text-primary"
-            >
-              <Phone size={13} className="text-tertiary" />
-              {row.phone}
-            </a>
+          <div className="mt-1.5">
+            <ContactLine row={row} />
+          </div>
+
+          {!chatOpen && preview && (
+            <p className="mt-1.5 max-w-md truncate text-footnote text-tertiary">{preview}</p>
           )}
 
           <button
@@ -377,34 +551,42 @@ function ApplicationCard({
           </button>
         </div>
 
-        {/* Status pipeline */}
-        <div className="flex shrink-0 rounded-lg border border-border bg-canvas p-0.5">
-          {STATUS_FLOW.map((s) => {
-            const active = row.status === s.value;
-            const label = t(s.labelKey);
-            return (
-              <button
-                key={s.value}
-                type="button"
-                onClick={() => onStatus(row.id, s.value)}
-                aria-pressed={active}
-                className={[
-                  'rounded-md px-3 py-1.5 text-footnote transition-base',
-                  active
-                    ? s.value === 'spam'
-                      ? 'bg-danger/10 font-medium text-danger'
-                      : 'bg-surface font-medium text-primary shadow-sm'
-                    : 'text-tertiary hover:text-secondary',
-                ].join(' ')}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        <StatusPills row={row} onStatus={onStatus} />
       </div>
 
       {chatOpen && <ChatPanel applicationId={row.id} name={row.name} />}
+    </div>
+  );
+}
+
+function ProcessedRow({
+  row,
+  onStatus,
+  divider,
+}: {
+  row: ApplicationRow;
+  onStatus: (id: string, status: string) => void;
+  divider: boolean;
+}) {
+  const { t } = useT();
+  const date = useAppDate(row.createdAt);
+  return (
+    <div
+      className={[
+        'flex flex-col gap-3 bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between',
+        divider ? 'border-t border-border' : '',
+      ].join(' ')}
+    >
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="truncate text-footnote font-medium text-primary">
+          {row.name || t('admin.appNoName')}
+        </span>
+        <ContactLine row={row} />
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="hidden text-caption text-tertiary sm:inline">{date}</span>
+        <StatusPills row={row} onStatus={onStatus} />
+      </div>
     </div>
   );
 }
@@ -550,7 +732,7 @@ function ChatPanel({ applicationId, name }: { applicationId: string; name: strin
         <>
           <div
             ref={scrollRef}
-            className="slim-scroll flex max-h-64 flex-col gap-2 overflow-y-auto px-4 py-3"
+            className="slim-scroll flex max-h-[26rem] min-h-[12rem] flex-col gap-2 overflow-y-auto px-4 py-3"
           >
             {!loaded ? (
               <p className="py-6 text-center text-caption text-tertiary">{t('admin.chatLoading')}</p>

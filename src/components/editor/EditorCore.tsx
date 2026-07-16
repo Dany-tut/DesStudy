@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { UploadCloud, AlertCircle, RotateCcw, Plus, X, GraduationCap, Link2, Image as ImageIcon, ChevronDown } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
+import { UploadCloud, AlertCircle, RotateCcw, Plus, X, GraduationCap, Link2, Image as ImageIcon, ChevronDown, ChevronsDownUp } from 'lucide-react';
 import { parseSvgToLayers } from '@/lib/editor/parseSvg';
 import type { Layer, ParseResult, EditorTool } from '@/lib/editor/types';
 import { listDrafts, saveDraft, deleteDraft, coverPageOf, type EditorDraftEntry } from '@/lib/editor/drafts';
@@ -14,6 +15,7 @@ import { PagesPanel } from './PagesPanel';
 import { StageCanvas } from './StageCanvas';
 import { EditorDock } from './EditorDock';
 import { PropertiesPanel } from './PropertiesPanel';
+import { FrameSizePanel, CanvasBackgroundPanel } from './FramePresetPanel';
 import { type EditorStep } from './StepBar';
 import { ExerciseSetupPanel, ZoneEditor, Step4Access, type EditorDraft } from './EditorSteps';
 
@@ -56,6 +58,51 @@ function removeFromTree(layers: Layer[], id: string): Layer[] {
     out.push(l.children.length ? { ...l, children: removeFromTree(l.children, id) } : l);
   }
   return out;
+}
+
+/** Drop position of a layer-panel drag: reorder as a sibling before / after the
+ *  target, or nest as the target's last child. */
+export type LayerDropPos = 'before' | 'after' | 'inside';
+
+/** True when `id` is `layer` itself or anywhere in its subtree. */
+function inSubtree(layer: Layer, id: string): boolean {
+  return layer.id === id || layer.children.some((c) => inSubtree(c, id));
+}
+
+/** Insert `node` relative to `targetId`: as its previous / next sibling, or (for
+ *  `inside`) appended as its last child. Returns null when the target is absent. */
+function insertRelative(layers: Layer[], targetId: string, node: Layer, pos: LayerDropPos): Layer[] | null {
+  let found = false;
+  const walk = (list: Layer[]): Layer[] => {
+    const out: Layer[] = [];
+    for (const l of list) {
+      if (l.id === targetId) {
+        found = true;
+        if (pos === 'inside') {
+          out.push({ ...l, children: [...l.children, node] });
+        } else if (pos === 'before') {
+          out.push(node, l);
+        } else {
+          out.push(l, node);
+        }
+        continue;
+      }
+      out.push(l.children.length ? { ...l, children: walk(l.children) } : l);
+    }
+    return out;
+  };
+  const out = walk(layers);
+  return found ? out : null;
+}
+
+/** Move `dragId` next to / inside `targetId`. Guards against dropping a node onto
+ *  itself or into its own subtree; returns null when the move is invalid. */
+function moveLayerInTree(layers: Layer[], dragId: string, targetId: string, pos: LayerDropPos): Layer[] | null {
+  if (dragId === targetId) return null;
+  const dragged = findLayer(layers, dragId);
+  if (!dragged) return null;
+  if (inSubtree(dragged, targetId)) return null; // can't nest a node inside itself
+  return insertRelative(removeFromTree(layers, dragId), targetId, dragged, pos);
 }
 
 /**
@@ -194,16 +241,39 @@ function collectIds(layer: Layer, acc: Set<string>): void {
   for (const c of layer.children) collectIds(c, acc);
 }
 
-/** Deep-clone a layer subtree with fresh ids, recording old→new for SVG relabel. */
-function cloneSubtree(layer: Layer, idMap: Map<string, string>): Layer {
+/** Deep-clone a layer subtree with fresh ids, recording old→new for SVG relabel.
+ *  With `linkTwin`, each clone also gets `props.twinId` pointing at the layer it
+ *  was cloned from — used when spawning a «сломанный» twin so the auto-diff pairs
+ *  layers by identity (survives reordering) rather than by tree position. */
+function cloneSubtree(layer: Layer, idMap: Map<string, string>, linkTwin = false): Layer {
   const nid = rid('L');
   idMap.set(layer.id, nid);
   return {
     ...layer,
     id: nid,
-    props: { ...layer.props },
-    children: layer.children.map((c) => cloneSubtree(c, idMap)),
+    props: linkTwin ? { ...layer.props, twinId: layer.id } : { ...layer.props },
+    children: layer.children.map((c) => cloneSubtree(c, idMap, linkTwin)),
   };
+}
+
+/** Name for a pasted copy: «Блок» → «Блок копия» → «Блок копия 2» … so repeated
+ *  pastes read cleanly instead of stacking «копия копия копия». */
+function copyName(name: string): string {
+  const m = name.match(/^(.*?) копия(?: (\d+))?$/);
+  if (m) return `${m[1]} копия ${m[2] ? parseInt(m[2], 10) + 1 : 2}`;
+  return `${name} копия`;
+}
+
+/** Immutably insert `layer` right after the sibling `afterId`, at whatever depth
+ *  `afterId` lives — mirrors "duplicate lands next to the original" in the tree. */
+function insertAfterInTree(layers: Layer[], afterId: string, layer: Layer): Layer[] {
+  const i = layers.findIndex((l) => l.id === afterId);
+  if (i !== -1) {
+    const out = [...layers];
+    out.splice(i + 1, 0, layer);
+    return out;
+  }
+  return layers.map((l) => ({ ...l, children: insertAfterInTree(l.children, afterId, layer) }));
 }
 
 /** Index path from `root`'s subtree down to `id` ([] = root itself, null = absent). */
@@ -283,6 +353,7 @@ const EMPTY_DRAFT: EditorDraft = {
 };
 
 export function EditorCore() {
+  const { t, tp } = useT();
   const [result, setResult] = useState<ParseResult | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -340,6 +411,9 @@ export function EditorCore() {
     [],
   );
 
+  // Live-measured geometry of the primary selection, in root user space — the
+  // accurate X/Y/W/H the inspector shows and edits (the tree `box` goes stale).
+  const [selBox, setSelBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   // Right-click menu — position + the layer clicked (null = empty canvas).
   const [menu, setMenu] = useState<{ x: number; y: number; layerId: string | null } | null>(null);
@@ -353,6 +427,9 @@ export function EditorCore() {
   // Scale mode (K): corner handles scale proportionally. Cleared by V / any other
   // tool. Only meaningful while `tool === 'move'`.
   const [scaleMode, setScaleMode] = useState(false);
+  // Canvas (page) background colour — Figma surfaces this when nothing is
+  // selected. null → themed default; a hex overrides the dotted canvas backdrop.
+  const [canvasBg, setCanvasBg] = useState<string | null>(null);
   // Bumped to ask the canvas to refit the scene to the viewport.
   const [fitSignal, setFitSignal] = useState(0);
   const [draft, setDraft] = useState<EditorDraft>(EMPTY_DRAFT);
@@ -381,6 +458,8 @@ export function EditorCore() {
   // Collapse state for the two left-panel sections (Figma-style chevrons).
   const [pagesCollapsed, setPagesCollapsed] = useState(false);
   const [layersCollapsed, setLayersCollapsed] = useState(false);
+  // Bumped by the header "collapse all" control — folds every group in the tree.
+  const [collapseSignal, setCollapseSignal] = useState(0);
 
   // ── Lessons (DB-backed) ────────────────────────────────────────────────────
   // The editor home is lessons-first: existing lessons show as cards, and the
@@ -425,7 +504,7 @@ export function EditorCore() {
         });
         const data = await res.json();
         if (!res.ok) {
-          setLessonError(data.message ?? 'Не удалось создать урок');
+          setLessonError(data.message ?? t('editor.home.createFailed'));
           return;
         }
         if (withFigma) {
@@ -437,12 +516,12 @@ export function EditorCore() {
         }
         router.push(`/admin/lessons/${data.id}`);
       } catch {
-        setLessonError('Не удалось создать урок — проверь соединение');
+        setLessonError(t('editor.home.createFailedNetwork'));
       } finally {
         setCreating(false);
       }
     },
-    [router],
+    [router, t],
   );
 
   // ── Undo / redo ──────────────────────────────────────────────────────────
@@ -528,9 +607,31 @@ export function EditorCore() {
   }, [draft.zones]);
   const zoneIds = useMemo(() => new Set(zoneByLayer.keys()), [zoneByLayer]);
 
+  // Top-level frames marked as эталон — the layers panel paints their whole
+  // subtree green (matching the on-canvas BadgeCheck) and badges the frame row.
+  const referenceIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const l of result?.screen.layers ?? [])
+      if (l.props.frameRole === 'reference') s.add(l.id);
+    return s;
+  }, [result]);
+
+  // Top-level frames marked as «сломанный» — the layers panel paints their whole
+  // subtree red (matching the on-canvas Bug badge) and badges the frame row; the
+  // canvas draws their selection chrome red too.
+  const flawedIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const l of result?.screen.layers ?? [])
+      if (l.props.frameRole === 'flawed') s.add(l.id);
+    return s;
+  }, [result]);
+
   // Auto-diff the selected layer against its эталон twin: locate the top-level
   // frame it lives in, confirm that frame is «сломанный», find the sibling
-  // reference frame, mirror the index path into it, and compare props. Undefined
+  // reference frame, then pair the layer to its counterpart. Preference order:
+  // (1) the explicit `twinId` link stamped when the сломанный twin was spawned —
+  // robust to reordering/insert/delete; (2) fall back to mirroring the index
+  // path for layers with no link (hand-built pairs, older drafts). Undefined
   // when there's no pairing (plain frame / no reference), so the editor hides the
   // «Из эталона» affordance; [] means «paired, identical». Declared with the
   // other hooks (before any early return) so hook order stays stable.
@@ -541,8 +642,9 @@ export function EditorCore() {
     if (!host || host.props.frameRole !== 'flawed') return undefined;
     const ref = tops.find((t) => t.id !== host.id && t.props.frameRole === 'reference');
     if (!ref) return undefined;
-    const path = pathTo(host, selected.id)!;
-    const twin = atPath(ref, path);
+    const twin =
+      (selected.props.twinId ? findLayer(ref.children, selected.props.twinId) : null) ??
+      atPath(ref, pathTo(host, selected.id)!);
     if (!twin) return [];
     return diffLayerProps(twin, selected);
   }, [selected, result]);
@@ -802,6 +904,33 @@ export function EditorCore() {
     [pushUndo],
   );
 
+  // Commit a plain-rect resize from the canvas: write the new box onto the rect's
+  // x/y/width/height and refresh its tree box. rx/ry are left untouched, so the
+  // corner radius stays constant instead of being stretched by a matrix scale
+  // (Figma's rect-resize behaviour). The canvas already resized the rect live.
+  const resizeRect = useCallback(
+    (id: string, box: { x: number; y: number; w: number; h: number }) => {
+      if (!(box.w > 0 && box.h > 0)) return;
+      pushUndo();
+      setResult((r) => {
+        if (!r) return r;
+        const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
+        const el = doc.querySelector(`[data-layer-id="${id}"]`);
+        if (!el || el.tagName.toLowerCase() !== 'rect') return r;
+        el.setAttribute('x', String(box.x));
+        el.setAttribute('y', String(box.y));
+        el.setAttribute('width', String(box.w));
+        el.setAttribute('height', String(box.h));
+        return {
+          ...r,
+          svg: new XMLSerializer().serializeToString(doc.documentElement),
+          screen: { ...r.screen, layers: setBoxInTree(r.screen.layers, id, box) },
+        };
+      });
+    },
+    [pushUndo],
+  );
+
   // Toggle "clip content" on a frame/group (Figma's clip-content). ON: wrap the
   // node in a clip-path sized to its CURRENT rendered bounds (measured live via
   // getBBox, so it respects the node's own transform), so anything overflowing
@@ -985,8 +1114,16 @@ export function EditorCore() {
         const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
         const el = doc.querySelector(`[data-layer-id="${id}"]`);
         if (!el) return r;
-        el.setAttribute('rx', String(v));
-        el.setAttribute('ry', String(v));
+        // A plain rect rounds itself; a frame <g> has no radius of its own, so round
+        // its bg rect (visible corner) and clip rect (so children clip to the round).
+        const targets = el.tagName.toLowerCase() === 'rect'
+          ? [el]
+          : Array.from(el.querySelectorAll(':scope > rect[data-frame-bg], :scope > clipPath > rect'));
+        if (!targets.length) return r;
+        for (const t of targets) {
+          t.setAttribute('rx', String(v));
+          t.setAttribute('ry', String(v));
+        }
         const patch = (ls: Layer[]): Layer[] =>
           ls.map((l) => (l.id === id ? { ...l, props: { ...l.props, radius: v } } : { ...l, children: patch(l.children) }));
         return {
@@ -998,6 +1135,201 @@ export function EditorCore() {
     },
     [pushUndo],
   );
+
+  // ── Generic layer-prop edit ────────────────────────────────────────────────
+  // Mutate one layer's SVG element and mirror a props patch into the tree in a
+  // single undo step, so the inspector value updates live. Used by opacity /
+  // stroke / auto-layout edits that don't need bespoke geometry handling.
+  const editLayer = useCallback(
+    (id: string, mutateEl: (el: Element) => void, patchProps: (p: Layer['props']) => Partial<Layer['props']>) => {
+      pushUndo();
+      setResult((r) => {
+        if (!r) return r;
+        const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
+        const el = doc.querySelector(`[data-layer-id="${id}"]`);
+        if (!el) return r;
+        mutateEl(el);
+        const patch = (ls: Layer[]): Layer[] =>
+          ls.map((l) => (l.id === id ? { ...l, props: { ...l.props, ...patchProps(l.props) } } : { ...l, children: patch(l.children) }));
+        return {
+          ...r,
+          svg: new XMLSerializer().serializeToString(doc.documentElement),
+          screen: { ...r.screen, layers: patch(r.screen.layers) },
+        };
+      });
+    },
+    [pushUndo],
+  );
+
+  const setLayerOpacity = useCallback(
+    (id: string, value: number) => {
+      const o = Math.max(0, Math.min(1, value));
+      editLayer(
+        id,
+        (el) => (o >= 1 ? el.removeAttribute('opacity') : el.setAttribute('opacity', String(+o.toFixed(3)))),
+        () => ({ opacity: o >= 1 ? undefined : +o.toFixed(3) }),
+      );
+    },
+    [editLayer],
+  );
+
+  const setLayerStroke = useCallback(
+    (id: string, color: string | null) => {
+      if (color === null) {
+        editLayer(
+          id,
+          (el) => {
+            el.removeAttribute('stroke');
+            el.removeAttribute('stroke-width');
+          },
+          () => ({ stroke: undefined, strokeWidth: undefined }),
+        );
+        return;
+      }
+      editLayer(
+        id,
+        (el) => {
+          el.setAttribute('stroke', color);
+          if (!el.getAttribute('stroke-width')) el.setAttribute('stroke-width', '1');
+        },
+        (p) => ({ stroke: color, strokeWidth: p.strokeWidth ?? 1 }),
+      );
+    },
+    [editLayer],
+  );
+
+  const setLayerStrokeWidth = useCallback(
+    (id: string, width: number) => {
+      const w = Math.max(0, width);
+      editLayer(id, (el) => el.setAttribute('stroke-width', String(w)), () => ({ strokeWidth: w }));
+    },
+    [editLayer],
+  );
+
+  // Switch a frame's auto-layout flow (metadata only — `data-layout` drives the
+  // parser's re-inference; the canvas geometry is unchanged).
+  const setLayerLayout = useCallback(
+    (id: string, layout: 'row' | 'column' | 'grid' | 'none') => {
+      editLayer(
+        id,
+        (el) => (layout === 'none' ? el.removeAttribute('data-layout') : el.setAttribute('data-layout', layout)),
+        () => ({ layout }),
+      );
+    },
+    [editLayer],
+  );
+
+  // ── Live geometry (position / size) ────────────────────────────────────────
+  // Measure the selected layer's box in ROOT (screen) user space, live from the
+  // rendered DOM — the source of truth for geometry (tree `box` goes stale after
+  // transforms). Frames measure their bounds rect; other layers their own bbox.
+  const measureLayerBox = useCallback((id: string): { x: number; y: number; w: number; h: number } | null => {
+    const host = svgHostRef.current;
+    const node = host?.querySelector(`[data-layer-id="${id}"]`) as SVGGraphicsElement | null;
+    if (!node) return null;
+    const target = (node.querySelector(':scope > rect[data-frame-bg]') as SVGGraphicsElement | null) ?? node;
+    try {
+      const bb = target.getBBox();
+      const ctm = target.getCTM();
+      if (!ctm) return null;
+      const corners = [
+        [bb.x, bb.y],
+        [bb.x + bb.width, bb.y],
+        [bb.x, bb.y + bb.height],
+        [bb.x + bb.width, bb.y + bb.height],
+      ].map(([x, y]) => new DOMPoint(x, y).matrixTransform(ctm));
+      const xs = corners.map((p) => p.x);
+      const ys = corners.map((p) => p.y);
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      return { x: +x.toFixed(2), y: +y.toFixed(2), w: +(Math.max(...xs) - x).toFixed(2), h: +(Math.max(...ys) - y).toFixed(2) };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const parentCTM = useCallback((id: string): DOMMatrix | null => {
+    const host = svgHostRef.current;
+    const node = host?.querySelector(`[data-layer-id="${id}"]`);
+    const parent = node?.parentNode as (SVGGraphicsElement & { getCTM?: () => DOMMatrix | null }) | null;
+    try {
+      return parent && typeof parent.getCTM === 'function' ? parent.getCTM() : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Move the selected layer so its top-left lands at root-space (x, y). The delta
+  // is converted into the layer's PARENT space (via the parent CTM) before being
+  // prepended, so it works under nested/transformed groups too.
+  const moveLayerTo = useCallback(
+    (id: string, x: number, y: number) => {
+      const box = measureLayerBox(id);
+      if (!box) return;
+      const dxRoot = x - box.x;
+      const dyRoot = y - box.y;
+      const P = parentCTM(id);
+      let pdx = dxRoot;
+      let pdy = dyRoot;
+      if (P) {
+        const inv = P.inverse();
+        pdx = inv.a * dxRoot + inv.c * dyRoot;
+        pdy = inv.b * dxRoot + inv.d * dyRoot;
+      }
+      if (Math.abs(pdx) < 0.01 && Math.abs(pdy) < 0.01) return;
+      transformLayers([id], `matrix(1 0 0 1 ${pdx.toFixed(3)} ${pdy.toFixed(3)})`);
+    },
+    [measureLayerBox, parentCTM, transformLayers],
+  );
+
+  // Resize the selected layer to (w, h) root-space units by scaling from its
+  // top-left corner. The scale is expressed in parent space so nested transforms
+  // are respected. (Scales children too — matches Figma group resize.)
+  const resizeLayerTo = useCallback(
+    (id: string, w: number, h: number) => {
+      if (!(w > 0 && h > 0)) return;
+      const box = measureLayerBox(id);
+      if (!box || box.w <= 0 || box.h <= 0) return;
+      const sx = w / box.w;
+      const sy = h / box.h;
+      if (Math.abs(sx - 1) < 0.001 && Math.abs(sy - 1) < 0.001) return;
+      const Mroot = new DOMMatrix().translateSelf(box.x, box.y).scaleSelf(sx, sy).translateSelf(-box.x, -box.y);
+      const P = parentCTM(id);
+      const M = P ? P.inverse().multiply(Mroot).multiply(P) : Mroot;
+      transformLayers([id], `matrix(${M.a} ${M.b} ${M.c} ${M.d} ${M.e} ${M.f})`);
+    },
+    [measureLayerBox, parentCTM, transformLayers],
+  );
+
+  // Align the selected layer within the artboard (screen bounds). Figma aligns to
+  // the parent/selection; for a single layer the canvas is the sensible frame.
+  const alignLayer = useCallback(
+    (edge: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom') => {
+      if (!selectedId || !result) return;
+      const box = measureLayerBox(selectedId);
+      if (!box) return;
+      const W = result.screen.width;
+      const H = result.screen.height;
+      if (edge === 'left') moveLayerTo(selectedId, 0, box.y);
+      else if (edge === 'hcenter') moveLayerTo(selectedId, (W - box.w) / 2, box.y);
+      else if (edge === 'right') moveLayerTo(selectedId, W - box.w, box.y);
+      else if (edge === 'top') moveLayerTo(selectedId, box.x, 0);
+      else if (edge === 'vcenter') moveLayerTo(selectedId, box.x, (H - box.h) / 2);
+      else if (edge === 'bottom') moveLayerTo(selectedId, box.x, H - box.h);
+    },
+    [selectedId, result, measureLayerBox, moveLayerTo],
+  );
+
+  // Re-measure the selection's live box whenever the pick or the markup changes
+  // (a transform commit re-serialises `svg`, so this re-runs and re-syncs X/Y/W/H).
+  useEffect(() => {
+    if (!selectedId) {
+      setSelBox(null);
+      return;
+    }
+    const raf = requestAnimationFrame(() => setSelBox(measureLayerBox(selectedId)));
+    return () => cancelAnimationFrame(raf);
+  }, [selectedId, result?.svg, measureLayerBox]);
 
   // Rename a layer: persist to the source markup (`data-name`) so it survives a
   // re-serialize, and mirror it in the layer tree the panel renders from.
@@ -1166,6 +1498,79 @@ export function EditorCore() {
     [pushUndo],
   );
 
+  // Layers-panel drag-and-drop: move `dragId` next to / inside `targetId`. Mirror
+  // the tree edit into the markup so paint order (DOM position) tracks the tree —
+  // `inside` appends the node as the group's last child (front-most), before/after
+  // reorders it among the target's siblings. Guarded against nesting a node in its
+  // own subtree by moveLayerInTree.
+  const reparentLayer = useCallback(
+    (dragId: string, targetId: string, pos: LayerDropPos, copy = false) => {
+      const cur = latest.current;
+      if (!cur) return;
+
+      // Alt-drop in the tree: clone the dragged subtree with fresh ids and drop
+      // the copy at the target — the original stays where it was, mirroring the
+      // canvas Alt-drag. A plain drop just moves the existing node.
+      if (copy) {
+        const src = findLayer(cur.layers, dragId);
+        if (!src) return;
+        const idMap = new Map<string, string>();
+        const clone = cloneSubtree(src, idMap);
+        const layers = insertRelative(cur.layers, targetId, clone, pos);
+        if (!layers) return;
+        pushUndo();
+        setResult((r) => {
+          if (!r) return r;
+          const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
+          const srcEl = doc.querySelector(`[data-layer-id="${dragId}"]`);
+          const targetEl = doc.querySelector(`[data-layer-id="${targetId}"]`);
+          if (!srcEl || !targetEl) return r;
+          const el = srcEl.cloneNode(true) as Element;
+          const relabel = (node: Element) => {
+            const old = node.getAttribute('data-layer-id');
+            if (old && idMap.has(old)) node.setAttribute('data-layer-id', idMap.get(old)!);
+            for (const child of Array.from(node.children)) relabel(child);
+          };
+          relabel(el);
+          if (pos === 'inside') {
+            targetEl.appendChild(el);
+          } else {
+            const parent = targetEl.parentNode;
+            if (!parent) return r;
+            parent.insertBefore(el, pos === 'before' ? targetEl : targetEl.nextSibling);
+          }
+          return { ...r, svg: new XMLSerializer().serializeToString(doc.documentElement), screen: { ...r.screen, layers } };
+        });
+        setSelectedIds([clone.id]);
+        anchorRef.current = clone.id;
+        return;
+      }
+
+      const moved = moveLayerInTree(cur.layers, dragId, targetId, pos);
+      if (!moved) return;
+
+      pushUndo();
+      setResult((r) => {
+        if (!r) return r;
+        const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
+        const dragEl = doc.querySelector(`[data-layer-id="${dragId}"]`);
+        const targetEl = doc.querySelector(`[data-layer-id="${targetId}"]`);
+        if (!dragEl || !targetEl) return r;
+        if (pos === 'inside') {
+          targetEl.appendChild(dragEl);
+        } else {
+          const parent = targetEl.parentNode;
+          if (!parent) return r;
+          parent.insertBefore(dragEl, pos === 'before' ? targetEl : targetEl.nextSibling);
+        }
+        return { ...r, svg: new XMLSerializer().serializeToString(doc.documentElement), screen: { ...r.screen, layers: moved } };
+      });
+      setSelectedIds([dragId]);
+      anchorRef.current = dragId;
+    },
+    [pushUndo],
+  );
+
   // Duplicate a top-level frame as its «сломанный» twin: clone the subtree with
   // fresh ids (so both frames coexist and the auto-diff can pair layers by index
   // path), relabel the cloned SVG node, shift it to the right, mark the original
@@ -1181,7 +1586,10 @@ export function EditorCore() {
       if (frame.type !== 'frame') return;
 
       const idMap = new Map<string, string>();
-      const clone = cloneSubtree(frame, idMap);
+      const clone = cloneSubtree(frame, idMap, true);
+      // The frame itself pairs to the эталон by role, not by twinId — clear the
+      // link the clone helper stamped on the root so only inner layers carry it.
+      delete clone.props.twinId;
       clone.name = `${frame.name} · сломанный`;
       clone.props = { ...clone.props, frameRole: 'flawed' };
 
@@ -1217,6 +1625,162 @@ export function EditorCore() {
     },
     [pushUndo],
   );
+
+  // Clone one or more layers (any depth), relabel their SVG ids, offset the copies
+  // by (dx,dy) user units, drop each next to its original in both the markup and
+  // the tree, and select the copies. Powers Alt-drag duplicate, Cmd/Ctrl+D and
+  // paste. Returns the new ids.
+  const duplicateLayers = useCallback(
+    (ids: string[], dx = 0, dy = 0): string[] => {
+      const cur = latest.current;
+      if (!cur || !ids.length) return [];
+      // Plan the clones off the current tree so we know the fresh ids up front
+      // (setResult runs deferred — we need the ids now to update the selection).
+      const plans: { srcId: string; clone: Layer; idMap: Map<string, string> }[] = [];
+      for (const id of ids) {
+        const layer = findLayer(cur.layers, id);
+        if (!layer) continue;
+        const idMap = new Map<string, string>();
+        plans.push({ srcId: id, clone: cloneSubtree(layer, idMap), idMap });
+      }
+      if (!plans.length) return [];
+      pushUndo();
+      setResult((r) => {
+        if (!r) return r;
+        const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
+        let layers = r.screen.layers;
+        for (const { srcId, clone, idMap } of plans) {
+          const orig = doc.querySelector(`[data-layer-id="${srcId}"]`);
+          if (!orig) continue;
+          const el = orig.cloneNode(true) as Element;
+          const relabel = (node: Element) => {
+            const old = node.getAttribute('data-layer-id');
+            if (old && idMap.has(old)) node.setAttribute('data-layer-id', idMap.get(old)!);
+            for (const child of Array.from(node.children)) relabel(child);
+          };
+          relabel(el);
+          if (dx || dy) {
+            const prev = el.getAttribute('transform') ?? '';
+            el.setAttribute('transform', `translate(${dx.toFixed(2)},${dy.toFixed(2)}) ${prev}`.trim());
+          }
+          orig.parentNode?.insertBefore(el, orig.nextSibling);
+          layers = insertAfterInTree(layers, srcId, clone);
+        }
+        return { ...r, svg: new XMLSerializer().serializeToString(doc.documentElement), screen: { ...r.screen, layers } };
+      });
+      const newIds = plans.map((p) => p.clone.id);
+      setSelectedIds(newIds);
+      return newIds;
+    },
+    [pushUndo],
+  );
+
+  // Alt-drag drop from the canvas: leave the originals put and stamp a copy at the
+  // dragged offset (StageCanvas has already snapped the live nodes back to base).
+  const duplicateLayersAt = useCallback(
+    (ids: string[], dx: number, dy: number) => {
+      duplicateLayers(ids, dx, dy);
+    },
+    [duplicateLayers],
+  );
+
+  // Cmd/Ctrl+D — duplicate the selection in place, nudged down-right like Figma.
+  const duplicateSelection = useCallback(() => {
+    if (selectedIds.length) duplicateLayers(selectedIds, 10, 10);
+  }, [selectedIds, duplicateLayers]);
+
+  // Internal copy/paste clipboard — snapshots each copied layer's markup and tree
+  // node at copy time, so paste survives even if the original is later moved or
+  // removed. Not the OS clipboard (we only shuttle layers within the editor).
+  const clipboard = useRef<{ markup: string; layer: Layer }[]>([]);
+
+  const copySelection = useCallback(() => {
+    const cur = latest.current;
+    if (!cur || !selectedIds.length) return;
+    const doc = new DOMParser().parseFromString(cur.svg, 'image/svg+xml');
+    const items: { markup: string; layer: Layer }[] = [];
+    for (const id of selectedIds) {
+      const layer = findLayer(cur.layers, id);
+      const el = doc.querySelector(`[data-layer-id="${id}"]`);
+      if (layer && el) items.push({ markup: new XMLSerializer().serializeToString(el), layer });
+    }
+    if (items.length) clipboard.current = items;
+  }, [selectedIds]);
+
+  const pasteClipboard = useCallback(() => {
+    const items = clipboard.current;
+    if (!items.length) return;
+    // The pasted copies land right below the selected layer (like Figma); fall
+    // back to appending at the end when nothing is selected.
+    const anchorId = selectedIds.length ? selectedIds[selectedIds.length - 1] : null;
+    // Re-clone from the snapshot with fresh ids every paste, so repeated pastes
+    // don't collide and each copy is independent. The top-level node is renamed
+    // «… копия» so the copy is distinguishable in the tree.
+    const plans = items.map(({ markup, layer }) => {
+      const idMap = new Map<string, string>();
+      const clone = cloneSubtree(layer, idMap);
+      clone.name = copyName(layer.name);
+      return { markup, clone, idMap };
+    });
+    pushUndo();
+    setResult((r) => {
+      if (!r) return r;
+      const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
+      let layers = r.screen.layers;
+      // Moving anchors so multiple pasted layers stack in order below the target.
+      let curAnchorId = anchorId;
+      let anchorEl = anchorId ? doc.querySelector(`[data-layer-id="${anchorId}"]`) : null;
+      for (const { markup, clone, idMap } of plans) {
+        const frag = new DOMParser().parseFromString(markup, 'image/svg+xml').documentElement;
+        const el = doc.importNode(frag, true) as Element;
+        const relabel = (node: Element) => {
+          const old = node.getAttribute('data-layer-id');
+          if (old && idMap.has(old)) node.setAttribute('data-layer-id', idMap.get(old)!);
+          for (const child of Array.from(node.children)) relabel(child);
+        };
+        relabel(el);
+        const prev = el.getAttribute('transform') ?? '';
+        el.setAttribute('transform', `translate(20,20) ${prev}`.trim());
+        if (anchorEl?.parentNode) {
+          anchorEl.parentNode.insertBefore(el, anchorEl.nextSibling);
+          layers = insertAfterInTree(layers, curAnchorId!, clone);
+        } else {
+          doc.documentElement.appendChild(el);
+          layers = [...layers, clone];
+        }
+        anchorEl = el;
+        curAnchorId = clone.id;
+      }
+      return { ...r, svg: new XMLSerializer().serializeToString(doc.documentElement), screen: { ...r.screen, layers } };
+    });
+    setSelectedIds(plans.map((p) => p.clone.id));
+  }, [pushUndo, selectedIds]);
+
+  // Cmd/Ctrl + C / V / D — copy, paste, duplicate. Skip while typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k !== 'c' && k !== 'v' && k !== 'd') return;
+      const ae = document.activeElement;
+      if (ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae as HTMLElement).isContentEditable)) return;
+      if (k === 'c') {
+        if (!selectedIds.length) return;
+        e.preventDefault();
+        copySelection();
+      } else if (k === 'v') {
+        if (!clipboard.current.length) return;
+        e.preventDefault();
+        pasteClipboard();
+      } else {
+        if (!selectedIds.length) return;
+        e.preventDefault();
+        duplicateSelection();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedIds, copySelection, pasteClipboard, duplicateSelection]);
 
   // Cmd/Ctrl+G groups the current selection into an auto-layout frame; adding
   // Shift makes a plain group. Skip while typing in a field.
@@ -1388,6 +1952,21 @@ export function EditorCore() {
     [pushUndo],
   );
 
+  // Drop a preset-sized artboard (picked from the frame panel). Places it at the
+  // root, just right of any existing top-level frames so it never nests into or
+  // overlaps them, then reuses the normal draw path.
+  const createFrameSized = useCallback(
+    (w: number, h: number) => {
+      const tops = latest.current?.layers ?? [];
+      let x = 0;
+      for (const l of tops) {
+        if (l.type === 'frame' && l.props.box) x = Math.max(x, l.props.box.x + l.props.box.w + 80);
+      }
+      createFrame({ x, y: 0, w, h });
+    },
+    [createFrame],
+  );
+
   const createText = useCallback(
     (pt: { x: number; y: number }) => {
       const gid = rid('L');
@@ -1432,18 +2011,23 @@ export function EditorCore() {
   // Single-key tool switches (Figma: V/F/R/P/T/C) — only on canvas steps, and
   // never while typing. Picking a tool also flips the dock to its tools face.
   useEffect(() => {
-    const keyTool: Record<string, EditorTool> = { v: 'move', f: 'frame', r: 'shape', p: 'pen', t: 'text', c: 'comment' };
+    // Keyed on `e.code` (the physical key), not `e.key`, so shortcuts work on
+    // any keyboard layout — on a Cyrillic layout `e.key` for the V key is 'м',
+    // which would never match. Figma does the same.
+    const keyTool: Record<string, EditorTool> = {
+      KeyV: 'move', KeyM: 'move', KeyF: 'frame', KeyR: 'shape', KeyP: 'pen', KeyT: 'text', KeyC: 'comment',
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const ae = document.activeElement;
       if (ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae as HTMLElement).isContentEditable)) return;
       // K → Scale mode (proportional resize); still the move tool underneath.
-      if (e.key.toLowerCase() === 'k') {
+      if (e.code === 'KeyK') {
         setTool('move');
         setScaleMode(true);
         return;
       }
-      const t = keyTool[e.key.toLowerCase()];
+      const t = keyTool[e.code];
       if (!t) return;
       setTool(t);
       setScaleMode(false);
@@ -1597,7 +2181,7 @@ export function EditorCore() {
               <button
                 type="button"
                 onClick={() => removeDraft(d.id)}
-                title="Удалить файл"
+                title={t('editor.home.deleteFile')}
                 className="rounded p-0.5 text-tertiary opacity-60 transition-fast hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
               >
                 <X size={12} />
@@ -1610,8 +2194,8 @@ export function EditorCore() {
         type="button"
         onClick={() => void createLesson(false)}
         disabled={creating}
-        title="Новый урок"
-        aria-label="Новый урок"
+        title={t('editor.home.newLesson')}
+        aria-label={t('editor.home.newLesson')}
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand text-white transition-fast hover:bg-brand/90 disabled:opacity-50"
       >
         <Plus size={16} />
@@ -1678,20 +2262,28 @@ export function EditorCore() {
               type="button"
               onClick={() => setLayersCollapsed((v) => !v)}
               className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-              title={layersCollapsed ? 'Развернуть' : 'Свернуть'}
+              title={layersCollapsed ? t('editor.sidebar.expand') : t('editor.sidebar.collapse')}
             >
               <ChevronDown
                 size={13}
                 className={`shrink-0 text-tertiary transition-fast ${layersCollapsed ? 'opacity-100 -rotate-90' : 'opacity-0 group-hover:opacity-100'}`}
               />
               <span className="truncate text-caption font-semibold uppercase tracking-wide text-tertiary">
-                Слои
+                {t('editor.sidebar.layers')}
               </span>
             </button>
             <button
               type="button"
+              onClick={() => setCollapseSignal((v) => v + 1)}
+              title={t('editor.sidebar.collapseAll')}
+              className="shrink-0 text-tertiary transition-fast hover:text-brand"
+            >
+              <ChevronsDownUp size={14} />
+            </button>
+            <button
+              type="button"
               onClick={() => replaceRef.current?.click()}
-              title="Загрузить другой SVG"
+              title={t('editor.sidebar.loadOtherSvg')}
               className="shrink-0 text-tertiary transition-fast hover:text-brand"
             >
               <RotateCcw size={14} />
@@ -1718,14 +2310,18 @@ export function EditorCore() {
                 onRename={renameLayer}
                 onDelete={deleteLayer}
                 onContextMenu={openMenu}
+                onReparent={reparentLayer}
                 renameId={renameId}
                 onRenameHandled={clearRenameId}
                 zoneIds={zoneIds}
+                referenceIds={referenceIds}
+                flawedIds={flawedIds}
+                collapseSignal={collapseSignal}
               />
             </div>
           )}
           <p className="mt-auto truncate border-t border-border px-4 py-2 text-caption text-tertiary">
-            {fileName} · {layerCount} {layerCount === 1 ? 'слой' : 'слоёв'} · {result.screen.width}×{result.screen.height}
+            {fileName} · {tp('editor.sidebar.layerCount', layerCount)} · {result.screen.width}×{result.screen.height}
           </p>
         </aside>
       )}
@@ -1737,28 +2333,33 @@ export function EditorCore() {
             draft={draft}
             zoneCount={draft.zones.length}
             onPatch={patchDraft}
-            onSave={() => alert('Черновик сохранён локально (запись в БД — следующий шаг).')}
-            onPublish={() => alert('Публикация подключается к API уроков следующим шагом.')}
+            onSave={() => alert(t('editor.steps.savedDraftAlert'))}
+            onPublish={() => alert(t('editor.steps.publishAlert'))}
           />
         ) : (
           <StageCanvas
             svg={result.svg}
             width={result.screen.width}
             height={result.screen.height}
+            background={canvasBg}
             selectedIds={selectedIds}
             hoveredId={hoveredId}
             onSelect={select}
             onSelectMany={selectMany}
             onHover={setHoveredId}
             onMoveLayers={moveLayers}
+            onDuplicateLayers={duplicateLayersAt}
             onTransformLayers={transformLayers}
             onResizeFrame={resizeFrameBox}
+            onResizeRect={resizeRect}
             onSetRadius={setLayerRadius}
             onContextMenu={openMenu}
             tool={tool}
             scaleMode={scaleMode}
             radiusLayerId={
-              selectedIds.length === 1 && selected && selected.type === 'block' ? selected.id : null
+              selectedIds.length === 1 && selected && (selected.type === 'block' || selected.type === 'frame')
+                ? selected.id
+                : null
             }
             radius={selected?.props.radius ?? 0}
             onCreateRect={createRect}
@@ -1780,6 +2381,10 @@ export function EditorCore() {
             // so the canvas falls back gracefully.
             setScaleMode(t === 'move' && variant === 'scale');
           }}
+          // The right-hand pill swaps the whole surface: Редактор → canvas +
+          // tools (step 1), Доступы → the lesson settings / publish step (step 2).
+          viewMode={step === 2 ? 'share' : 'editor'}
+          onViewMode={(m) => setStep(m === 'share' ? 2 : 1)}
         />
       </section>
 
@@ -1787,17 +2392,26 @@ export function EditorCore() {
              задания когда ничего не выбрано. ── */}
       {showRight && (
         <aside className="flex w-[248px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-border bg-elevated px-3 py-3">
-          {selected ? (
+          {tool === 'frame' ? (
+            <FrameSizePanel onPick={createFrameSized} />
+          ) : selected ? (
             <>
               <PropertiesPanel
                 layer={selected}
                 screen={result.screen}
+                liveBox={selBox}
                 onRadius={(v) => mutate(selected.id, (el) => (el.setAttribute('rx', String(v)), el.setAttribute('ry', String(v))))}
                 onFill={(v) =>
                   selected.type === 'frame'
                     ? mutate(selected.id, (el) => setFrameFill(el, v, selected.props.box))
                     : mutate(selected.id, (el) => el.setAttribute('fill', v))
                 }
+                onOpacity={(v) => setLayerOpacity(selected.id, v)}
+                onStroke={(v) => setLayerStroke(selected.id, v)}
+                onStrokeWidth={(v) => setLayerStrokeWidth(selected.id, v)}
+                onLayout={selected.type === 'frame' ? (l) => setLayerLayout(selected.id, l) : undefined}
+                onMove={(x, y) => moveLayerTo(selected.id, x, y)}
+                onAlign={alignLayer}
                 onText={(v) => mutate(selected.id, (el) => (el.textContent = v))}
                 onResize={
                   selected.type === 'frame' &&
@@ -1807,7 +2421,7 @@ export function EditorCore() {
                   Math.round(selected.props.box.w) === result.screen.width &&
                   Math.round(selected.props.box.h) === result.screen.height
                     ? (w, h) => resizeFrame(selected.id, w, h)
-                    : undefined
+                    : (w, h) => resizeLayerTo(selected.id, w, h)
                 }
                 onToggleClip={
                   selected.type === 'frame'
@@ -1827,11 +2441,17 @@ export function EditorCore() {
               </div>
             </>
           ) : (
-            <ExerciseSetupPanel
-              draft={draft}
-              onKind={(kind) => patchDraft({ kind })}
-              onBroken={(brokenSvg) => patchDraft({ brokenSvg })}
-            />
+            <>
+              <ExerciseSetupPanel
+                draft={draft}
+                onKind={(kind) => patchDraft({ kind })}
+                onBroken={(brokenSvg) => patchDraft({ brokenSvg })}
+              />
+              <CanvasBackgroundPanel
+                value={canvasBg ?? '#f7f8fa'}
+                onChange={setCanvasBg}
+              />
+            </>
           )}
         </aside>
       )}
@@ -1911,15 +2531,15 @@ export function EditorCore() {
 }
 
 /** "Edited N ago" — coarse relative time for the file cards. */
-function relTime(ts: number): string {
+function relTime(ts: number, t: (key: string, vars?: Record<string, string | number>) => string): string {
   const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (s < 60) return 'только что';
+  if (s < 60) return t('editor.home.justNow');
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m} мин назад`;
+  if (m < 60) return t('editor.home.minsAgo', { count: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} ч назад`;
+  if (h < 24) return t('editor.home.hoursAgo', { count: h });
   const d = Math.floor(h / 24);
-  return `${d} дн назад`;
+  return t('editor.home.daysAgo', { count: d });
 }
 
 /**
@@ -1953,11 +2573,12 @@ function ProjectGrid({
   onOpen: (d: EditorDraftEntry) => void;
   onDelete: (id: string) => void;
 }) {
+  const { t, tp } = useT();
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       {/* ── Lessons — the primary surface ── */}
       <section>
-        <h2 className="mb-3 text-callout font-semibold text-primary">Уроки</h2>
+        <h2 className="mb-3 text-callout font-semibold text-primary">{t('editor.home.lessons')}</h2>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
           {/* New-lesson cards — mixed tasks, or a single Figma submission. */}
           <button
@@ -1969,8 +2590,8 @@ function ProjectGrid({
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand/10 text-brand">
               <GraduationCap size={20} />
             </span>
-            <p className="px-4 text-footnote font-semibold text-primary">Новый урок</p>
-            <p className="px-4 text-caption text-tertiary">Разные задания</p>
+            <p className="px-4 text-footnote font-semibold text-primary">{t('editor.home.newLesson')}</p>
+            <p className="px-4 text-caption text-tertiary">{t('editor.home.newLessonMixed')}</p>
           </button>
 
           <button
@@ -1982,8 +2603,8 @@ function ProjectGrid({
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand/10 text-brand">
               <Link2 size={20} />
             </span>
-            <p className="px-4 text-footnote font-semibold text-primary">Урок · сдача в Figma</p>
-            <p className="px-4 text-caption text-tertiary">Одно задание со ссылкой</p>
+            <p className="px-4 text-footnote font-semibold text-primary">{t('editor.home.newLessonFigma')}</p>
+            <p className="px-4 text-caption text-tertiary">{t('editor.home.newLessonFigmaHint')}</p>
           </button>
 
           {lessons.map((l) => (
@@ -1998,10 +2619,10 @@ function ProjectGrid({
               </span>
               <span className="min-w-0 px-0.5">
                 <span className="block truncate text-footnote font-medium text-primary">
-                  {l.title || 'Без названия'}
+                  {l.title || t('editor.home.untitled')}
                 </span>
                 <span className="block text-caption text-tertiary">
-                  {l.blockCount} {l.blockCount === 1 ? 'блок' : 'блоков'} · изменён {relTime(new Date(l.updatedAt).getTime())}
+                  {tp('editor.home.blockCount', l.blockCount)} · {t('editor.home.editedAt', { time: relTime(new Date(l.updatedAt).getTime(), t) })}
                 </span>
               </span>
             </button>
@@ -2012,7 +2633,7 @@ function ProjectGrid({
       {/* ── SVG screen-critique files — the standalone importer ── */}
       <section>
         <h2 className="mb-3 flex items-center gap-2 text-callout font-semibold text-primary">
-          <ImageIcon size={16} className="text-tertiary" /> SVG-разборы экрана
+          <ImageIcon size={16} className="text-tertiary" /> {t('editor.home.svgCritiques')}
         </h2>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
           {/* Import tile — dashed, matches the dropzone affordance. */}
@@ -2031,7 +2652,7 @@ function ProjectGrid({
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand/10 text-brand">
               <UploadCloud size={20} />
             </span>
-            <p className="px-4 text-footnote font-semibold text-primary">Перетащи SVG или выбери файл</p>
+            <p className="px-4 text-footnote font-semibold text-primary">{t('editor.home.dropSvg')}</p>
             <input
               type="file"
               accept=".svg,image/svg+xml"
@@ -2067,7 +2688,7 @@ function ProjectGrid({
                       e.stopPropagation();
                       onDelete(d.id);
                     }}
-                    title="Удалить файл"
+                    title={t('editor.home.deleteFile')}
                     className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md bg-black/40 text-white opacity-0 backdrop-blur transition-fast hover:bg-danger group-hover:opacity-100"
                   >
                     <X size={13} />
@@ -2075,7 +2696,7 @@ function ProjectGrid({
                 </button>
                 <div className="min-w-0 px-0.5">
                   <p className="truncate text-footnote font-medium text-primary">{d.fileName}</p>
-                  <p className="text-caption text-tertiary">Изменён {relTime(d.updatedAt)}</p>
+                  <p className="text-caption text-tertiary">{t('editor.home.editedAtCap', { time: relTime(d.updatedAt, t) })}</p>
                 </div>
               </div>
             );

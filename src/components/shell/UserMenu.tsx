@@ -146,7 +146,7 @@ export function UserMenu({
           ref={panelRef}
           role="menu"
           style={{ position: 'fixed', top: coords?.top ?? -9999, left: coords?.left ?? -9999 }}
-          className="z-[60] w-[16rem] overflow-hidden rounded-2xl border border-border bg-surface p-1.5 shadow-xl"
+          className="z-[60] w-[16rem] overflow-hidden rounded-2xl border border-border bg-surface p-2 shadow-xl"
         >
           <div className="flex items-center gap-3 px-2.5 py-2">
             <span
@@ -163,7 +163,7 @@ export function UserMenu({
             </div>
           </div>
 
-          <div className="my-1.5 flex items-center gap-1 rounded-xl bg-muted p-1">
+          <div className="my-1.5 flex items-center gap-1 rounded-xl bg-muted p-1.5">
             <ThemeChip
               active={theme === 'light'}
               onClick={() => pickTheme('light')}
@@ -178,7 +178,7 @@ export function UserMenu({
             />
           </div>
 
-          <div className="mb-1.5 flex items-center gap-1 rounded-xl bg-muted p-1">
+          <div className="mb-1.5 flex items-center gap-1 rounded-xl bg-muted p-1.5">
             {LOCALES.map((loc) => (
               <ThemeChip
                 key={loc}

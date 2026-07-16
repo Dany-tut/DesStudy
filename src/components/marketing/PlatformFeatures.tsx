@@ -156,15 +156,17 @@ function CardArt({ art }: { art: Art }) {
       return (
         <Stage>
           <div className="absolute inset-0 flex flex-col justify-center gap-1.5 px-3">
-            <span className="max-w-[70%] translate-y-1 self-start rounded-lg rounded-bl-sm bg-[rgb(var(--brand-rgb)/0.14)] px-2 py-1 text-[10px] font-medium text-secondary opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+            {/* learner's question — brand bubble, right */}
+            <span className="max-w-[72%] self-end rounded-2xl rounded-br-sm bg-brand px-2.5 py-1 text-[10px] font-medium text-white shadow-sm">
               где тут ошибка?
             </span>
-            <span className="flex items-center gap-1 self-end rounded-lg rounded-br-sm bg-brand px-2.5 py-2 shadow-sm">
+            {/* mentor thinking back — light bubble, left, with typing dots */}
+            <span className="flex items-center gap-1 self-start rounded-2xl rounded-bl-sm bg-surface px-2.5 py-1.5 shadow-sm ring-1 ring-inset ring-[rgb(var(--brand-rgb)/0.18)]">
               {[0, 1, 2].map((i) => (
                 <i
                   key={i}
-                  className="pf-typing block h-1 w-1 rounded-full bg-white"
-                  style={{ animationDelay: `${i * 180}ms`, opacity: 0.5 }}
+                  className="pf-typing block h-1.5 w-1.5 rounded-full bg-brand"
+                  style={{ animationDelay: `${i * 180}ms`, opacity: 0.55 }}
                 />
               ))}
             </span>
@@ -199,19 +201,20 @@ function CardArt({ art }: { art: Art }) {
     case 'threeforms':
       return (
         <Stage>
-          <div className="absolute inset-0 flex items-center justify-between px-5">
-            <div className="absolute inset-x-5 top-[42%] h-0.5 -translate-y-1/2 rounded bg-[rgb(var(--brand-rgb)/0.16)]" />
-            <div className="absolute left-5 top-[42%] h-0.5 w-0 -translate-y-1/2 rounded bg-brand transition-[width] duration-[900ms] ease-out group-hover:w-[calc(100%-2.5rem)]" />
+          <div className="absolute inset-0 flex items-start justify-between px-6 pt-3">
+            {/* track + fill, pinned to the circle centres (24px pad + 10px radius = 34px) */}
+            <div className="absolute inset-x-[34px] top-[22px] h-0.5 -translate-y-1/2 rounded-full bg-[rgb(var(--brand-rgb)/0.16)]" />
+            <div className="absolute left-[34px] top-[22px] h-0.5 w-0 -translate-y-1/2 rounded-full bg-brand transition-[width] duration-[900ms] ease-out group-hover:w-[calc(100%-68px)]" />
             {['теория', 'тренажёр', 'проект'].map((label, i) => (
-              <div key={label} className="relative z-10 flex flex-col items-center gap-1">
+              <div key={label} className="relative z-10 flex flex-col items-center gap-1.5">
                 <span
-                  className="flex h-4 w-4 items-center justify-center rounded-full bg-[rgb(var(--brand-rgb)/0.18)] text-[8px] font-bold text-brand ring-2 ring-[rgb(var(--brand-rgb)/0.05)] transition-colors duration-300 group-hover:bg-brand group-hover:text-white"
+                  className="flex h-5 w-5 items-center justify-center rounded-full bg-surface text-[9px] font-bold text-brand ring-2 ring-[rgb(var(--brand-rgb)/0.25)] transition-all duration-300 group-hover:bg-brand group-hover:text-white group-hover:ring-brand"
                   style={{ transitionDelay: `${i * 260}ms` }}
                 >
                   {i + 1}
                 </span>
                 <span
-                  className="text-[8px] font-medium text-secondary transition-colors duration-300 group-hover:text-brand"
+                  className="text-[9px] font-medium text-secondary transition-colors duration-300 group-hover:text-brand"
                   style={{ transitionDelay: `${i * 260}ms` }}
                 >
                   {label}

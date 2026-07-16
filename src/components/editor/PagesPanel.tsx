@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, FileText, Minus, Star, Pencil, Trash2 } from 'lucide-react';
 import type { PageMeta } from '@/lib/editor/pages';
+import { useT } from '@/lib/i18n/client';
 
 interface PagesPanelProps {
   items: PageMeta[];
@@ -39,6 +40,7 @@ export function PagesPanel({
   onDelete,
   onSetCover,
 }: PagesPanelProps) {
+  const { t } = useT();
   const [addOpen, setAddOpen] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; id: string; kind: 'page' | 'divider' } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -52,19 +54,19 @@ export function PagesPanel({
           type="button"
           onClick={onToggleCollapsed}
           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-          title={collapsed ? 'Развернуть' : 'Свернуть'}
+          title={collapsed ? t('editor.sidebar.expand') : t('editor.sidebar.collapse')}
         >
           <ChevronDown
             size={13}
             className={`shrink-0 text-tertiary transition-fast ${collapsed ? 'opacity-100 -rotate-90' : 'opacity-0 group-hover:opacity-100'}`}
           />
-          <span className="truncate text-caption font-semibold uppercase tracking-wide text-tertiary">Страницы</span>
+          <span className="truncate text-caption font-semibold uppercase tracking-wide text-tertiary">{t('editor.sidebar.pages')}</span>
         </button>
         <div className="relative shrink-0">
           <button
             type="button"
             onClick={() => setAddOpen((v) => !v)}
-            title="Добавить"
+            title={t('editor.pages.add')}
             className="text-tertiary transition-fast hover:text-brand"
           >
             <Plus size={15} />
@@ -73,7 +75,7 @@ export function PagesPanel({
             <Dropdown onClose={() => setAddOpen(false)} className="absolute right-0 top-6 w-52">
               <MenuItem
                 icon={<FileText size={14} />}
-                label="Новая страница"
+                label={t('editor.pages.newPage')}
                 onClick={() => {
                   onAddPage();
                   setAddOpen(false);
@@ -81,7 +83,7 @@ export function PagesPanel({
               />
               <MenuItem
                 icon={<Minus size={14} />}
-                label="Разделитель"
+                label={t('editor.pages.divider')}
                 onClick={() => {
                   onAddDivider();
                   setAddOpen(false);
@@ -143,7 +145,7 @@ export function PagesPanel({
                   </button>
                 )}
                 {item.id === coverId && (
-                  <Star size={12} className="shrink-0 fill-warning text-warning" aria-label="Обложка" />
+                  <Star size={12} className="shrink-0 fill-warning text-warning" aria-label={t('editor.pages.cover')} />
                 )}
               </div>
             ),
@@ -162,7 +164,7 @@ export function PagesPanel({
           {menu.kind === 'page' && (
             <MenuItem
               icon={<Star size={14} />}
-              label="Назначить обложкой"
+              label={t('editor.pages.setCover')}
               onClick={() => {
                 onSetCover(menu.id);
                 setMenu(null);
@@ -171,7 +173,7 @@ export function PagesPanel({
           )}
           <MenuItem
             icon={<Pencil size={14} />}
-            label="Переименовать"
+            label={t('editor.pages.rename')}
             onClick={() => {
               setEditingId(menu.id);
               setMenu(null);
@@ -180,7 +182,7 @@ export function PagesPanel({
           {(menu.kind === 'divider' || pageCount > 1) && (
             <MenuItem
               icon={<Trash2 size={14} />}
-              label="Удалить"
+              label={t('editor.pages.delete')}
               danger
               onClick={() => {
                 onDelete(menu.id);

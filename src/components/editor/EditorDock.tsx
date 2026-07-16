@@ -35,6 +35,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { EditorTool } from '@/lib/editor/types';
+import { useT } from '@/lib/i18n/client';
 
 /** A selection made from a tool group. `tool` is the underlying canvas tool;
  *  `variant` disambiguates sub-modes the tool exposes (e.g. move → scale). */
@@ -55,7 +56,8 @@ export interface ToolChoice {
 /** One entry in a tool's variant dropdown. */
 interface VariantDef {
   id: string;
-  label: string;
+  /** i18n key for the variant label. */
+  labelKey: string;
   icon: LucideIcon;
   /** Keyboard hint shown right-aligned in the menu. */
   hint?: string;
@@ -66,7 +68,8 @@ interface VariantDef {
 
 interface ToolDef {
   id: EditorTool;
-  label: string;
+  /** i18n key for the tool label. */
+  labelKey: string;
   icon: LucideIcon;
   /** Whole tool is a placeholder — dimmed, tagged «скоро». */
   soon?: boolean;
@@ -82,62 +85,62 @@ interface ToolDef {
 const TOOLS: ToolDef[] = [
   {
     id: 'move',
-    label: 'Выделение · V',
+    labelKey: 'editor.dock.tools.move',
     icon: MousePointer2,
     variants: [
-      { id: 'move', label: 'Выделение', icon: MousePointer2, hint: 'V' },
-      { id: 'scale', label: 'Масштаб', icon: Scaling, hint: 'K' },
-      { id: 'hand', label: 'Рука', icon: Hand, hint: 'H', soon: true },
+      { id: 'move', labelKey: 'editor.dock.variants.move', icon: MousePointer2, hint: 'V' },
+      { id: 'scale', labelKey: 'editor.dock.variants.scale', icon: Scaling, hint: 'K' },
+      { id: 'hand', labelKey: 'editor.dock.variants.hand', icon: Hand, hint: 'H', soon: true },
     ],
   },
   {
     id: 'frame',
-    label: 'Фрейм · F',
+    labelKey: 'editor.dock.tools.frame',
     icon: Frame,
     variants: [
-      { id: 'frame', label: 'Фрейм', icon: Frame, hint: 'F' },
-      { id: 'section', label: 'Секция', icon: Crop, hint: '⇧S', soon: true },
-      { id: 'slice', label: 'Срез', icon: Scissors, hint: 'S', soon: true },
+      { id: 'frame', labelKey: 'editor.dock.variants.frame', icon: Frame, hint: 'F' },
+      { id: 'section', labelKey: 'editor.dock.variants.section', icon: Crop, hint: '⇧S', soon: true },
+      { id: 'slice', labelKey: 'editor.dock.variants.slice', icon: Scissors, hint: 'S', soon: true },
     ],
   },
   {
     id: 'shape',
-    label: 'Прямоугольник · R',
+    labelKey: 'editor.dock.tools.shape',
     icon: Square,
     variants: [
-      { id: 'rect', label: 'Прямоугольник', icon: Square, hint: 'R' },
-      { id: 'ellipse', label: 'Эллипс', icon: Circle, hint: 'O', soon: true },
-      { id: 'line', label: 'Линия', icon: Minus, hint: 'L', soon: true },
-      { id: 'arrow', label: 'Стрелка', icon: MoveUpRight, hint: '⇧L', soon: true },
-      { id: 'polygon', label: 'Многоугольник', icon: Triangle, soon: true },
-      { id: 'star', label: 'Звезда', icon: Star, soon: true },
-      { id: 'image', label: 'Изображение…', icon: ImageIcon, hint: '⇧⌘K', soon: true },
+      { id: 'rect', labelKey: 'editor.dock.variants.rect', icon: Square, hint: 'R' },
+      { id: 'ellipse', labelKey: 'editor.dock.variants.ellipse', icon: Circle, hint: 'O', soon: true },
+      { id: 'line', labelKey: 'editor.dock.variants.line', icon: Minus, hint: 'L', soon: true },
+      { id: 'arrow', labelKey: 'editor.dock.variants.arrow', icon: MoveUpRight, hint: '⇧L', soon: true },
+      { id: 'polygon', labelKey: 'editor.dock.variants.polygon', icon: Triangle, soon: true },
+      { id: 'star', labelKey: 'editor.dock.variants.star', icon: Star, soon: true },
+      { id: 'image', labelKey: 'editor.dock.variants.image', icon: ImageIcon, hint: '⇧⌘K', soon: true },
     ],
   },
-  { id: 'text', label: 'Текст · T', icon: Type },
+  { id: 'text', labelKey: 'editor.dock.tools.text', icon: Type },
   // ── divider ── (placeholders below)
   {
     id: 'pen',
-    label: 'Перо · P',
+    labelKey: 'editor.dock.tools.pen',
     icon: PenTool,
     soon: true,
     variants: [
-      { id: 'pen', label: 'Перо', icon: PenTool, hint: 'P', soon: true },
-      { id: 'pencil', label: 'Карандаш', icon: Pencil, hint: '⇧P', soon: true },
+      { id: 'pen', labelKey: 'editor.dock.variants.pen', icon: PenTool, hint: 'P', soon: true },
+      { id: 'pencil', labelKey: 'editor.dock.variants.pencil', icon: Pencil, hint: '⇧P', soon: true },
     ],
   },
   {
     id: 'comment',
-    label: 'Комментарий · C',
+    labelKey: 'editor.dock.tools.comment',
     icon: MessageCircle,
     soon: true,
     variants: [
-      { id: 'comment', label: 'Комментарий', icon: MessageCircle, hint: 'C', soon: true },
-      { id: 'annotation', label: 'Аннотация', icon: MessageSquareText, hint: 'Y', soon: true },
-      { id: 'measure', label: 'Измерение', icon: Ruler, hint: '⇧M', soon: true },
+      { id: 'comment', labelKey: 'editor.dock.variants.comment', icon: MessageCircle, hint: 'C', soon: true },
+      { id: 'annotation', labelKey: 'editor.dock.variants.annotation', icon: MessageSquareText, hint: 'Y', soon: true },
+      { id: 'measure', labelKey: 'editor.dock.variants.measure', icon: Ruler, hint: '⇧M', soon: true },
     ],
   },
-  { id: 'components', label: 'Компоненты', icon: Component, soon: true },
+  { id: 'components', labelKey: 'editor.dock.tools.components', icon: Component, soon: true },
 ];
 
 /** First placeholder tool — a divider is drawn just before it. */
@@ -145,34 +148,39 @@ const FIRST_SOON = TOOLS.findIndex((t) => t.soon);
 
 /** Right-hand mode segment — matches the screenshot's grouped pill. Cosmetic for
  *  now (dev-mode / code hand-off arrive with the platform work). */
-const MODE_SEGMENT: { id: string; label: string; icon: LucideIcon }[] = [
-  { id: 'draw', label: 'Рисование', icon: Spline },
-  { id: 'design', label: 'Дизайн', icon: MousePointerClick },
-  { id: 'dev', label: 'Dev-режим', icon: Boxes },
-  { id: 'code', label: 'Код', icon: Code2 },
+const MODE_SEGMENT: { id: string; labelKey: string; icon: LucideIcon }[] = [
+  { id: 'draw', labelKey: 'editor.dock.modes.draw', icon: Spline },
+  { id: 'design', labelKey: 'editor.dock.modes.design', icon: MousePointerClick },
+  { id: 'dev', labelKey: 'editor.dock.modes.dev', icon: Boxes },
+  { id: 'code', labelKey: 'editor.dock.modes.code', icon: Code2 },
 ];
 
-type ViewMode = 'editor' | 'share';
+export type ViewMode = 'editor' | 'share';
 
-/** The detached right-hand pill — view modes. Clickable (toggles which is
- *  active); the actual surfaces arrive with the platform work. */
-const VIEW_MODES: { id: ViewMode; label: string; icon: LucideIcon }[] = [
-  { id: 'editor', label: 'Редактор', icon: SquarePen },
-  { id: 'share', label: 'Доступы', icon: Share2 },
+/** The detached right-hand pill — Редактор (canvas + tools) vs Доступы (the
+ *  lesson settings / publish step). Controlled by the parent, which owns the
+ *  step it maps onto. */
+const VIEW_MODES: { id: ViewMode; labelKey: string; icon: LucideIcon }[] = [
+  { id: 'editor', labelKey: 'editor.dock.views.editor', icon: SquarePen },
+  { id: 'share', labelKey: 'editor.dock.views.share', icon: Share2 },
 ];
 
 export function EditorDock({
   tool,
   onTool,
+  viewMode,
+  onViewMode,
 }: {
   tool: EditorTool;
   onTool: (choice: ToolChoice) => void;
+  viewMode: ViewMode;
+  onViewMode: (m: ViewMode) => void;
 }) {
+  const { t: tr } = useT();
   // Which tool's variant dropdown is open + where its anchor button sits (viewport
   // coords), so the menu can be portalled to <body> — out of the dock's glass, so
   // its own backdrop-blur samples the canvas (a nested backdrop-filter doesn't).
   const [menu, setMenu] = useState<{ id: EditorTool; left: number; top: number } | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('editor');
 
   // Close the dropdown on outside click / Escape. The portalled menu
   // lives outside dockRef, so its own subtree is whitelisted via `[data-tool-menu]`.
@@ -217,7 +225,7 @@ export function EditorDock({
                           <button
                             type="button"
                             onClick={() => onTool({ tool: t.id })}
-                            title={t.soon ? `${t.label} · скоро` : t.label}
+                            title={t.soon ? `${tr(t.labelKey)} · ${tr('editor.dock.soon')}` : tr(t.labelKey)}
                             className={[
                               'flex h-9 items-center gap-0.5 rounded-xl pl-2 transition-fast',
                               t.variants ? 'pr-1' : 'pr-2',
@@ -299,10 +307,10 @@ export function EditorDock({
                                         className={isDefault ? 'text-brand' : 'text-transparent'}
                                       />
                                       <VIcon size={15} className="shrink-0 text-secondary" />
-                                      <span className="flex-1">{v.label}</span>
+                                      <span className="flex-1">{tr(v.labelKey)}</span>
                                       {v.soon ? (
                                         <span className="rounded bg-hover px-1.5 py-0.5 text-caption text-tertiary">
-                                          скоро
+                                          {tr('editor.dock.soon')}
                                         </span>
                                       ) : (
                                         v.hint && (
@@ -334,7 +342,7 @@ export function EditorDock({
                         <button
                           key={m.id}
                           type="button"
-                          title={`${m.label} · скоро`}
+                          title={`${tr(m.labelKey)} · ${tr('editor.dock.soon')}`}
                           className={[
                             'flex h-8 w-8 items-center justify-center rounded-lg transition-fast',
                             active ? 'bg-brand text-on-brand' : 'text-tertiary hover:text-primary',
@@ -358,9 +366,9 @@ export function EditorDock({
               <button
                 key={m.id}
                 type="button"
-                title={m.label}
+                title={tr(m.labelKey)}
                 aria-pressed={active}
-                onClick={() => setViewMode(m.id)}
+                onClick={() => onViewMode(m.id)}
                 className={[
                   'flex h-9 w-9 items-center justify-center rounded-xl transition-fast',
                   active ? 'bg-brand text-on-brand' : 'text-secondary hover:bg-hover hover:text-primary',

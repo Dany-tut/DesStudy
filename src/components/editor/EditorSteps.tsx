@@ -5,6 +5,7 @@ import { UploadCloud, Trash2, Target, Check, Lock, Globe, FileText, Send, GitCom
 import { CRITIQUE_ROLES, CRITIQUE_DEFECTS, DEFECT_PROPS } from '@/lib/curriculum/screenCritique';
 import type { CritiqueZone, CritiqueRoleId, CritiqueDefectId, DefectDelta, DefectProp } from '@/lib/curriculum/types';
 import type { Layer } from '@/lib/editor/types';
+import { useT } from '@/lib/i18n/client';
 
 export type ExerciseKind = 'critique' | 'spot-diff' | 'fix-screen';
 export type AccessMode = 'PUBLIC' | 'RESTRICTED';
@@ -20,10 +21,10 @@ export interface EditorDraft {
   audience: string;
 }
 
-const KINDS: { id: ExerciseKind; label: string; hint: string; icon: typeof GitCompare }[] = [
-  { id: 'critique', label: 'Критика экрана', hint: 'ученик разбирает роли и дефекты одного экрана', icon: Target },
-  { id: 'spot-diff', label: 'Найди отличие', hint: 'сравнить эталон и сломанный вариант', icon: Crop },
-  { id: 'fix-screen', label: 'Почини экран', hint: 'из сломанного собрать правильный', icon: Wrench },
+const KINDS: { id: ExerciseKind; labelKey: string; hintKey: string; icon: typeof GitCompare }[] = [
+  { id: 'critique', labelKey: 'editor.steps.kindCritique', hintKey: 'editor.steps.kindCritiqueHint', icon: Target },
+  { id: 'spot-diff', labelKey: 'editor.steps.kindSpotDiff', hintKey: 'editor.steps.kindSpotDiffHint', icon: Crop },
+  { id: 'fix-screen', labelKey: 'editor.steps.kindFixScreen', hintKey: 'editor.steps.kindFixScreenHint', icon: Wrench },
 ];
 
 /* ───────────────── Unified editor — exercise-type + broken variant ───────────────── */
@@ -44,11 +45,12 @@ export function ExerciseSetupPanel({
   onKind: (k: ExerciseKind) => void;
   onBroken: (svg: string | undefined) => void;
 }) {
+  const { t } = useT();
   const fileRef = useRef<HTMLInputElement>(null);
   const needsBroken = draft.kind !== 'critique';
   return (
     <div className="flex flex-col gap-3 px-1">
-      <p className="text-caption font-medium uppercase tracking-wide text-tertiary">Тип задания</p>
+      <p className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.steps.taskType')}</p>
       <div className="flex flex-col gap-1.5">
         {KINDS.map((k) => {
           const active = draft.kind === k.id;
@@ -65,8 +67,8 @@ export function ExerciseSetupPanel({
             >
               <Icon size={15} className={active ? 'mt-0.5 text-brand' : 'mt-0.5 text-tertiary'} />
               <span className="flex min-w-0 flex-col">
-                <span className="text-caption font-semibold text-primary">{k.label}</span>
-                <span className="text-caption leading-tight text-tertiary">{k.hint}</span>
+                <span className="text-caption font-semibold text-primary">{t(k.labelKey)}</span>
+                <span className="text-caption leading-tight text-tertiary">{t(k.hintKey)}</span>
               </span>
             </button>
           );
@@ -75,17 +77,17 @@ export function ExerciseSetupPanel({
 
       {needsBroken && (
         <>
-          <p className="mt-1 text-caption font-medium uppercase tracking-wide text-tertiary">Сломанный вариант</p>
+          <p className="mt-1 text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.steps.brokenVariant')}</p>
           {draft.brokenSvg ? (
             <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-2.5 py-2">
               <span className="flex items-center gap-1.5 text-caption text-secondary">
-                <span className="h-2 w-2 rounded-full bg-warning" /> Загружен
+                <span className="h-2 w-2 rounded-full bg-warning" /> {t('editor.steps.loaded')}
               </span>
               <button
                 type="button"
                 onClick={() => onBroken(undefined)}
                 className="text-tertiary transition-fast hover:text-danger"
-                title="Убрать"
+                title={t('editor.steps.remove')}
               >
                 <Trash2 size={13} />
               </button>
@@ -97,7 +99,7 @@ export function ExerciseSetupPanel({
               className="flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border bg-surface py-4 text-center transition-base hover:border-brand/40"
             >
               <UploadCloud size={18} className="text-brand" />
-              <span className="text-caption font-medium text-primary">Загрузить «кривой» SVG</span>
+              <span className="text-caption font-medium text-primary">{t('editor.steps.uploadBrokenSvg')}</span>
             </button>
           )}
           <input
@@ -139,10 +141,11 @@ export function ZoneEditor({
   onRemove: () => void;
   onPatch: (patch: Partial<CritiqueZone>) => void;
 }) {
+  const { t } = useT();
   return (
     <div className="flex flex-col gap-4 px-1">
       <div>
-        <p className="text-caption font-medium uppercase tracking-wide text-tertiary">Зона критики</p>
+        <p className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.zone.title')}</p>
         <p className="mt-0.5 truncate text-footnote font-semibold text-primary">{layer.name}</p>
       </div>
 
@@ -152,12 +155,12 @@ export function ZoneEditor({
           onClick={onAdd}
           className="flex items-center justify-center gap-1.5 rounded-lg bg-brand/10 py-2 text-footnote font-medium text-brand transition-fast hover:bg-brand/15"
         >
-          <Target size={14} /> Сделать зоной критики
+          <Target size={14} /> {t('editor.zone.make')}
         </button>
       ) : (
         <>
           <label className="flex flex-col gap-1">
-            <span className="text-caption text-tertiary">Подпись зоны</span>
+            <span className="text-caption text-tertiary">{t('editor.zone.label')}</span>
             <input
               defaultValue={zone.label}
               key={`lbl-${zone.id}`}
@@ -167,7 +170,7 @@ export function ZoneEditor({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-caption text-tertiary">Правильная роль</span>
+            <span className="text-caption text-tertiary">{t('editor.zone.correctRole')}</span>
             <select
               value={zone.role}
               onChange={(e) => onPatch({ role: e.target.value as CritiqueRoleId })}
@@ -182,7 +185,7 @@ export function ZoneEditor({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-caption text-tertiary">Дефект</span>
+            <span className="text-caption text-tertiary">{t('editor.zone.defect')}</span>
             <select
               value={zone.defect}
               onChange={(e) => onPatch({ defect: e.target.value as CritiqueDefectId })}
@@ -197,13 +200,13 @@ export function ZoneEditor({
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-caption text-tertiary">Заметка ментора</span>
+            <span className="text-caption text-tertiary">{t('editor.zone.mentorNote')}</span>
             <textarea
               rows={3}
               defaultValue={zone.roleNote}
               key={`note-${zone.id}`}
               onChange={(e) => onPatch({ roleNote: e.target.value })}
-              placeholder="Почему роль/дефект именно такие"
+              placeholder={t('editor.zone.mentorNotePlaceholder')}
               className="resize-none rounded-lg border border-border bg-canvas px-2 py-1.5 text-caption text-primary"
             />
           </label>
@@ -219,7 +222,7 @@ export function ZoneEditor({
             onClick={onRemove}
             className="flex items-center justify-center gap-1.5 rounded-lg border border-border py-2 text-caption font-medium text-danger transition-fast hover:bg-danger/5"
           >
-            <Trash2 size={13} /> Убрать зону
+            <Trash2 size={13} /> {t('editor.zone.removeZone')}
           </button>
         </>
       )}
@@ -243,6 +246,7 @@ function DeltaEditor({
   autoDeltas?: DefectDelta[];
   onChange: (deltas: DefectDelta[]) => void;
 }) {
+  const { t } = useT();
   const patchAt = (i: number, patch: Partial<DefectDelta>) =>
     onChange(deltas.map((d, j) => (j === i ? { ...d, ...patch } : d)));
   const removeAt = (i: number) => onChange(deltas.filter((_, j) => j !== i));
@@ -251,21 +255,21 @@ function DeltaEditor({
   return (
     <div className="flex flex-col gap-2 border-t border-border pt-3">
       <div className="flex items-center justify-between">
-        <span className="text-caption font-medium uppercase tracking-wide text-tertiary">Что сломано</span>
+        <span className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.zone.whatBroke')}</span>
         {autoDeltas && autoDeltas.length > 0 && (
           <button
             type="button"
             onClick={() => onChange(autoDeltas)}
-            title="Сравнить с эталоном и подставить отличия"
+            title={t('editor.zone.compareTitle')}
             className="flex items-center gap-1 text-caption font-medium text-brand transition-fast hover:text-brand-hover"
           >
-            <GitCompareArrows size={12} /> Из эталона
+            <GitCompareArrows size={12} /> {t('editor.zone.fromReference')}
           </button>
         )}
       </div>
 
       {autoDeltas && autoDeltas.length === 0 && deltas.length === 0 && (
-        <p className="text-caption leading-tight text-tertiary">Слой совпадает с эталоном — отличий нет.</p>
+        <p className="text-caption leading-tight text-tertiary">{t('editor.zone.matchesReference')}</p>
       )}
 
       {deltas.map((d, i) => (
@@ -286,7 +290,7 @@ function DeltaEditor({
               type="button"
               onClick={() => removeAt(i)}
               className="shrink-0 rounded p-1 text-tertiary transition-fast hover:text-danger"
-              title="Убрать отличие"
+              title={t('editor.zone.removeDiff')}
             >
               <Trash2 size={12} />
             </button>
@@ -295,14 +299,14 @@ function DeltaEditor({
             <input
               value={d.was ?? ''}
               onChange={(e) => patchAt(i, { was: e.target.value })}
-              placeholder="эталон"
+              placeholder={t('editor.zone.referencePlaceholder')}
               className="min-w-0 flex-1 rounded-md border border-success/40 bg-canvas px-2 py-1 text-caption text-primary"
             />
             <span className="shrink-0 text-caption text-tertiary">→</span>
             <input
               value={d.now ?? ''}
               onChange={(e) => patchAt(i, { now: e.target.value })}
-              placeholder="сломано"
+              placeholder={t('editor.zone.brokenPlaceholder')}
               className="min-w-0 flex-1 rounded-md border border-warning/50 bg-canvas px-2 py-1 text-caption text-primary"
             />
           </div>
@@ -314,7 +318,7 @@ function DeltaEditor({
         onClick={add}
         className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-1.5 text-caption font-medium text-secondary transition-fast hover:border-brand/40 hover:text-primary"
       >
-        <Plus size={13} /> Добавить отличие
+        <Plus size={13} /> {t('editor.zone.addDiff')}
       </button>
     </div>
   );
@@ -335,44 +339,46 @@ export function Step4Access({
   onSave: () => void;
   onPublish: () => void;
 }) {
+  const { t } = useT();
   const restricted = draft.access === 'RESTRICTED';
+  const kindLabelKey = KINDS.find((k) => k.id === draft.kind)?.labelKey;
   return (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col gap-6 overflow-y-auto p-8 pb-24">
       <label className="flex flex-col gap-1">
-        <span className="text-caption text-tertiary">Название урока</span>
+        <span className="text-caption text-tertiary">{t('editor.access.lessonTitle')}</span>
         <input
           defaultValue={draft.title}
           onChange={(e) => onPatch({ title: e.target.value })}
-          placeholder="Напр. «Премиум-карта: иерархия»"
+          placeholder={t('editor.access.lessonTitlePlaceholder')}
           className="rounded-lg border border-border bg-canvas px-3 py-2 text-footnote text-primary"
         />
       </label>
 
       <div>
-        <p className="text-callout font-semibold text-primary">Доступ</p>
+        <p className="text-callout font-semibold text-primary">{t('editor.access.access')}</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <AccessCard
             active={!restricted}
             icon={Globe}
-            title="Публично"
-            hint="виден всем, включая гостей"
+            title={t('editor.access.public')}
+            hint={t('editor.access.publicHint')}
             onClick={() => onPatch({ access: 'PUBLIC' })}
           />
           <AccessCard
             active={restricted}
             icon={Lock}
-            title="Ограниченный"
-            hint="только выбранным группам/ученикам"
+            title={t('editor.access.restricted')}
+            hint={t('editor.access.restrictedHint')}
             onClick={() => onPatch({ access: 'RESTRICTED' })}
           />
         </div>
         {restricted && (
           <label className="mt-3 flex flex-col gap-1">
-            <span className="text-caption text-tertiary">Кому открыть (группы / ученики)</span>
+            <span className="text-caption text-tertiary">{t('editor.access.audienceLabel')}</span>
             <input
               defaultValue={draft.audience}
               onChange={(e) => onPatch({ audience: e.target.value })}
-              placeholder="Напр. «Поток UX-1, Иван П.»"
+              placeholder={t('editor.access.audiencePlaceholder')}
               className="rounded-lg border border-border bg-canvas px-3 py-2 text-footnote text-primary"
             />
           </label>
@@ -380,13 +386,13 @@ export function Step4Access({
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-4">
-        <p className="mb-2 text-caption font-medium uppercase tracking-wide text-tertiary">Итог</p>
+        <p className="mb-2 text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.access.summary')}</p>
         <ul className="space-y-1 text-caption text-secondary">
-          <li>Тип: <b className="text-primary">{KINDS.find((k) => k.id === draft.kind)?.label}</b></li>
-          <li>Зон критики: <b className="text-primary">{zoneCount}</b></li>
-          <li>Отмечено отличий: <b className="text-primary">{draft.zones.reduce((n, z) => n + (z.deltas?.length ?? 0), 0)}</b></li>
-          <li>Сломанный вариант: <b className="text-primary">{draft.brokenSvg ? 'есть' : 'нет'}</b></li>
-          <li>Доступ: <b className="text-primary">{restricted ? 'ограниченный' : 'публичный'}</b></li>
+          <li>{t('editor.access.summaryType')}: <b className="text-primary">{kindLabelKey ? t(kindLabelKey) : ''}</b></li>
+          <li>{t('editor.access.summaryZones')}: <b className="text-primary">{zoneCount}</b></li>
+          <li>{t('editor.access.summaryDiffs')}: <b className="text-primary">{draft.zones.reduce((n, z) => n + (z.deltas?.length ?? 0), 0)}</b></li>
+          <li>{t('editor.access.summaryBroken')}: <b className="text-primary">{draft.brokenSvg ? t('editor.access.yes') : t('editor.access.no')}</b></li>
+          <li>{t('editor.access.summaryAccess')}: <b className="text-primary">{restricted ? t('editor.access.restrictedShort') : t('editor.access.publicShort')}</b></li>
         </ul>
       </div>
 
@@ -396,14 +402,14 @@ export function Step4Access({
           onClick={onSave}
           className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 text-footnote font-medium text-secondary transition-fast hover:text-primary"
         >
-          <FileText size={15} /> В черновики
+          <FileText size={15} /> {t('editor.access.toDrafts')}
         </button>
         <button
           type="button"
           onClick={onPublish}
           className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-footnote font-semibold text-on-brand transition-fast hover:bg-brand-hover"
         >
-          <Send size={15} /> Опубликовать
+          <Send size={15} /> {t('editor.access.publish')}
         </button>
       </div>
     </div>

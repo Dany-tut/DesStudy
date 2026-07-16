@@ -1,6 +1,7 @@
 'use client';
 
 import { Layers, Send, type LucideIcon } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * The floating bottom step-bar — the assignment authoring flow. The former
@@ -15,14 +16,14 @@ export type EditorStep = 1 | 2;
 
 interface Step {
   id: EditorStep;
-  label: string;
-  hint: string;
+  labelKey: string;
+  hintKey: string;
   icon: LucideIcon;
 }
 
 export const STEPS: Step[] = [
-  { id: 1, label: 'Редактор', hint: 'Слои, роли, зоны', icon: Layers },
-  { id: 2, label: 'Доступ', hint: 'Тип и публикация', icon: Send },
+  { id: 1, labelKey: 'editor.stepbar.editorLabel', hintKey: 'editor.stepbar.editorHint', icon: Layers },
+  { id: 2, labelKey: 'editor.stepbar.accessLabel', hintKey: 'editor.stepbar.accessHint', icon: Send },
 ];
 
 export function StepBar({
@@ -35,6 +36,7 @@ export function StepBar({
   /** Highest step reachable so far (steps beyond are locked/dimmed). */
   enabledThrough: EditorStep;
 }) {
+  const { t } = useT();
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
       <div className="glass pointer-events-auto flex items-center gap-1 rounded-2xl p-1.5 shadow-lg">
@@ -66,9 +68,9 @@ export function StepBar({
                 {s.id}
               </span>
               <span className="hidden flex-col leading-tight sm:flex">
-                <span className="text-footnote font-semibold">{s.label}</span>
+                <span className="text-footnote font-semibold">{t(s.labelKey)}</span>
                 <span className={active ? 'text-caption text-on-brand/70' : 'text-caption text-tertiary'}>
-                  {s.hint}
+                  {t(s.hintKey)}
                 </span>
               </span>
               <Icon size={15} className="sm:hidden" />

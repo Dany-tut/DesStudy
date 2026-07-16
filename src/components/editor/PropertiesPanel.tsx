@@ -16,6 +16,9 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Layer, ParsedScreen } from '@/lib/editor/types';
+import { useT } from '@/lib/i18n/client';
+
+import { ColorPicker } from './ColorPicker';
 
 /**
  * The Figma-style properties panel — a read-across-then-edit inspector for the
@@ -30,8 +33,15 @@ import type { Layer, ParsedScreen } from '@/lib/editor/types';
 export function PropertiesPanel({
   layer,
   screen,
+  liveBox,
   onRadius,
   onFill,
+  onOpacity,
+  onStroke,
+  onStrokeWidth,
+  onLayout,
+  onMove,
+  onAlign,
   onText,
   onResize,
   onToggleClip,
@@ -39,15 +49,26 @@ export function PropertiesPanel({
 }: {
   layer: Layer;
   screen?: ParsedScreen | null;
+  /** Live-measured geometry (root user space) — preferred over the stale tree box. */
+  liveBox?: { x: number; y: number; w: number; h: number } | null;
   onRadius?: (v: number) => void;
   onFill?: (v: string) => void;
+  onOpacity?: (v: number) => void;
+  onStroke?: (v: string | null) => void;
+  onStrokeWidth?: (v: number) => void;
+  onLayout?: (l: 'row' | 'column' | 'grid' | 'none') => void;
+  onMove?: (x: number, y: number) => void;
+  onAlign?: (edge: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom') => void;
   onText?: (v: string) => void;
   onResize?: (w: number, h: number) => void;
   onToggleClip?: (on: boolean) => void;
   footer?: React.ReactNode;
 }) {
+  const { t } = useT();
   const { props } = layer;
-  const box = props.box;
+  // Prefer the live-measured box (accurate after transforms) over the parse-time
+  // tree box, which goes stale once a layer is moved/scaled.
+  const box = liveBox ?? props.box;
   const isFrame = layer.type === 'frame';
   // A REAL frame (explicit auto-layout or a framified group) vs a plain group.
   // Only real frames get frame-only affordances like "Clip content" — a plain
@@ -58,51 +79,87 @@ export function PropertiesPanel({
     <div className="flex flex-col">
       {/* Header */}
       <div className="px-1 pb-3">
-        <p className="text-caption font-medium uppercase tracking-wide text-tertiary">Свойства</p>
+        <p className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.props.properties')}</p>
         <p className="mt-0.5 flex items-center gap-1.5 truncate text-footnote font-semibold text-primary">
           {layer.name}
           <span className="rounded bg-hover px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-tertiary">
-            {typeLabel(layer)}
+            {t(typeLabelKey(layer))}
           </span>
         </p>
       </div>
 
       {/* ── Position ── */}
-      <Section title="Позиция">
+      <Section title={t('editor.props.position')}>
         <div className="mb-2 flex items-center gap-1">
-          {[AlignStartVertical, AlignCenterVertical, AlignEndVertical].map((I, i) => (
-            <GhostBtn key={i} Icon={I} />
+          {(
+            [
+              [AlignStartVertical, 'left'],
+              [AlignCenterVertical, 'hcenter'],
+              [AlignEndVertical, 'right'],
+            ] as const
+          ).map(([I, edge], i) => (
+            <GhostBtn key={i} Icon={I} onClick={onAlign ? () => onAlign(edge) : undefined} />
           ))}
-          <span className="mx-1 h-4 w-px bg-border" />
-          {[AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal].map((I, i) => (
-            <GhostBtn key={i} Icon={I} />
+          <span className="mx-1 h-4 w-px bg-border-strong" />
+          {(
+            [
+              [AlignStartHorizontal, 'top'],
+              [AlignCenterHorizontal, 'vcenter'],
+              [AlignEndHorizontal, 'bottom'],
+            ] as const
+          ).map(([I, edge], i) => (
+            <GhostBtn key={i} Icon={I} onClick={onAlign ? () => onAlign(edge) : undefined} />
           ))}
         </div>
         <div className="grid grid-cols-2 gap-1.5">
-          <Field label="X" value={box ? round(box.x) : 'Mixed'} />
-          <Field label="Y" value={box ? round(box.y) : 'Mixed'} />
+          {onMove && box ? (
+            <>
+              <ScrubField label="X" value={Math.round(box.x)} onCommit={(v) => onMove(v, Math.round(box.y))} allowNeg />
+              <ScrubField label="Y" value={Math.round(box.y)} onCommit={(v) => onMove(Math.round(box.x), v)} allowNeg />
+            </>
+          ) : (
+            <>
+              <Field label="X" value={box ? round(box.x) : 'Mixed'} />
+              <Field label="Y" value={box ? round(box.y) : 'Mixed'} />
+            </>
+          )}
         </div>
       </Section>
 
       {/* ── Layout ── */}
-      <Section title="Раскладка">
+      <Section title={t('editor.props.layout')}>
         {isFrame && (
           <div className="mb-2 flex items-center gap-1">
-            <FlowChip Icon={Columns3} label="Ряд" active={props.layout === 'row'} />
-            <FlowChip Icon={Rows3} label="Колонка" active={props.layout === 'column'} />
-            <FlowChip Icon={LayoutGrid} label="Сетка" active={props.layout === 'grid'} />
+            <FlowChip
+              Icon={Columns3}
+              label={t('editor.props.row')}
+              active={props.layout === 'row'}
+              onClick={onLayout ? () => onLayout(props.layout === 'row' ? 'none' : 'row') : undefined}
+            />
+            <FlowChip
+              Icon={Rows3}
+              label={t('editor.props.column')}
+              active={props.layout === 'column'}
+              onClick={onLayout ? () => onLayout(props.layout === 'column' ? 'none' : 'column') : undefined}
+            />
+            <FlowChip
+              Icon={LayoutGrid}
+              label={t('editor.props.grid')}
+              active={props.layout === 'grid'}
+              onClick={onLayout ? () => onLayout(props.layout === 'grid' ? 'none' : 'grid') : undefined}
+            />
           </div>
         )}
         <div className="grid grid-cols-2 gap-1.5">
           {onResize && box ? (
             <>
-              <CommitField label="Ш" value={round(box.w)} onCommit={(v) => onResize(v, Math.round(box.h))} />
-              <CommitField label="В" value={round(box.h)} onCommit={(v) => onResize(Math.round(box.w), v)} />
+              <ScrubField label={t('editor.props.w')} value={Math.round(box.w)} onCommit={(v) => onResize(v, Math.round(box.h))} min={1} />
+              <ScrubField label={t('editor.props.h')} value={Math.round(box.h)} onCommit={(v) => onResize(Math.round(box.w), v)} min={1} />
             </>
           ) : (
             <>
-              <Field label="Ш" value={box ? round(box.w) : 'Mixed'} />
-              <Field label="В" value={box ? round(box.h) : 'Mixed'} />
+              <Field label={t('editor.props.w')} value={box ? round(box.w) : 'Mixed'} />
+              <Field label={t('editor.props.h')} value={box ? round(box.h) : 'Mixed'} />
             </>
           )}
         </div>
@@ -112,39 +169,48 @@ export function PropertiesPanel({
       </Section>
 
       {/* ── Appearance ── */}
-      <Section title="Внешний вид">
+      <Section title={t('editor.props.appearance')}>
         <div className="grid grid-cols-2 gap-1.5">
-          <Field label="Прозр." value={props.opacity != null ? `${Math.round(props.opacity * 100)}%` : '100%'} />
-          {layer.type === 'block' ? (
-            <EditableField
-              label="Радиус"
-              value={props.radius ?? 0}
-              onChange={onRadius}
+          {onOpacity ? (
+            <ScrubField
+              label={t('editor.props.opacity')}
+              value={props.opacity != null ? Math.round(props.opacity * 100) : 100}
+              onCommit={(pct) => onOpacity(pct / 100)}
+              min={0}
+              max={100}
+              suffix="%"
             />
           ) : (
-            <Field label="Радиус" value={props.radius != null ? String(props.radius) : '—'} />
+            <Field label={t('editor.props.opacity')} value={props.opacity != null ? `${Math.round(props.opacity * 100)}%` : '100%'} />
+          )}
+          {layer.type === 'block' && onRadius ? (
+            <ScrubField label={t('editor.props.radius')} value={props.radius ?? 0} onCommit={onRadius} min={0} />
+          ) : (
+            <Field label={t('editor.props.radius')} value={props.radius != null ? String(props.radius) : '—'} />
           )}
         </div>
       </Section>
 
       {/* ── Fill ── */}
       <Section
-        title="Заливка"
+        title={t('editor.props.fill')}
         action={<PlusBtn />}
       >
         {props.fill || props.color ? (
           <ColorRow
             value={(props.fill ?? props.color) as string}
             onChange={onFill}
+            opacity={props.opacity ?? 1}
+            onOpacity={onOpacity}
           />
         ) : (
-          <p className="px-1 text-caption text-tertiary">Нет заливки</p>
+          <p className="px-1 text-caption text-tertiary">{t('editor.props.noFill')}</p>
         )}
       </Section>
 
       {/* ── Text ── */}
       {layer.type === 'text' && (
-        <Section title="Текст">
+        <Section title={t('editor.props.text')}>
           {onText ? (
             <textarea
               rows={2}
@@ -164,28 +230,194 @@ export function PropertiesPanel({
         </Section>
       )}
 
-      {/* ── Stroke / Effects (parity with Figma; not authored here) ── */}
-      <Section title="Обводка" action={<PlusBtn />} muted />
-      <Section title="Эффекты" action={<PlusBtn />} muted last />
+      {/* ── Stroke ── */}
+      {(() => {
+        const hasStroke = !!props.stroke;
+        return (
+          <Section
+            title={t('editor.props.stroke')}
+            muted={!hasStroke && !onStroke}
+            action={
+              !hasStroke && onStroke ? (
+                <PlusBtn onClick={() => onStroke(DEFAULT_STROKE)} title={t('editor.props.addStroke')} />
+              ) : (
+                <PlusBtn />
+              )
+            }
+          >
+            {hasStroke ? (
+              <>
+                <ColorRow value={props.stroke as string} onChange={onStroke ? (v) => onStroke(v) : undefined} />
+                {onStrokeWidth && (
+                  <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                    <ScrubField
+                      label={t('editor.props.strokeWidth')}
+                      value={Math.round(props.strokeWidth ?? 1)}
+                      onCommit={(v) => onStrokeWidth(v)}
+                      min={0}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onStroke?.(null)}
+                      className="flex items-center justify-center rounded-md border border-border bg-surface px-2 py-1.5 text-caption text-tertiary transition-fast hover:border-border-strong hover:text-primary focus-visible:!outline-none"
+                    >
+                      {t('editor.props.removeStroke')}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : onStroke ? null : (
+              <p className="px-1 text-caption text-tertiary">{t('editor.props.noStroke')}</p>
+            )}
+          </Section>
+        );
+      })()}
+
+      {/* ── Effects (parity with Figma; not authored here) ── */}
+      <Section title={t('editor.props.effects')} action={<PlusBtn />} muted last />
 
       {footer && <div className="pt-3">{footer}</div>}
     </div>
   );
 }
 
-function typeLabel(layer: Layer): string {
+/** i18n key for the type badge. Plain groups read as "Group"; a real frame is
+ *  "Auto" for an explicit auto-layout (row / column) and "Frame" otherwise. */
+function typeLabelKey(layer: Layer): string {
   if (layer.type === 'frame') {
-    // Plain groups (no explicit frame flag) read as "Group". A real frame is
-    // "Auto" only for an explicit auto-layout (row / column — the two the menu
-    // offers); `grid`/`none` are parse-time inferences, so it reads as "Frame".
-    if (!layer.props.frame) return 'Group';
-    return layer.props.layout === 'row' || layer.props.layout === 'column' ? 'Auto' : 'Frame';
+    if (!layer.props.frame) return 'editor.props.typeGroup';
+    return layer.props.layout === 'row' || layer.props.layout === 'column'
+      ? 'editor.props.typeAuto'
+      : 'editor.props.typeFrame';
   }
-  const map: Record<string, string> = { text: 'Text', block: 'Block', image: 'Image', vector: 'Vector' };
+  const map: Record<string, string> = {
+    text: 'editor.props.typeText',
+    block: 'editor.props.typeBlock',
+    image: 'editor.props.typeImage',
+    vector: 'editor.props.typeVector',
+  };
   return map[layer.type] ?? layer.type;
 }
 
 const round = (n: number) => String(Math.round(n));
+
+/**
+ * Shared field-cell styling so every inspector control reads identically.
+ * Rest: soft `bg-surface` fill with a barely-there hairline. Hover firms the
+ * border to `border-strong`. Focus swaps to a single brand border + soft ring
+ * (the inner inputs suppress their own `:focus-visible` outline via `!outline-none`
+ * so the ring never doubles up). `FIELD_STATIC` is the read-only variant.
+ */
+const FIELD_BASE =
+  'flex items-center gap-1.5 rounded-md border bg-surface px-2 py-1.5 transition-fast';
+const FIELD_STATIC = `${FIELD_BASE} border-border`;
+const FIELD_INTERACTIVE =
+  `group ${FIELD_BASE} border-border hover:border-border-strong ` +
+  'focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/25';
+
+/** Seed color when adding a stroke from scratch — a neutral dark border. */
+const DEFAULT_STROKE = '#1A1A1A';
+
+/**
+ * The panel's one numeric cell — a Figma-style scrubbable field. The label is a
+ * drag handle (grab it, drag left/right to nudge the value with an `ew-resize`
+ * cursor); the input takes free text and commits on Enter/blur. Values clamp to
+ * [min, max] and reject non-numeric junk. `onCommit` fires live during a scrub
+ * (so the canvas previews) and once when a typed value settles. An optional
+ * `suffix` renders a trailing unit (e.g. «%»).
+ */
+function ScrubField({
+  label,
+  value,
+  onCommit,
+  min,
+  max,
+  allowNeg,
+  suffix,
+}: {
+  label: string;
+  value: number;
+  onCommit: (v: number) => void;
+  min?: number;
+  max?: number;
+  allowNeg?: boolean;
+  suffix?: string;
+}) {
+  const [text, setText] = useState(String(value));
+  const editing = useState(false);
+  const isEditing = editing[0];
+  const setEditing = editing[1];
+  // Re-sync from upstream only while not being typed into (so external edits show).
+  useEffect(() => {
+    if (!isEditing) setText(String(value));
+  }, [value, isEditing]);
+
+  const clampNum = (n: number) => {
+    let r = Math.round(n);
+    if (!allowNeg && r < 0) r = 0;
+    if (min != null) r = Math.max(min, r);
+    if (max != null) r = Math.min(max, r);
+    return r;
+  };
+
+  const commit = () => {
+    const n = Number(text);
+    if (Number.isFinite(n) && text.trim() !== '' && text.trim() !== '-') {
+      const c = clampNum(n);
+      if (c !== value) onCommit(c);
+      setText(String(c));
+    } else {
+      setText(String(value));
+    }
+    setEditing(false);
+  };
+
+  // Drag the label to scrub: 2px of travel per unit, clamped live.
+  const startScrub = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startVal = value;
+    let last = startVal;
+    const move = (ev: PointerEvent) => {
+      const next = clampNum(startVal + Math.round((ev.clientX - startX) / 2));
+      if (next !== last) {
+        last = next;
+        onCommit(next);
+      }
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  return (
+    <label className={FIELD_INTERACTIVE}>
+      <span
+        onPointerDown={startScrub}
+        className="cursor-ew-resize select-none text-caption text-tertiary transition-fast group-hover:text-secondary"
+      >
+        {label}
+      </span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={text}
+        onFocus={() => setEditing(true)}
+        onChange={(e) => {
+          const raw = e.target.value.replace(allowNeg ? /[^0-9-]/g : /[^0-9]/g, '');
+          setText(raw);
+        }}
+        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+        onBlur={commit}
+        className="w-full min-w-0 bg-transparent text-caption tabular-nums text-primary !outline-none focus-visible:!outline-none"
+      />
+      {suffix && <span className="shrink-0 text-caption text-tertiary">{suffix}</span>}
+    </label>
+  );
+}
 
 function Section({
   title,
@@ -214,108 +446,98 @@ function Section({
 /** Read-only value field — Figma's boxed metric cell. */
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center gap-1.5 rounded-md border border-border bg-canvas px-2 py-1.5">
+    <div className={FIELD_STATIC}>
       <span className="text-caption text-tertiary">{label}</span>
       <span className="truncate text-caption tabular-nums text-primary">{value}</span>
     </div>
   );
 }
 
-/** Editable numeric field (radius) — same cell, live input. */
-function EditableField({ label, value, onChange }: { label: string; value: number; onChange?: (v: number) => void }) {
-  if (!onChange) return <Field label={label} value={String(value)} />;
-  return (
-    <label className="flex items-center gap-1.5 rounded-md border border-border bg-canvas px-2 py-1.5 focus-within:border-brand">
-      <span className="text-caption text-tertiary">{label}</span>
-      <input
-        type="number"
-        defaultValue={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full min-w-0 bg-transparent text-caption tabular-nums text-primary outline-none"
-      />
-    </label>
-  );
-}
-
-/** Numeric field that commits on Enter/blur (not per keystroke) — for W/H so the
- *  artboard doesn't resize on every digit. Re-syncs when the value changes. */
-function CommitField({ label, value, onCommit }: { label: string; value: string; onCommit: (v: number) => void }) {
-  const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
-  const commit = () => {
-    const n = Number(text);
-    if (Number.isFinite(n) && n > 0 && String(Math.round(n)) !== value) onCommit(Math.round(n));
-    else setText(value);
-  };
-  return (
-    <label className="flex items-center gap-1.5 rounded-md border border-border bg-canvas px-2 py-1.5 focus-within:border-brand">
-      <span className="text-caption text-tertiary">{label}</span>
-      <input
-        type="number"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-        onBlur={commit}
-        className="w-full min-w-0 bg-transparent text-caption tabular-nums text-primary outline-none"
-      />
-    </label>
-  );
-}
-
-function ColorRow({ value, onChange }: { value: string; onChange?: (v: string) => void }) {
+function ColorRow({
+  value,
+  onChange,
+  opacity,
+  onOpacity,
+}: {
+  value: string;
+  onChange?: (v: string) => void;
+  opacity?: number;
+  onOpacity?: (v: number) => void;
+}) {
   const hex = /^#[0-9a-f]{6}$/i.test(value) ? value : '#000000';
+  if (onChange)
+    return (
+      <ColorPicker
+        value={hex}
+        onChange={onChange}
+        opacity={opacity}
+        onOpacityChange={onOpacity}
+      />
+    );
   return (
-    <div className="flex items-center gap-2 rounded-md border border-border bg-canvas px-2 py-1.5">
-      {onChange ? (
-        <input
-          type="color"
-          value={hex}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-4 w-4 shrink-0 cursor-pointer rounded border border-border bg-transparent p-0"
-          aria-label="Цвет заливки"
-        />
-      ) : (
-        <span className="h-4 w-4 shrink-0 rounded border border-border" style={{ background: value }} />
-      )}
-      {onChange ? (
-        <input
-          defaultValue={value.replace(/^#/, '').toUpperCase()}
-          onChange={(e) => onChange(`#${e.target.value.replace(/^#/, '')}`)}
-          className="w-full min-w-0 bg-transparent text-caption uppercase tabular-nums text-primary outline-none"
-        />
-      ) : (
-        <span className="truncate text-caption uppercase tabular-nums text-primary">{value.replace(/^#/, '')}</span>
-      )}
+    <div className={`${FIELD_STATIC} gap-2`}>
+      <span className="h-4 w-4 shrink-0 rounded-sm border border-border-strong" style={{ background: value }} />
+      <span className="truncate text-caption uppercase tabular-nums text-primary">{value.replace(/^#/, '')}</span>
       <span className="shrink-0 text-caption tabular-nums text-tertiary">100%</span>
     </div>
   );
 }
 
-function GhostBtn({ Icon }: { Icon: typeof MousePointer2 }) {
+function GhostBtn({ Icon, onClick }: { Icon: typeof MousePointer2; onClick?: () => void }) {
+  if (!onClick) {
+    return (
+      <span className="flex h-6 w-6 items-center justify-center rounded-md text-tertiary">
+        <Icon size={13} />
+      </span>
+    );
+  }
   return (
-    <span className="flex h-6 w-6 items-center justify-center rounded text-tertiary">
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-6 w-6 items-center justify-center rounded-md text-tertiary transition-fast hover:bg-hover hover:text-primary focus-visible:!outline-none focus-visible:bg-hover focus-visible:text-primary"
+    >
       <Icon size={13} />
-    </span>
+    </button>
   );
 }
 
-function FlowChip({ Icon, label, active }: { Icon: typeof MousePointer2; label: string; active?: boolean }) {
+function FlowChip({
+  Icon,
+  label,
+  active,
+  onClick,
+}: {
+  Icon: typeof MousePointer2;
+  label: string;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const cls = [
+    'flex h-7 flex-1 items-center justify-center rounded-md border transition-fast focus-visible:!outline-none',
+    active
+      ? 'border-brand bg-brand/12 text-brand'
+      : 'border-border bg-surface text-tertiary',
+    onClick && !active ? 'hover:border-border-strong hover:text-secondary' : '',
+  ].join(' ');
+  if (!onClick) {
+    return (
+      <span title={label} className={cls}>
+        <Icon size={13} />
+      </span>
+    );
+  }
   return (
-    <span
-      title={label}
-      className={[
-        'flex h-6 flex-1 items-center justify-center rounded border text-tertiary',
-        active ? 'border-brand bg-brand/10 text-brand' : 'border-border bg-canvas',
-      ].join(' ')}
-    >
+    <button type="button" title={label} onClick={onClick} className={cls}>
       <Icon size={13} />
-    </span>
+    </button>
   );
 }
 
 /** Figma-style "Обрезать содержимое" row: a label + a switch that clips the
  *  frame's children to its bounds. */
 function ClipToggle({ checked, onChange }: { checked: boolean; onChange: (on: boolean) => void }) {
+  const { t } = useT();
   return (
     <button
       type="button"
@@ -323,7 +545,7 @@ function ClipToggle({ checked, onChange }: { checked: boolean; onChange: (on: bo
       className="mt-2 flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-footnote text-secondary transition-fast hover:text-primary"
     >
       <Scissors size={13} className="text-tertiary" />
-      <span className="flex-1">Обрезать содержимое</span>
+      <span className="flex-1">{t('editor.props.clipContent')}</span>
       <span
         className={[
           'relative h-4 w-7 shrink-0 rounded-full transition-fast',
@@ -341,10 +563,22 @@ function ClipToggle({ checked, onChange }: { checked: boolean; onChange: (on: bo
   );
 }
 
-function PlusBtn() {
+function PlusBtn({ onClick, title }: { onClick?: () => void; title?: string } = {}) {
+  if (!onClick) {
+    return (
+      <span className="flex h-4 w-4 items-center justify-center text-tertiary">
+        <Plus size={13} />
+      </span>
+    );
+  }
   return (
-    <span className="flex h-4 w-4 items-center justify-center text-tertiary">
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="flex h-4 w-4 items-center justify-center rounded text-tertiary transition-colors hover:bg-canvas hover:text-primary"
+    >
       <Plus size={13} />
-    </span>
+    </button>
   );
 }

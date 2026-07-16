@@ -11,6 +11,7 @@
  * is configured, so the whole flow works offline during development.
  */
 import Anthropic from '@anthropic-ai/sdk';
+import type { Locale } from '@/lib/i18n/config';
 
 export interface MentorInput {
   lessonTitle: string;
@@ -298,11 +299,29 @@ const CHAT_SYSTEM = `Ты — AI-ментор платформы DesStudy, гд�
 - Если вопрос не про дизайн — мягко верни к теме дизайна/интерфейсов.
 - Отвечай на русском.`;
 
+// English twin of the coach system prompt — same role and rules, so an EN
+// visitor gets an English reply. Only the language of the answer changes.
+const CHAT_SYSTEM_EN = `You are the AI mentor of DesStudy, a platform where people learn UI/UX design by doing.
+
+Your role: COACH. You genuinely help — you explain the principle and give a concrete direction, but you don't do the work for the person.
+
+Rules:
+- Deliver value on the question RIGHT AWAY: name the principle, technique or benchmark that moves the person forward. You may give concrete values/examples as a reference (e.g. a 4/8/16 spacing scale). Don't answer with only a counter-question.
+- The one thing you DON'T do is complete a specific lesson task in full for them (no "here's the final answer, copy it"). In everything else, be as helpful as possible.
+- If the question is too general to answer without details — give a short useful pointer AND ask one question to clarify context. Don't start the reply with a question.
+- Be concrete, warm and concise: 2–4 short sentences, no fluff or preamble.
+- This is a chat: write plain prose in continuous sentences. No markdown — no asterisks, **bold**, headings, numbered or bulleted lists.
+- Platform voice: calm, professional, encouraging. Don't be saccharine.
+- If the question isn't about design — gently steer back to design/interfaces.
+- Answer in English.`;
+
 /** Offline fallback — a generic guiding question (never solves it for them). */
-function chatFallback(): { reply: string; offline: true } {
+function chatFallback(locale: Locale = 'ru'): { reply: string; offline: true } {
   return {
     reply:
-      'Хороший вопрос. Прежде чем подсказать — что ты уже пробовал и какой результат смущает сильнее всего? Давай начнём оттуда.',
+      locale === 'en'
+        ? 'Good question. Before I nudge you — what have you already tried, and which part of the result bothers you most? Let’s start there.'
+        : 'Хороший вопрос. Прежде чем подсказать — что ты уже пробовал и какой результат смущает сильнее всего? Давай начнём оттуда.',
     offline: true,
   };
 }
@@ -310,9 +329,10 @@ function chatFallback(): { reply: string; offline: true } {
 export async function coachChat(
   message: string,
   history: { role: 'user' | 'assistant'; content: string }[] = [],
+  locale: Locale = 'ru',
 ): Promise<{ reply: string; offline?: boolean }> {
   const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return chatFallback();
+  if (!key) return chatFallback(locale);
 
   // We call the proxy with a plain fetch rather than the SDK, for two reasons:
   //  1. Auth — the proxy expects `Authorization: Bearer`, not Anthropic's

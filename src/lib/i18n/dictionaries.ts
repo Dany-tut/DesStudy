@@ -12,6 +12,7 @@
 
 import type { Locale, PluralForms } from './config';
 import { exercisesRu, exercisesEn } from './dictionaries/exercises';
+import { editorRu, editorEn } from './dictionaries/editor';
 
 export const dictionaries = {
   ru: {
@@ -226,10 +227,20 @@ export const dictionaries = {
         'Внешние лиды: заявки, которые ученики оставляют на экране тарифов («Оставить заявку»). Внутренние покупки и апгрейды — во вкладке «Оплаты».',
       appsHeading: 'Заявки',
       appsNewBadge: '{count} новых',
+      appsFilterAll: 'Все',
+      appsFilterUnread: 'Непрочитанные',
+      appsRefresh: 'Обновить',
+      appsProcessed: 'Обработанные',
+      appsAllHandled: 'Все заявки обработаны 🎉',
       appNoName: 'Без имени',
+      sourceTelegram: 'Telegram',
+      sourceEmail: 'Email',
+      sourcePhone: 'Телефон',
       copyTgAria: 'Скопировать Telegram',
-      writeChat: 'Написать в чат',
-      hideChat: 'Скрыть чат',
+      copyContactAria: 'Скопировать контакт',
+      chatYouPrefix: 'Вы: ',
+      writeChat: 'Открыть диалог',
+      hideChat: 'Скрыть диалог',
       chatWith: 'Чат с {name}',
       chatWithFallback: 'заявителем',
       botNotConnected: 'бот не подключён',
@@ -344,6 +355,7 @@ export const dictionaries = {
       videoCaption: 'Пример встроенного видео урока',
     },
     exercises: exercisesRu,
+    editor: editorRu,
   },
 
   en: {
@@ -556,10 +568,20 @@ export const dictionaries = {
         'External leads: applications students leave on the pricing screen (“Leave a request”). Internal purchases and upgrades are in the “Payments” tab.',
       appsHeading: 'Applications',
       appsNewBadge: '{count} new',
+      appsFilterAll: 'All',
+      appsFilterUnread: 'Unread',
+      appsRefresh: 'Refresh',
+      appsProcessed: 'Processed',
+      appsAllHandled: 'All leads handled 🎉',
       appNoName: 'No name',
+      sourceTelegram: 'Telegram',
+      sourceEmail: 'Email',
+      sourcePhone: 'Phone',
       copyTgAria: 'Copy Telegram',
-      writeChat: 'Open chat',
-      hideChat: 'Hide chat',
+      copyContactAria: 'Copy contact',
+      chatYouPrefix: 'You: ',
+      writeChat: 'Open dialog',
+      hideChat: 'Hide dialog',
       chatWith: 'Chat with {name}',
       chatWithFallback: 'the applicant',
       botNotConnected: 'bot not connected',
@@ -674,6 +696,7 @@ export const dictionaries = {
       videoCaption: 'Example of an embedded lesson video',
     },
     exercises: exercisesEn,
+    editor: editorEn,
   },
 } as const;
 

@@ -24,6 +24,10 @@
   --warning: #e5a13a;
   --danger: #e5484d;
   --info: #3e8ff0;
+  /* Эталон marker green — layers panel + on-canvas badge. Muted in dark. */
+  --ref-green: #3fb950;
+  /* Косячный (flawed) marker red — layers panel + selection chrome + on-canvas badge. */
+  --flaw-red: #f24822;
 
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(255, 255, 255, 0.4);
@@ -70,6 +74,8 @@
     --brand-rgb: 124 140 255;
     --bg-muted-rgb: 32 36 44;
     --border-rgb: 32 36 44;
+    --ref-green: #46915a;
+    --flaw-red: #f26350;
   }
 }
 
@@ -92,6 +98,8 @@
   --brand-rgb: 124 140 255;
   --bg-muted-rgb: 32 36 44;
   --border-rgb: 32 36 44;
+  --ref-green: #46915a;
+  --flaw-red: #f26350;
 }
 
 html,
@@ -402,9 +410,7 @@ input::-webkit-caps-lock-indicator {
 
 /* 8pt dotted grid background for the Interactive Canvas. */
 .canvas-grid {
-  background-image: radial-gradient(var(--border-strong) 1px, transparent 1px);
-  background-size: 8px 8px;
-  background-position: -1px -1px;
+  /* Solid canvas background — the dotted grid was removed for a flat fill. */
 }
 
 /* Glassmorphism utility (floating navigation, elevated panels). */
@@ -649,3 +655,11 @@ a:hover > .brand-logo .bl4 { animation: bl4 6s cubic-bezier(.65,0,.35,1) infinit
 /* Editor canvas: let <text> layers be picked anywhere in their box, not only
    on the painted glyphs — so users don't have to aim at individual letters. */
 .editor-svg-host text { pointer-events: bounding-box; }
+
+/* Alt/Option held → show the duplicate (copy) cursor anywhere an Alt-drag
+   duplicates: the canvas shapes handle it inline, this covers the surfaces
+   outside the canvas — the layer-tree rows and the frame-name chrome label.
+   `.alt-copy` is toggled on <html> by StageCanvas while Alt is down. `!important`
+   beats the elements' own default-cursor utilities. */
+html.alt-copy .layer-row,
+html.alt-copy .frame-name-label { cursor: copy !important; }

@@ -3,6 +3,7 @@
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Frame as FrameIcon, BadgeCheck, Bug } from 'lucide-react';
 import type { EditorTool } from '@/lib/editor/types';
+import { useT } from '@/lib/i18n/client';
 
 /** A top-level frame the canvas draws chrome for: a name label above the frame
  *  and a role icon (frame / эталон / косячный) that cycles on click. */
@@ -87,14 +88,17 @@ export function StageCanvas({
   svg,
   width,
   height,
+  background = null,
   selectedIds,
   hoveredId,
   onSelect,
   onSelectMany,
   onHover,
   onMoveLayers,
+  onDuplicateLayers,
   onTransformLayers,
   onResizeFrame,
+  onResizeRect,
   onSetRadius,
   onContextMenu,
   tool = 'move',
@@ -115,6 +119,8 @@ export function StageCanvas({
   /** viewBox size in user units — one unit renders as one content-space px. */
   width: number;
   height: number;
+  /** Canvas (page) background colour. null → the themed default (dotted grid). */
+  background?: string | null;
   /** Selected layer ids. The last entry is the "primary" (drives side panels). */
   selectedIds: string[];
   hoveredId: string | null;
@@ -127,12 +133,18 @@ export function StageCanvas({
   onHover: (id: string | null) => void;
   /** Commit a finished drag: shift every given layer by (dx,dy) user units. */
   onMoveLayers: (ids: string[], dx: number, dy: number) => void;
+  /** Alt/Option-drag drop: leave the originals put and stamp a copy of each at the
+   *  dragged (dx,dy) offset — Figma's Alt-drag-to-duplicate. */
+  onDuplicateLayers?: (ids: string[], dx: number, dy: number) => void;
   /** Commit a finished resize/rotate: prepend `matrix(...)` (content/root space)
    *  to every given layer's transform. */
   onTransformLayers?: (ids: string[], matrix: string) => void;
   /** Commit a frame-border resize: set the frame's bg/clip rect to the new local
    *  box, leaving its children untouched (Figma frame semantics). */
   onResizeFrame?: (id: string, box: { x: number; y: number; w: number; h: number }) => void;
+  /** Commit a plain-rect resize: set the rect's x/y/width/height to the new box,
+   *  leaving rx/ry untouched so the corner radius doesn't stretch. */
+  onResizeRect?: (id: string, box: { x: number; y: number; w: number; h: number }) => void;
   /** Commit a corner-radius drag on a single rect layer. */
   onSetRadius?: (id: string, r: number) => void;
   /** Right-click — opens the shared context menu. `layerId` is null on empty grid. */
@@ -166,10 +178,13 @@ export function StageCanvas({
   /** Cycle a frame's role (обычный → эталон → косячный → обычный). */
   onCycleFrameRole?: (id: string) => void;
 }) {
+  const { t } = useT();
   const hostRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const selHiRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View | null>(null);
+  // Alt held over the stage → show the duplicate (copy) cursor, Figma-style.
+  const [altHeld, setAltHeld] = useState(false);
   const [selBoxes, setSelBoxes] = useState<Box[]>([]);
   const [hovBox, setHovBox] = useState<Box | null>(null);
   const [zoneBoxes, setZoneBoxes] = useState<Box[]>([]);
@@ -188,7 +203,7 @@ export function StageCanvas({
   const drag = useRef<
     | null
     | { kind: 'pan'; startX: number; startY: number; ox: number; oy: number; scale: number }
-    | { kind: 'move'; ids: string[]; nodes: { node: SVGGraphicsElement; base: string }[]; startX: number; startY: number; scale: number; dx: number; dy: number; baseBox: SnapBox; targets: SnapBox[] }
+    | { kind: 'move'; ids: string[]; nodes: { node: SVGGraphicsElement; base: string }[]; startX: number; startY: number; scale: number; dx: number; dy: number; baseBox: SnapBox; targets: SnapBox[]; duplicate: boolean; clones?: Element[] }
     | { kind: 'draw'; crLeft: number; crTop: number; scale: number; sx: number; sy: number; box: { x: number; y: number; w: number; h: number }; hitId: string | null; frame?: boolean }
     | { kind: 'marquee'; crLeft: number; crTop: number; scale: number; sx: number; sy: number; box: { x: number; y: number; w: number; h: number }; additive: boolean; base: string[] }
     | {
@@ -204,6 +219,9 @@ export function StageCanvas({
         anchorX: number; anchorY: number;
         cx: number; cy: number; startAngle: number;
         cornerX: number; cornerY: number; maxRadius: number; layerId: string | null;
+        // Radius drag: inward direction of the grabbed corner (+1/-1 per axis), so
+        // the same distance maths works from any of the four corners.
+        radiusSx: number; radiusSy: number;
         lockAspect: boolean;
         lastMatrix: string | null;
         lastRadius: number | null;
@@ -217,6 +235,12 @@ export function StageCanvas({
         frameRects?: { el: Element; x0: number; y0: number; w0: number; h0: number }[] | null;
         frameId?: string | null;
         lastFrameBox?: { x: number; y: number; w: number; h: number } | null;
+        // Plain-rect resize: when the sole selected node is a bare <rect>, we resize
+        // by mutating its x/y/width/height (leaving rx/ry untouched) instead of baking
+        // a matrix scale — otherwise the scale stretches the rounded corners into
+        // ellipses. Reuses the frameRects live-mutation path; commits via onResizeRect.
+        rectResize?: boolean;
+        rectId?: string | null;
         // Frame-chrome strips (name + role icon) of the resized frames, captured at
         // drag start so `flush` can ride them along live — otherwise the label/icon
         // lag behind the frame's edges until the resize commits. `off` is the fixed
@@ -233,7 +257,8 @@ export function StageCanvas({
   // both updated imperatively during a transform gesture, then re-derived from
   // React state on commit.
   const dimLabelRef = useRef<HTMLDivElement>(null);
-  const radiusHandleRef = useRef<HTMLDivElement>(null);
+  // One radius handle per corner (all four move together — SVG rx/ry is uniform).
+  const radiusHandleRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Imperative alignment guides drawn during a Shift-drag — positioned in
   // content space (so 1px = 1 user unit) and toggled without a re-render.
@@ -355,6 +380,22 @@ export function StageCanvas({
     }
     return { left: l, top: t, width: r - l, height: b - t };
   }, [selBoxes]);
+
+  // Selection-chrome accent by role: a selected «сломанный» frame paints its
+  // transform gizmo red and an эталон frame green (matching the frame badge and
+  // the layers panel); anything else stays brand-blue.
+  const selAccent = useMemo(() => {
+    const roles = new Set<string>();
+    for (const id of selectedIds) {
+      const f = frames?.find((fr) => fr.id === id);
+      if (f?.role) roles.add(f.role);
+    }
+    if (roles.size === 1) {
+      if (roles.has('flawed')) return 'var(--flaw-red)';
+      if (roles.has('reference')) return 'var(--ref-green)';
+    }
+    return 'var(--brand)';
+  }, [selectedIds, frames]);
 
   // Wheel: pan by default, zoom-to-cursor with Alt. Bound natively so we can
   // preventDefault (the page must not scroll behind the fixed stage).
@@ -546,13 +587,32 @@ export function StageCanvas({
           const lab = dimLabelRef.current;
           if (lab) lab.textContent = `${Math.round((ang * 180) / Math.PI)}°`;
         } else {
-          // radius: drag the handle toward the centre to round the corner more.
-          let d = Math.min(px - g.cornerX, py - g.cornerY);
+          // radius: drag any corner handle toward the centre to round more. The
+          // grabbed corner's inward signs make the distance positive from any corner.
+          let d = Math.min((px - g.cornerX) * g.radiusSx, (py - g.cornerY) * g.radiusSy);
           d = Math.max(0, Math.min(d, g.maxRadius));
           g.lastRadius = d;
-          for (const { node } of g.nodes) { node.setAttribute('rx', String(d)); node.setAttribute('ry', String(d)); }
-          const rh = radiusHandleRef.current;
-          if (rh) { const hs = 9 / g.scale / 2; rh.style.left = `${g.cornerX + d - hs}px`; rh.style.top = `${g.cornerY + d - hs}px`; }
+          for (const { node } of g.nodes) {
+            // Plain rect rounds itself; a frame <g> rounds its bg + clip rects so the
+            // corner and the clipping both follow the drag live (commit mirrors this).
+            const targets = node.tagName.toLowerCase() === 'rect'
+              ? [node as Element]
+              : Array.from(node.querySelectorAll(':scope > rect[data-frame-bg], :scope > clipPath > rect'));
+            for (const t of targets) { t.setAttribute('rx', String(d)); t.setAttribute('ry', String(d)); }
+          }
+          // rx/ry is uniform, so slide all four handles inward from their own corners.
+          const hs = 9 / g.scale / 2;
+          const b = g.box;
+          const spots = [
+            { x: b.left, y: b.top, sx: 1, sy: 1 },
+            { x: b.left + b.width, y: b.top, sx: -1, sy: 1 },
+            { x: b.left + b.width, y: b.top + b.height, sx: -1, sy: -1 },
+            { x: b.left, y: b.top + b.height, sx: 1, sy: -1 },
+          ];
+          radiusHandleRefs.current.forEach((rh, i) => {
+            const sp = spots[i];
+            if (rh && sp) { rh.style.left = `${sp.x + sp.sx * d - hs}px`; rh.style.top = `${sp.y + sp.sy * d - hs}px`; }
+          });
         }
       } else {
         let dx = (p.x - g.startX) / g.scale;
@@ -597,7 +657,7 @@ export function StageCanvas({
         // wrapper, so ride each dragged frame's chrome along by the same delta —
         // otherwise the label/icon lag behind the frame until the drop commits.
         const content = contentRef.current;
-        if (content) {
+        if (content && !g.duplicate) {
           for (const id of g.ids) {
             const c = content.querySelector<HTMLElement>(`[data-frame-chrome-id="${id}"]`);
             if (c) c.style.transform = `translate(${dx}px, ${dy}px)`;
@@ -690,6 +750,8 @@ export function StageCanvas({
           if (g.lastRadius != null && g.layerId) onSetRadius?.(g.layerId, Math.round(g.lastRadius));
         } else if (g.frameId && g.lastFrameBox) {
           onResizeFrame?.(g.frameId, g.lastFrameBox);
+        } else if (g.rectResize && g.rectId && g.lastFrameBox) {
+          onResizeRect?.(g.rectId, g.lastFrameBox);
         } else if (g.lastMatrix) {
           onTransformLayers?.(g.ids, g.lastMatrix);
         }
@@ -707,7 +769,16 @@ export function StageCanvas({
         }
         if (vGuideRef.current) vGuideRef.current.style.display = 'none';
         if (hGuideRef.current) hGuideRef.current.style.display = 'none';
-        if (Math.abs(g.dx) > 0.5 || Math.abs(g.dy) > 0.5) onMoveLayers(g.ids, g.dx, g.dy);
+        // Discard the throwaway drag clones — the commit re-renders the real
+        // duplicates from React state. Removing them here (before the commit)
+        // avoids a one-frame flash of clone + committed copy stacked together.
+        if (g.clones) for (const c of g.clones) c.remove();
+        if (Math.abs(g.dx) > 0.5 || Math.abs(g.dy) > 0.5) {
+          // Alt-drag (Figma): drop commits a real copy of the selection at the
+          // dragged offset, leaving the originals put. A plain drag just moves them.
+          if (g.duplicate && onDuplicateLayers) onDuplicateLayers(g.ids, g.dx, g.dy);
+          else onMoveLayers(g.ids, g.dx, g.dy);
+        }
       }
     };
     window.addEventListener('pointermove', onMove);
@@ -717,7 +788,7 @@ export function StageCanvas({
       window.removeEventListener('pointerup', onUp);
       if (raf.current != null) cancelAnimationFrame(raf.current);
     };
-  }, [onMoveLayers, onCreateRect, onCreateFrame, onSelect, onSelectMany, onTransformLayers, onResizeFrame, onSetRadius]);
+  }, [onMoveLayers, onDuplicateLayers, onCreateRect, onCreateFrame, onSelect, onSelectMany, onTransformLayers, onResizeFrame, onResizeRect, onSetRadius]);
 
   function onPointerDown(e: React.PointerEvent) {
     if (!view) return;
@@ -752,6 +823,10 @@ export function StageCanvas({
     }
     if (e.button !== 0) return;
     const deep = wantsDeep(e);
+    // Alt held → this drag duplicates on drop (Figma Alt-drag). Alt also reads as
+    // "deep" for hover, but while duplicating we want to grab the whole selection
+    // rather than pierce to a child, so `dup` relaxes the grab check below.
+    const dup = e.altKey;
     const additive = e.shiftKey;
     const content = contentRef.current;
 
@@ -780,9 +855,30 @@ export function StageCanvas({
       }
       if (!nodes.length) return;
       const baseBox: SnapBox = { left: L, top: T, right: R, bottom: B, cx: (L + R) / 2, cy: (T + B) / 2 };
+      // Alt-drag (Figma): create the copy up front and drag *that*, leaving the
+      // originals untouched — so the source never appears to move and the new
+      // node exists from the first pixel. We clone each node in place (stripping
+      // layer ids so hover/queries still resolve to the originals) and steer the
+      // clones; on drop we commit real duplicates and discard the throwaway clones.
+      let dragNodes = nodes;
+      let clones: Element[] | undefined;
+      if (dup) {
+        dragNodes = [];
+        clones = [];
+        for (const { node, base } of nodes) {
+          const clone = node.cloneNode(true) as SVGGraphicsElement;
+          clone.removeAttribute('data-layer-id');
+          clone.querySelectorAll('[data-layer-id]').forEach((el) => el.removeAttribute('data-layer-id'));
+          clone.setAttribute('data-drag-clone', '');
+          clone.style.pointerEvents = 'none';
+          node.parentElement?.appendChild(clone);
+          dragNodes.push({ node: clone, base });
+          clones.push(clone);
+        }
+      }
       drag.current = {
-        kind: 'move', ids, nodes, startX: e.clientX, startY: e.clientY,
-        scale: view.scale, dx: 0, dy: 0, baseBox, targets,
+        kind: 'move', ids, nodes: dragNodes, startX: e.clientX, startY: e.clientY,
+        scale: view.scale, dx: 0, dy: 0, baseBox, targets, duplicate: dup, clones,
       };
     };
 
@@ -790,7 +886,7 @@ export function StageCanvas({
     // selected layer grabs the whole selection (Figma: drag within selection
     // moves it) — even if the hit resolves to a child or a different group.
     let id = layerIdAt(e.target, deep);
-    if (!additive && !deep && selectedIds.length) {
+    if (!additive && (!deep || dup) && selectedIds.length) {
       const hitEl = e.target instanceof Element ? e.target : null;
       for (const sid of selectedIds) {
         const selNode = content?.querySelector<Element>(`[data-layer-id="${sid}"]`);
@@ -897,6 +993,32 @@ export function StageCanvas({
       }
     }
 
+    // Plain-rect resize: the sole selected node is a <rect> whose transform carries
+    // NO rotation or skew (translate and/or scale are fine). Resize it via its
+    // x/y/width/height (rx/ry stay fixed) instead of a matrix scale, so the corner
+    // radius doesn't stretch. With b==c==0 the local→content map is `content = a·x+e`
+    // per axis, so the sx/sy ratios and the local anchor math (x0+w0-nw etc.) still
+    // hold — the constant scale factors a/d just ride along. Only a baked rotate/skew
+    // breaks that assumption, so those alone fall through to the matrix path.
+    let rectResize = false;
+    let rectId: string | null = null;
+    if (!frameRects && sub === 'resize' && ids.length === 1) {
+      const node = nodes[0].node;
+      const m = node.transform?.baseVal?.consolidate()?.matrix;
+      const noRotate = !m || (Math.abs(m.b) < 1e-6 && Math.abs(m.c) < 1e-6);
+      if (node.tagName.toLowerCase() === 'rect' && noRotate) {
+        frameRects = [{
+          el: node,
+          x0: +(node.getAttribute('x') ?? 0),
+          y0: +(node.getAttribute('y') ?? 0),
+          w0: +(node.getAttribute('width') ?? 0),
+          h0: +(node.getAttribute('height') ?? 0),
+        }];
+        rectResize = true;
+        rectId = ids[0];
+      }
+    }
+
     // Frame-chrome strips (name + role icon) of the selected frames, so a resize
     // can ride them along live from the same matrix instead of leaving the icon at
     // the old edge until commit. `off` = the fixed gap the label sits above the top.
@@ -936,12 +1058,19 @@ export function StageCanvas({
 
     drag.current = {
       kind: 'transform', sub, ids, nodes, scale: view.scale, crLeft: cr.left, crTop: cr.top, box,
-      frameRects, frameId, lastFrameBox: null, chromes, targets,
+      frameRects, frameId, rectResize, rectId, lastFrameBox: null, chromes, targets,
       movesE, movesW, movesN, movesS,
       anchorX: movesE ? box.left : movesW ? right : cx,
       anchorY: movesS ? box.top : movesN ? bottom : cy,
       cx, cy, startAngle: Math.atan2(py - cy, px - cx),
-      cornerX: box.left, cornerY: box.top, maxRadius: Math.min(box.width, box.height) / 2,
+      // Radius: `handle` is the grabbed corner ('nw'|'ne'|'se'|'sw'). Anchor at that
+      // corner; the inward sign per axis (+1 from a left/top edge, -1 from right/
+      // bottom) lets the drag maths run the same from any corner. Defaults to nw.
+      cornerX: handle.includes('e') ? right : box.left,
+      cornerY: handle.includes('s') ? bottom : box.top,
+      radiusSx: handle.includes('e') ? -1 : 1,
+      radiusSy: handle.includes('s') ? -1 : 1,
+      maxRadius: Math.min(box.width, box.height) / 2,
       layerId: radiusLayerId,
       lockAspect: scaleMode,
       lastMatrix: null, lastRadius: null,
@@ -967,13 +1096,25 @@ export function StageCanvas({
       if (!el || !hostRef.current?.contains(el)) return;
       onHover(layerIdAt(el, deep));
     };
-    const onKeyDown = (e: KeyboardEvent) => { if (isModifier(e.key)) rehover(true); };
-    const onKeyUp = (e: KeyboardEvent) => { if (isModifier(e.key)) rehover(wantsDeep(e)); };
+    // Mirror the Alt state onto <html> so panels outside the canvas (the layer
+    // tree, the frame-name chrome) can flip to the copy cursor via CSS — Figma
+    // shows the duplicate affordance anywhere you can Alt-drag, not just on shapes.
+    const setAlt = (on: boolean) => {
+      setAltHeld(on);
+      document.documentElement.classList.toggle('alt-copy', on);
+    };
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Alt') setAlt(true); if (isModifier(e.key)) rehover(true); };
+    const onKeyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') setAlt(false); if (isModifier(e.key)) rehover(wantsDeep(e)); };
+    // A window blur (Alt-Tab, focus lost) never fires keyup, so clear the flag.
+    const onBlur = () => setAlt(false);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+      document.documentElement.classList.remove('alt-copy');
     };
   }, [onHover]);
 
@@ -989,10 +1130,19 @@ export function StageCanvas({
       onPointerLeave={() => onHover(null)}
       className="canvas-grid relative h-full w-full touch-none select-none overflow-hidden bg-canvas"
       style={{
+        // Override the themed canvas colour when a page background is set; the
+        // dotted grid (a background-image) rides on top either way.
+        ...(background ? { backgroundColor: background } : null),
         cursor:
           drag.current?.kind === 'pan'
             ? 'grabbing'
-            : tool === 'text'
+            // Duplicate drag in progress, or Alt held over any object (selected or
+            // not): show the copy cursor (arrow + «＋») so it reads as Figma's
+            // Alt-drag-to-duplicate before and during the drag.
+            : (drag.current?.kind === 'move' && drag.current.duplicate) ||
+                (altHeld && (hovBox || hoveredId))
+              ? 'copy'
+              : tool === 'text'
               ? 'text'
               : tool === 'shape' || tool === 'frame'
                 ? 'crosshair'
@@ -1028,7 +1178,7 @@ export function StageCanvas({
           {selBoxes.length > 0 && (
             <div ref={selHiRef} className="pointer-events-none absolute left-0 top-0 origin-top-left will-change-transform" style={{ width, height }}>
               {selBoxes.length > 1 &&
-                selBoxes.map((b, i) => <Highlight key={`s-${i}`} box={b} kind="select" scale={view.scale} />)}
+                selBoxes.map((b, i) => <Highlight key={`s-${i}`} box={b} kind="select" scale={view.scale} color={selAccent} />)}
               {tool === 'move' && unionBox && (
                 <TransformHandles
                   box={unionBox}
@@ -1036,8 +1186,9 @@ export function StageCanvas({
                   scaleMode={scaleMode}
                   showRadius={radiusLayerId != null}
                   radius={radius}
-                  radiusHandleRef={radiusHandleRef}
+                  radiusHandleRefs={radiusHandleRefs}
                   dimLabelRef={dimLabelRef}
+                  accent={selAccent}
                   onStart={startTransform}
                 />
               )}
@@ -1076,7 +1227,7 @@ export function StageCanvas({
         </div>
       )}
       <div className="pointer-events-none absolute right-3 top-3 rounded-md bg-elevated/80 px-2 py-1 text-caption text-tertiary backdrop-blur">
-        ⌘/Ctrl+колесо — зум · перетаскивание — выделение рамкой · пробел/СКМ — рука · K — scale
+        {t('editor.hint.canvas')}
       </div>
     </div>
   );
@@ -1092,8 +1243,9 @@ function TransformHandles({
   scaleMode,
   showRadius,
   radius,
-  radiusHandleRef,
+  radiusHandleRefs,
   dimLabelRef,
+  accent = 'var(--brand)',
   onStart,
 }: {
   box: { left: number; top: number; width: number; height: number };
@@ -1101,32 +1253,39 @@ function TransformHandles({
   scaleMode: boolean;
   showRadius: boolean;
   radius: number;
-  radiusHandleRef: React.Ref<HTMLDivElement>;
+  radiusHandleRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
   dimLabelRef: React.Ref<HTMLDivElement>;
+  /** Gizmo stroke/handle colour — role-tinted (red flawed / green reference). */
+  accent?: string;
   onStart: (e: React.PointerEvent, sub: 'resize' | 'rotate' | 'radius', handle: string) => void;
 }) {
+  const { t } = useT();
   const s = 9 / scale;
   const rz = 22 / scale;
   const border = 1.5 / scale;
   const right = box.left + box.width;
   const bottom = box.top + box.height;
   const midX = box.left + box.width / 2;
-  const midY = box.top + box.height / 2;
   const corners = [
     { k: 'nw', x: box.left, y: box.top, cur: 'nwse-resize' },
     { k: 'ne', x: right, y: box.top, cur: 'nesw-resize' },
     { k: 'se', x: right, y: bottom, cur: 'nwse-resize' },
     { k: 'sw', x: box.left, y: bottom, cur: 'nesw-resize' },
   ];
+  // Invisible hit-strips along each side of the frame: grabbing anywhere on the
+  // blue line resizes from that edge, even though no square dot is drawn there.
+  // `hit` is the grab thickness in content px (constant screen size). Strips are
+  // inset by the corner size so they don't steal the corner squares' clicks.
+  const hit = 8 / scale;
   const edges = [
-    { k: 'n', x: midX, y: box.top, cur: 'ns-resize' },
-    { k: 'e', x: right, y: midY, cur: 'ew-resize' },
-    { k: 's', x: midX, y: bottom, cur: 'ns-resize' },
-    { k: 'w', x: box.left, y: midY, cur: 'ew-resize' },
+    { k: 'n', left: box.left + s, top: box.top - hit / 2, width: Math.max(box.width - 2 * s, 0), height: hit, cur: 'ns-resize' },
+    { k: 's', left: box.left + s, top: bottom - hit / 2, width: Math.max(box.width - 2 * s, 0), height: hit, cur: 'ns-resize' },
+    { k: 'w', left: box.left - hit / 2, top: box.top + s, width: hit, height: Math.max(box.height - 2 * s, 0), cur: 'ew-resize' },
+    { k: 'e', left: right - hit / 2, top: box.top + s, width: hit, height: Math.max(box.height - 2 * s, 0), cur: 'ew-resize' },
   ];
   const handleStyle = (x: number, y: number, cur: string): React.CSSProperties => ({
     left: x - s / 2, top: y - s / 2, width: s, height: s,
-    border: `${border}px solid var(--brand)`, background: '#fff', cursor: cur,
+    border: `${border}px solid ${accent}`, background: '#fff', cursor: cur,
     // During a resize the parent (selHiRef) is scaled by matrix(sx,sy) to preview
     // the new box — which would stretch these fixed-size squares. Counter-scale by
     // the inverse (fed as CSS vars on the parent, default 1) about each handle's
@@ -1151,7 +1310,7 @@ function TransformHandles({
           width: `calc(${box.width}px + 2 * ${border}px * var(--gizmo-inv-x, 1))`,
           height: `calc(${box.height}px + 2 * ${border}px * var(--gizmo-inv-y, 1))`,
           boxSizing: 'border-box',
-          borderStyle: 'solid', borderColor: 'var(--brand)',
+          borderStyle: 'solid', borderColor: accent,
           borderLeftWidth: `calc(${border}px * var(--gizmo-inv-x, 1))`,
           borderRightWidth: `calc(${border}px * var(--gizmo-inv-x, 1))`,
           borderTopWidth: `calc(${border}px * var(--gizmo-inv-y, 1))`,
@@ -1167,24 +1326,37 @@ function TransformHandles({
         />
       ))}
       {edges.map((h) => (
-        <div key={h.k} onPointerDown={(e) => onStart(e, 'resize', h.k)} className="pointer-events-auto absolute rounded-[1px]" style={handleStyle(h.x, h.y, h.cur)} />
+        <div
+          key={h.k}
+          onPointerDown={(e) => onStart(e, 'resize', h.k)}
+          className="pointer-events-auto absolute"
+          style={{
+            left: h.left, top: h.top, width: h.width, height: h.height, cursor: h.cur,
+            transform: 'scale(var(--gizmo-inv-x, 1), var(--gizmo-inv-y, 1))',
+          }}
+        />
       ))}
       {corners.map((h) => (
         <div key={h.k} onPointerDown={(e) => onStart(e, 'resize', h.k)} className="pointer-events-auto absolute rounded-[1px]" style={handleStyle(h.x, h.y, h.cur)} />
       ))}
-      {showRadius && !scaleMode && (
-        <div
-          ref={radiusHandleRef}
-          onPointerDown={(e) => onStart(e, 'radius', '')}
-          className="pointer-events-auto absolute rounded-full"
-          title="Скругление углов"
-          style={{ left: box.left + rInset - s / 2, top: box.top + rInset - s / 2, width: s, height: s, border: `${border}px solid var(--brand)`, background: '#fff', cursor: 'nwse-resize', transform: 'scale(var(--gizmo-inv-x, 1), var(--gizmo-inv-y, 1))' }}
-        />
-      )}
+      {showRadius && !scaleMode && corners.map((c, i) => {
+        const sx = c.k.includes('e') ? -1 : 1;
+        const sy = c.k.includes('s') ? -1 : 1;
+        return (
+          <div
+            key={`rad-${c.k}`}
+            ref={(el) => { radiusHandleRefs.current[i] = el; }}
+            onPointerDown={(e) => onStart(e, 'radius', c.k)}
+            className="pointer-events-auto absolute rounded-full"
+            title={t('editor.canvas.radiusTitle')}
+            style={{ left: c.x + sx * rInset - s / 2, top: c.y + sy * rInset - s / 2, width: s, height: s, border: `${border}px solid ${accent}`, background: '#fff', cursor: c.cur, transform: 'scale(var(--gizmo-inv-x, 1), var(--gizmo-inv-y, 1))' }}
+          />
+        );
+      })}
       <div
         ref={dimLabelRef}
         className="pointer-events-none absolute whitespace-nowrap rounded"
-        style={{ left: midX, top: bottom + 7 / scale, transform: 'translateX(-50%)', background: 'var(--brand)', color: '#fff', fontSize: 11 / scale, lineHeight: 1.35, padding: `${1 / scale}px ${5 / scale}px` }}
+        style={{ left: midX, top: bottom + 7 / scale, transform: 'translateX(-50%)', background: accent, color: '#fff', fontSize: 11 / scale, lineHeight: 1.35, padding: `${1 / scale}px ${5 / scale}px` }}
       >
         {Math.round(box.width)} × {Math.round(box.height)}
       </div>
@@ -1192,11 +1364,20 @@ function TransformHandles({
   );
 }
 
-const Highlight = forwardRef<HTMLDivElement, { box: Box; kind: 'select' | 'hover' | 'zone'; scale: number }>(
-  function Highlight({ box, kind, scale }, ref) {
+const Highlight = forwardRef<HTMLDivElement, { box: Box; kind: 'select' | 'hover' | 'zone'; scale: number; color?: string }>(
+  function Highlight({ box, kind, scale, color: colorOverride }, ref) {
   const color =
-    kind === 'select' ? 'var(--brand)' : kind === 'zone' ? '#3FB950' : 'rgba(var(--brand-rgb),0.5)';
+    kind === 'select' ? (colorOverride ?? 'var(--brand)') : kind === 'zone' ? '#3FB950' : 'rgba(var(--brand-rgb),0.5)';
   const weight = kind === 'select' ? 2 : kind === 'zone' ? 1.75 : 1.5;
+  // Tinted select fill matches the role accent; brand keeps its original wash.
+  const fill =
+    kind === 'select'
+      ? colorOverride && colorOverride !== 'var(--brand)'
+        ? `color-mix(in srgb, ${colorOverride} 8%, transparent)`
+        : 'rgba(var(--brand-rgb),0.08)'
+      : kind === 'zone'
+        ? 'rgba(63,185,80,0.08)'
+        : 'transparent';
   return (
     <div
       ref={ref}
@@ -1208,7 +1389,7 @@ const Highlight = forwardRef<HTMLDivElement, { box: Box; kind: 'select' | 'hover
         height: box.height,
         outline: `${weight / scale}px solid ${color}`,
         outlineOffset: 1 / scale,
-        background: kind === 'select' ? 'rgba(var(--brand-rgb),0.08)' : kind === 'zone' ? 'rgba(63,185,80,0.08)' : 'transparent',
+        background: fill,
       }}
     />
   );
@@ -1217,9 +1398,9 @@ const Highlight = forwardRef<HTMLDivElement, { box: Box; kind: 'select' | 'hover
 /** Visual spec for each frame role — the icon glyph, colour and tooltip shown
  *  in the frame chrome. `undefined` role falls back to the plain-frame entry. */
 const ROLE_META = {
-  frame: { Icon: FrameIcon, color: 'var(--text-tertiary)', title: 'Обычный фрейм · клик — сделать эталоном' },
-  reference: { Icon: BadgeCheck, color: '#3FB950', title: 'Эталон · клик — сделать косячным' },
-  flawed: { Icon: Bug, color: '#f24822', title: 'Косячный · клик — сделать обычным' },
+  frame: { Icon: FrameIcon, color: 'var(--text-tertiary)', titleKey: 'editor.canvas.roleFrame' },
+  reference: { Icon: BadgeCheck, color: 'var(--ref-green)', titleKey: 'editor.canvas.roleReference' },
+  flawed: { Icon: Bug, color: 'var(--flaw-red)', titleKey: 'editor.canvas.roleFlawed' },
 } as const;
 
 /**
@@ -1242,6 +1423,7 @@ function FrameChromeLabel({
   onSelect: (additive: boolean) => void;
   onCycleRole?: () => void;
 }) {
+  const { t } = useT();
   const { box } = frame;
   const meta = ROLE_META[frame.role ?? 'frame'];
   const { Icon } = meta;
@@ -1261,10 +1443,16 @@ function FrameChromeLabel({
           e.stopPropagation();
           onSelect(e.shiftKey || e.metaKey);
         }}
-        className="pointer-events-auto min-w-0 truncate text-left leading-none hover:underline"
+        // `frame-name-label` drives the cursor via CSS: default arrow normally
+        // (the <button>'s pointer/hand reads as a link, but selecting a frame is a
+        // canvas gesture), flipping to `copy` while Alt is held — Alt-drag
+        // duplicates the frame, same as the shapes on the canvas.
+        className="frame-name-label pointer-events-auto min-w-0 truncate text-left leading-none"
         style={{
           fontSize: font,
-          color: selected ? 'var(--brand)' : frame.role ? meta.color : 'var(--text-secondary)',
+          // A role-tagged frame keeps its role colour (red flawed / green
+          // reference) even while selected; plain frames go brand-blue on select.
+          color: frame.role ? meta.color : selected ? 'var(--brand)' : 'var(--text-secondary)',
           fontWeight: selected ? 600 : 500,
           paddingRight: gap,
         }}
@@ -1274,7 +1462,7 @@ function FrameChromeLabel({
       {onCycleRole && (
         <button
           type="button"
-          title={meta.title}
+          title={t(meta.titleKey)}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();

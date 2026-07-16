@@ -21,6 +21,10 @@ export interface LayerProps {
   radius?: number;
   /** Resolved fill colour (hex/rgb), or undefined when `fill="none"`. */
   fill?: string;
+  /** Stroke (border) colour, or undefined when `stroke="none"`/unset. */
+  stroke?: string;
+  /** Stroke width in SVG user units, when a stroke is present. */
+  strokeWidth?: number;
   /** Text content (concatenated tspans), for `text` layers. */
   text?: string;
   /** Font size in SVG user units, for `text` layers. */
@@ -50,6 +54,14 @@ export interface LayerProps {
    *  `flawed` = косячный (the version with planted defects). Undefined = plain
    *  frame. Only meaningful on `frame` layers; toggled by the teacher. */
   frameRole?: 'reference' | 'flawed';
+  /** Explicit link from a layer inside a `flawed` frame to its counterpart in
+   *  the `reference` frame (the эталон layer's `id`). Set when the сломанный
+   *  twin is spawned via «дублировать как сломанный», so the auto-diff can pair
+   *  layers by identity instead of by tree position — the pairing then survives
+   *  reordering, inserting, or deleting layers in either frame. Undefined on
+   *  reference/plain layers and on flawed layers with no known counterpart
+   *  (falls back to index-path matching). */
+  twinId?: string;
   /** Numeric bounding box when statically known (rect/image). Absolute
    *  positioning for highlights is computed at render time via the DOM, so this
    *  is best-effort metadata, not the source of truth for geometry. */

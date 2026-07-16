@@ -18,9 +18,12 @@ import {
   BoxSelect,
   SquareDashed,
   Maximize,
+  BadgeCheck,
+  Bug,
 } from 'lucide-react';
 import type { Layer, LayerType } from '@/lib/editor/types';
 import { playHover } from '@/lib/sound';
+import { useT } from '@/lib/i18n/client';
 
 const TYPE_ICON: Record<LayerType, typeof Square> = {
   frame: Frame,
@@ -58,6 +61,25 @@ function subtreeContains(layer: Layer, id: string): boolean {
   return layer.children.some((c) => c.id === id || subtreeContains(c, id));
 }
 
+/** Drop position of a layer-panel drag — kept in sync with EditorCore's LayerDropPos. */
+type DropPos = 'before' | 'after' | 'inside';
+
+/** Find a layer by id anywhere in the forest. */
+function findInForest(list: Layer[], id: string): Layer | null {
+  for (const l of list) {
+    if (l.id === id) return l;
+    const r = findInForest(l.children, id);
+    if (r) return r;
+  }
+  return null;
+}
+
+/** Collect a layer's id plus every descendant id — the set that can't receive it. */
+function collectIds(layer: Layer, set: Set<string>): void {
+  set.add(layer.id);
+  layer.children.forEach((c) => collectIds(c, set));
+}
+
 /**
  * The layers panel — Figma-style: nested rows with indent guides, expand/collapse
  * for groups, click to select (syncs with the canvas), hover to preview-highlight.
@@ -73,9 +95,13 @@ export function LayerTree({
   onRename,
   onDelete,
   onContextMenu,
+  onReparent,
   renameId,
   onRenameHandled,
   zoneIds,
+  referenceIds,
+  flawedIds,
+  collapseSignal,
 }: {
   layers: Layer[];
   /** Selected layer ids; the last is the "primary" (drives centering). */
@@ -90,18 +116,60 @@ export function LayerTree({
   /** Open the right-click menu for a layer (owned by the editor shell). Omitted
    *  where the tree is read-only (e.g. the critique-zone SVG builder). */
   onContextMenu?: (e: React.MouseEvent, layerId: string) => void;
+  /** Move `dragId` next to / inside `targetId` via drag-and-drop. Omitted where
+   *  the tree is read-only, which disables dragging. */
+  onReparent?: (dragId: string, targetId: string, pos: DropPos, copy?: boolean) => void;
   /** Id of the row the shell asked to inline-rename (from the context menu). */
   renameId?: string | null;
   onRenameHandled?: () => void;
   /** Layer ids promoted to critique zones — shown with a target badge. */
   zoneIds?: Set<string>;
+  /** Top-level frame ids marked as эталон — the row is badged and its whole
+   *  subtree is painted green. */
+  referenceIds?: Set<string>;
+  /** Top-level frame ids marked as «сломанный» — the row is badged and its whole
+   *  subtree is painted red. */
+  flawedIds?: Set<string>;
+  /** Bump this counter to collapse every group in the tree. */
+  collapseSignal?: number;
 }) {
   const primaryId = selectedIds.length ? selectedIds[selectedIds.length - 1] : null;
   const noop = () => {};
+
+  // Drag-and-drop state, owned here so every row sees the same drag. `forbidden`
+  // is the dragged node's own subtree — rows it can't be dropped onto.
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [drop, setDrop] = useState<{ id: string; pos: DropPos } | null>(null);
+  const forbidden = useRef<Set<string>>(new Set());
+
+  const beginDrag = (id: string) => {
+    setDragId(id);
+    const l = findInForest(layers, id);
+    const set = new Set<string>();
+    if (l) collectIds(l, set);
+    forbidden.current = set;
+  };
+  const endDrag = () => {
+    setDragId(null);
+    setDrop(null);
+    forbidden.current = new Set();
+  };
+  const hoverDrop = (id: string, pos: DropPos) => {
+    if (!dragId || forbidden.current.has(id)) {
+      setDrop((d) => (d ? null : d));
+      return;
+    }
+    setDrop((d) => (d && d.id === id && d.pos === pos ? d : { id, pos }));
+  };
+  const commitDrop = (copy: boolean) => {
+    if (dragId && drop && onReparent) onReparent(dragId, drop.id, drop.pos, copy);
+    endDrag();
+  };
+
   return (
     <div onMouseLeave={() => onHover(null)} className="flex flex-col">
       {layers.map((l, i) => (
-        <LayerRow key={l.id} layer={l} depth={0} selectedIds={selectedIds} primaryId={primaryId} runTop={!runNeighbourHi(layers, i - 1, selectedIds, false)} runBottom={!runNeighbourHi(layers, i + 1, selectedIds, false)} onSelect={onSelect} onHover={onHover} onRename={onRename} onDelete={onDelete} onContextMenu={onContextMenu ?? noop} renameId={renameId ?? null} onRenameHandled={onRenameHandled ?? noop} zoneIds={zoneIds} />
+        <LayerRow key={l.id} layer={l} depth={0} selectedIds={selectedIds} primaryId={primaryId} runTop={!runNeighbourHi(layers, i - 1, selectedIds, false)} runBottom={!runNeighbourHi(layers, i + 1, selectedIds, false)} onSelect={onSelect} onHover={onHover} onRename={onRename} onDelete={onDelete} onContextMenu={onContextMenu ?? noop} renameId={renameId ?? null} onRenameHandled={onRenameHandled ?? noop} zoneIds={zoneIds} isReference={!!referenceIds?.has(l.id)} inReference={!!referenceIds?.has(l.id)} isFlawed={!!flawedIds?.has(l.id)} inFlawed={!!flawedIds?.has(l.id)} draggable={!!onReparent} dragId={dragId} drop={drop} onBeginDrag={beginDrag} onHoverDrop={hoverDrop} onCommitDrop={commitDrop} onEndDrag={endDrag} collapseSignal={collapseSignal} />
       ))}
     </div>
   );
@@ -208,32 +276,33 @@ export function LayerContextMenu({
   onRename?: () => void;
   onDelete?: () => void;
 }) {
+  const { t } = useT();
   return (
     <ContextMenuShell x={x} y={y} onClose={onClose}>
       <button type="button" className={MENU_ITEM} onClick={() => onGroup('column')}>
         <Rows3 size={14} className="text-tertiary" />
-        Авто-макет · вертикальный
+        {t('editor.menu.autoLayoutVertical')}
       </button>
       <button type="button" className={MENU_ITEM} onClick={() => onGroup('row')}>
         <Columns3 size={14} className="text-tertiary" />
-        Авто-макет · горизонтальный
+        {t('editor.menu.autoLayoutHorizontal')}
       </button>
       {isGroup ? (
         <button type="button" className={MENU_ITEM} onClick={() => onUngroup?.()}>
           <Group size={14} className="text-tertiary" />
-          Разгруппировать
+          {t('editor.menu.ungroup')}
         </button>
       ) : (
         <button type="button" className={MENU_ITEM} onClick={() => onGroup('none')}>
           <Group size={14} className="text-tertiary" />
-          Сгруппировать
+          {t('editor.menu.group')}
           <span className="ml-auto text-caption text-tertiary">⌘G</span>
         </button>
       )}
       {canFramify && onFramify && (
         <button type="button" className={MENU_ITEM} onClick={onFramify}>
           <Frame size={14} className="text-tertiary" />
-          Преобразовать во фрейм
+          {t('editor.menu.convertToFrame')}
         </button>
       )}
       {onDuplicateFlawed && (
@@ -241,7 +310,7 @@ export function LayerContextMenu({
           <div className="my-1 h-px bg-border" />
           <button type="button" className={MENU_ITEM} onClick={onDuplicateFlawed}>
             <Copy size={14} className="text-tertiary" />
-            Дублировать как сломанный
+            {t('editor.menu.duplicateFlawed')}
           </button>
         </>
       )}
@@ -249,13 +318,13 @@ export function LayerContextMenu({
       {onRename && (
         <button type="button" className={MENU_ITEM} onClick={onRename}>
           <Pencil size={14} className="text-tertiary" />
-          Переименовать
+          {t('editor.menu.rename')}
         </button>
       )}
       {onDelete && (
         <button type="button" className={`${MENU_ITEM} hover:!text-danger`} onClick={onDelete}>
           <Trash2 size={14} className="text-tertiary" />
-          Удалить
+          {t('editor.menu.delete')}
         </button>
       )}
     </ContextMenuShell>
@@ -282,21 +351,22 @@ export function CanvasContextMenu({
   onClearSelection: () => void;
   onFitView: () => void;
 }) {
+  const { t } = useT();
   return (
     <ContextMenuShell x={x} y={y} onClose={onClose}>
       <button type="button" className={MENU_ITEM} disabled={!hasLayers} onClick={() => { onSelectAll(); onClose(); }}>
         <BoxSelect size={14} className="text-tertiary" />
-        Выделить всё
+        {t('editor.menu.selectAll')}
         <span className="ml-auto text-caption text-tertiary">⌘A</span>
       </button>
       <button type="button" className={MENU_ITEM} disabled={!hasSelection} onClick={() => { onClearSelection(); onClose(); }}>
         <SquareDashed size={14} className="text-tertiary" />
-        Снять выделение
+        {t('editor.menu.clearSelection')}
       </button>
       <div className="my-1 h-px bg-border" />
       <button type="button" className={MENU_ITEM} onClick={() => { onFitView(); onClose(); }}>
         <Maximize size={14} className="text-tertiary" />
-        Показать по размеру
+        {t('editor.menu.zoomToFit')}
         <span className="ml-auto text-caption text-tertiary">⇧1</span>
       </button>
     </ContextMenuShell>
@@ -319,11 +389,31 @@ function LayerRow({
   renameId,
   onRenameHandled,
   zoneIds,
+  isReference = false,
+  inReference = false,
+  isFlawed = false,
+  inFlawed = false,
+  draggable,
+  dragId,
+  drop,
+  onBeginDrag,
+  onHoverDrop,
+  onCommitDrop,
+  onEndDrag,
+  collapseSignal,
 }: {
   layer: Layer;
   depth: number;
   selectedIds: string[];
   primaryId: string | null;
+  /** This row is a top-level эталон frame — gets the BadgeCheck badge. */
+  isReference?: boolean;
+  /** This row is the эталон frame or lives inside one — painted green. */
+  inReference?: boolean;
+  /** This row is a top-level «сломанный» frame — gets the Bug badge. */
+  isFlawed?: boolean;
+  /** This row is the «сломанный» frame or lives inside one — painted red. */
+  inFlawed?: boolean;
   /** True when an ancestor group of this row is selected — the whole subtree of a
    *  picked group is highlighted, mirroring the canvas selection. */
   inSelectedGroup?: boolean;
@@ -340,7 +430,20 @@ function LayerRow({
   renameId: string | null;
   onRenameHandled: () => void;
   zoneIds?: Set<string>;
+  /** Whether rows can be dragged to reparent/reorder (off for read-only trees). */
+  draggable?: boolean;
+  /** The id currently being dragged (null when no drag is in flight). */
+  dragId?: string | null;
+  /** The active drop target + position, or null. */
+  drop?: { id: string; pos: DropPos } | null;
+  onBeginDrag?: (id: string) => void;
+  onHoverDrop?: (id: string, pos: DropPos) => void;
+  onCommitDrop?: (copy: boolean) => void;
+  onEndDrag?: () => void;
+  /** Bump this counter to collapse this row (and, recursively, all groups). */
+  collapseSignal?: number;
 }) {
+  const { t } = useT();
   const [open, setOpen] = useState(true);
   const [editing, setEditing] = useState(false);
 
@@ -351,6 +454,18 @@ function LayerRow({
       onRenameHandled();
     }
   }, [renameId, layer.id, onRenameHandled]);
+
+  // The header "collapse all" control bumps `collapseSignal` — fold this group up.
+  // Skip the initial mount (signal `undefined`/0) so the tree starts expanded.
+  const firstCollapse = useRef(true);
+  useEffect(() => {
+    if (firstCollapse.current) {
+      firstCollapse.current = false;
+      return;
+    }
+    // Keep top-level frames open — only fold the groups nested inside them.
+    if (depth > 0) setOpen(false);
+  }, [collapseSignal, depth]);
   const hasChildren = layer.children.length > 0;
   const active = selectedIds.includes(layer.id);
   const Icon = iconFor(layer);
@@ -398,8 +513,49 @@ function LayerRow({
           onHover(layer.id);
           playHover();
         }}
+        draggable={draggable && !editing}
+        onDragStart={(e) => {
+          e.stopPropagation();
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', layer.id);
+          onBeginDrag?.(layer.id);
+        }}
+        onDragOver={(e) => {
+          if (!dragId || dragId === layer.id) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          const el = rowRef.current;
+          if (!el) return;
+          const r = el.getBoundingClientRect();
+          const y = e.clientY - r.top;
+          // A group/frame accepts a middle "nest inside" band; a leaf is reorder-only.
+          const pos: DropPos =
+            layer.type === 'frame'
+              ? y < r.height * 0.28
+                ? 'before'
+                : y > r.height * 0.72
+                  ? 'after'
+                  : 'inside'
+              : y < r.height / 2
+                ? 'before'
+                : 'after';
+          onHoverDrop?.(layer.id, pos);
+        }}
+        onDrop={(e) => {
+          if (!dragId) return;
+          e.preventDefault();
+          e.stopPropagation();
+          // Alt/Option held on drop → duplicate into place instead of moving.
+          onCommitDrop?.(e.altKey);
+        }}
+        onDragEnd={() => onEndDrag?.()}
         className={[
-          'group relative flex cursor-pointer select-none items-center gap-1.5 py-1.5 pr-2 text-footnote transition-fast',
+          'layer-row group relative flex cursor-default select-none items-center gap-1.5 py-1.5 pr-2 text-footnote transition-fast',
+          dragId === layer.id ? 'opacity-40' : '',
+          // Nesting a node inside this group/frame — ring the whole row.
+          drop && drop.id === layer.id && drop.pos === 'inside'
+            ? 'rounded-md ring-2 ring-inset ring-brand'
+            : '',
           // A highlighted row rounds only the ends of its run; unselected rows keep
           // a plain rounded box for the hover chip.
           active || inSelectedGroup
@@ -412,13 +568,32 @@ function LayerRow({
           editing
             ? 'text-primary'
             : active
-              ? 'bg-brand/10 text-brand'
+              ? inReference
+                ? 'bg-[color-mix(in_srgb,var(--ref-green)_15%,transparent)] text-[var(--ref-green)]'
+                : inFlawed
+                  ? 'bg-[color-mix(in_srgb,var(--flaw-red)_15%,transparent)] text-[var(--flaw-red)]'
+                  : 'bg-brand/10 text-brand'
               : inSelectedGroup
-                ? 'bg-brand/[0.06] text-secondary hover:bg-hover'
-                : 'text-secondary hover:bg-hover',
+                ? inReference
+                  ? 'bg-[color-mix(in_srgb,var(--ref-green)_8%,transparent)] text-[var(--ref-green)] hover:bg-hover'
+                  : inFlawed
+                    ? 'bg-[color-mix(in_srgb,var(--flaw-red)_8%,transparent)] text-[var(--flaw-red)] hover:bg-hover'
+                    : 'bg-brand/[0.06] text-secondary hover:bg-hover'
+                : inReference
+                  ? 'text-[var(--ref-green)] hover:bg-hover'
+                  : inFlawed
+                    ? 'text-[var(--flaw-red)] hover:bg-hover'
+                    : 'text-secondary hover:bg-hover',
         ].join(' ')}
         style={{ paddingLeft: 8 + depth * 14 }}
       >
+        {/* Reorder drop line — before / after this row. */}
+        {drop && drop.id === layer.id && drop.pos === 'before' && (
+          <span aria-hidden className="pointer-events-none absolute -top-px left-1 right-1 h-0.5 rounded-full bg-brand" />
+        )}
+        {drop && drop.id === layer.id && drop.pos === 'after' && (
+          <span aria-hidden className="pointer-events-none absolute -bottom-px left-1 right-1 h-0.5 rounded-full bg-brand" />
+        )}
         {/* Indent guides — one hairline per ancestor level, like Figma. */}
         {Array.from({ length: depth }).map((_, i) => (
           <span
@@ -431,19 +606,22 @@ function LayerRow({
         {hasChildren ? (
           <button
             type="button"
-            aria-label={open ? 'Свернуть' : 'Развернуть'}
+            aria-label={open ? t('editor.sidebar.collapse') : t('editor.sidebar.expand')}
             onClick={(e) => {
               e.stopPropagation();
               setOpen((o) => !o);
             }}
-            className="relative flex h-4 w-4 shrink-0 items-center justify-center text-tertiary"
+            className="relative flex h-4 w-4 shrink-0 cursor-default items-center justify-center text-tertiary"
           >
             <ChevronRight size={13} className={['transition-fast', open ? 'rotate-90' : ''].join(' ')} />
           </button>
         ) : (
           <span className="relative h-4 w-4 shrink-0" />
         )}
-        <Icon size={13} className={active ? 'text-brand' : 'text-tertiary'} />
+        <Icon
+          size={13}
+          className={inReference ? 'text-[var(--ref-green)]' : inFlawed ? 'text-[var(--flaw-red)]' : active ? 'text-brand' : 'text-tertiary'}
+        />
         {editing ? (
           <input
             autoFocus
@@ -469,21 +647,27 @@ function LayerRow({
         ) : (
           <span className="min-w-0 flex-1 truncate">{layer.name}</span>
         )}
+        {!editing && isReference && (
+          <BadgeCheck size={12} className="ml-auto shrink-0 text-[var(--ref-green)]" aria-label={t('editor.tree.reference')} />
+        )}
+        {!editing && isFlawed && (
+          <Bug size={12} className="ml-auto shrink-0 text-[var(--flaw-red)]" aria-label={t('editor.tree.flawed')} />
+        )}
         {!editing && zoneIds?.has(layer.id) && (
-          <Target size={11} className="ml-auto shrink-0 text-[#3FB950]" aria-label="Зона критики" />
+          <Target size={11} className={`${isReference || isFlawed ? 'ml-1.5' : 'ml-auto'} shrink-0 text-[#3FB950]`} aria-label={t('editor.tree.critiqueZone')} />
         )}
         {!editing && onDelete && (
           <button
             type="button"
-            aria-label="Удалить слой"
-            title="Удалить слой"
+            aria-label={t('editor.tree.deleteLayer')}
+            title={t('editor.tree.deleteLayer')}
             onClick={(e) => {
               e.stopPropagation();
               onDelete(layer.id);
             }}
             className={[
-              'shrink-0 text-tertiary opacity-0 transition-fast hover:text-danger group-hover:opacity-100',
-              zoneIds?.has(layer.id) ? 'ml-1.5' : 'ml-auto',
+              'shrink-0 cursor-default text-tertiary opacity-0 transition-fast hover:text-danger group-hover:opacity-100',
+              isReference || isFlawed || zoneIds?.has(layer.id) ? 'ml-1.5' : 'ml-auto',
             ].join(' ')}
           >
             <Trash2 size={12} />
@@ -502,7 +686,7 @@ function LayerRow({
                 ? ctxHi || selectedIds.includes(layer.children[i + 1].id)
                 : false;
             return (
-              <LayerRow key={c.id} layer={c} depth={depth + 1} selectedIds={selectedIds} primaryId={primaryId} inSelectedGroup={ctxHi} runTop={!hiPrev} runBottom={!hiNext} onSelect={onSelect} onHover={onHover} onRename={onRename} onDelete={onDelete} onContextMenu={onContextMenu} renameId={renameId} onRenameHandled={onRenameHandled} zoneIds={zoneIds} />
+              <LayerRow key={c.id} layer={c} depth={depth + 1} selectedIds={selectedIds} primaryId={primaryId} inSelectedGroup={ctxHi} runTop={!hiPrev} runBottom={!hiNext} onSelect={onSelect} onHover={onHover} onRename={onRename} onDelete={onDelete} onContextMenu={onContextMenu} renameId={renameId} onRenameHandled={onRenameHandled} zoneIds={zoneIds} inReference={inReference} inFlawed={inFlawed} draggable={draggable} dragId={dragId} drop={drop} onBeginDrag={onBeginDrag} onHoverDrop={onHoverDrop} onCommitDrop={onCommitDrop} onEndDrag={onEndDrag} collapseSignal={collapseSignal} />
             );
           })}
         </>

@@ -86,6 +86,12 @@ function extractProps(el: Element, tag: string): LayerProps {
   const op = num(attrOrStyle(el, 'opacity'));
   if (op != null && op < 1) props.opacity = op;
 
+  const stroke = attrOrStyle(el, 'stroke');
+  if (stroke && stroke !== 'none') {
+    props.stroke = stroke;
+    props.strokeWidth = num(attrOrStyle(el, 'stroke-width')) ?? 1;
+  }
+
   // A group/frame carrying a clip-path reads as "clip content" enabled.
   const clipped = !!(el.getAttribute('clip-path') || attrOrStyle(el, 'clip-path'));
   if (clipped) props.clip = true;
@@ -120,6 +126,49 @@ function extractProps(el: Element, tag: string): LayerProps {
 }
 
 type Box = NonNullable<LayerProps['box']>;
+
+/**
+ * A frame's TRUE bounds come from its own clip rect, not the union of its
+ * children. Figma exports a clipped frame as `<g clip-path="url(#id)">` whose
+ * `<clipPath id>` (in <defs>) holds a single rect at the artboard bounds. The
+ * children min/max we compute otherwise is wrong — it only sees `rect`/`image`
+ * children (text and vectors have no box) and ignores nested `transform`s, so a
+ * real screen resolves to a cropped, offset box (the crooked selection bug).
+ *
+ * Returns the clip rect's box in the frame's local space (the same space the
+ * inserted `data-frame-bg` rect lives in), or null when the frame isn't clipped
+ * by a plain `userSpaceOnUse` rect — then the caller falls back to min/max.
+ */
+function clipBox(el: Element): Box | null {
+  const cp = el.getAttribute('clip-path') || styleProp(el, 'clip-path');
+  if (!cp) return null;
+  const m = cp.match(/url\(\s*["']?#([^"')\s]+)["']?\s*\)/);
+  if (!m) return null;
+  const doc = el.ownerDocument;
+  if (!doc) return null;
+  // getElementById is unreliable under xmldom — scan clipPath defs by id.
+  const defs = doc.getElementsByTagName('clipPath');
+  let def: Element | null = null;
+  for (let i = 0; i < defs.length; i++) {
+    if (defs[i].getAttribute('id') === m[1]) { def = defs[i]; break; }
+  }
+  if (!def) return null;
+  // objectBoundingBox units are 0..1 fractions, not user-space px — can't use.
+  const units = def.getAttribute('clipPathUnits');
+  if (units && units !== 'userSpaceOnUse') return null;
+  let rect: Element | null = null;
+  for (let i = 0; i < def.childNodes.length; i++) {
+    const c = def.childNodes[i] as Element;
+    if (c.nodeType === 1 && localName(c) === 'rect') { rect = c; break; }
+  }
+  if (!rect) return null;
+  // x/y default to 0 when omitted (SVG rects drop them at the origin — as Figma
+  // exports a full-artboard clip rect: `<rect width=375 height=812/>`).
+  const x = num(rect.getAttribute('x')) ?? 0, y = num(rect.getAttribute('y')) ?? 0;
+  const w = num(rect.getAttribute('width')), h = num(rect.getAttribute('height'));
+  if (w == null || h == null || !(w > 0) || !(h > 0)) return null;
+  return { x, y, w, h };
+}
 
 /** Guess a frame's auto-layout flow from its children's boxes: aligned tops →
  *  a horizontal row, aligned lefts → a vertical column, else a grid/free group.
@@ -166,11 +215,18 @@ function walkChildren(el: Element, counter: { n: number }): Layer[] {
     // children line up (all same top ≈ a row, all same left ≈ a column).
     if (type === 'frame' && children.length) {
       const boxes = children.map((c) => c.props.box).filter(Boolean) as NonNullable<LayerProps['box']>[];
-      if (boxes.length) {
-        const x = Math.min(...boxes.map((b) => b.x));
-        const y = Math.min(...boxes.map((b) => b.y));
-        const w = Math.max(...boxes.map((b) => b.x + b.w)) - x;
-        const h = Math.max(...boxes.map((b) => b.y + b.h)) - y;
+      // Prefer the frame's own clip rect (its real artboard bounds) over the
+      // children min/max — the latter misses text/vectors and ignores nested
+      // transforms, giving a cropped, offset box. Fall back to min/max only when
+      // the frame carries no usable clip rect.
+      const cbox = clipBox(child);
+      if (cbox || boxes.length) {
+        const { x, y, w, h } = cbox ?? {
+          x: Math.min(...boxes.map((b) => b.x)),
+          y: Math.min(...boxes.map((b) => b.y)),
+          w: Math.max(...boxes.map((b) => b.x + b.w)) - Math.min(...boxes.map((b) => b.x)),
+          h: Math.max(...boxes.map((b) => b.y + b.h)) - Math.min(...boxes.map((b) => b.y)),
+        };
         props.box = { x, y, w, h };
         props.layout = inferLayout(boxes);
         // A frame has no fill of its own in SVG — its background is the first
