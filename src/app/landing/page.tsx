@@ -24,7 +24,7 @@ export default function LandingPage() {
           Duolingo × LeetCode для UI/UX
         </span>
         <h1 className="mx-auto mt-5 max-w-[760px] text-display font-bold leading-[1.05] tracking-tight text-primary">
-          Учись дизайну, <span className="text-brand">делая</span>{' '}—<br />а не смотря видео
+          Учись дизайну{' '}— <span className="text-brand">делая</span>,<br />а не смотря видео
         </h1>
         <p className="mx-auto mt-5 max-w-[600px] text-title3 font-normal leading-relaxed text-secondary">
           Интерактивная платформа, где каждое правило дизайна ты сразу применяешь руками. Мгновенная

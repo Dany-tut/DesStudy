@@ -800,9 +800,9 @@ function QuizMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
 /* ── mode: match — pair term ↔ value (`match`) ───────────────────────── */
 
 const PAIRS = [
-  { id: 'space-100', term: 'space-100', value: '4px' },
-  { id: 'space-300', term: 'space-300', value: '12px' },
-  { id: 'radius-lg', term: 'radius-lg', value: '16px' },
+  { id: 'space', term: 'space-200', value: '8px' },
+  { id: 'font', term: 'font-size-body', value: '16px' },
+  { id: 'color', term: 'color-fg-muted', value: 'приглушённый серый' },
 ];
 
 function MatchMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }) {
