@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { LogOut, Settings, User, Sun, Moon } from 'lucide-react';
 import { useI18n } from '@/lib/i18n/client';
 import { LOCALES, LOCALE_NAMES } from '@/lib/i18n/config';
@@ -48,15 +49,46 @@ export function UserMenu({
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<ThemePref>('light');
   const [busy, setBusy] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setTheme(loadSettings().theme), []);
+
+  // Position the (portaled) panel relative to the trigger. Portaling to
+  // document.body lets the menu escape ancestor `overflow-hidden`/stacking
+  // contexts (e.g. the editor's full-bleed workspace) so it never gets clipped.
+  const PANEL_W = 256; // w-[16rem]
+  useLayoutEffect(() => {
+    if (!open) return;
+    function place() {
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const gap = 6;
+      const ph = panelRef.current?.offsetHeight ?? 0;
+      const top = openUp ? r.top - gap - ph : r.bottom - gap;
+      const left = align === 'end' ? r.right - PANEL_W : r.left;
+      // Keep the panel within the viewport horizontally.
+      const clampedLeft = Math.max(8, Math.min(left, window.innerWidth - PANEL_W - 8));
+      setCoords({ top, left: clampedLeft });
+    }
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open, align, openUp]);
 
   // Close on outside click / Escape.
   useEffect(() => {
     if (!open) return;
     function onDown(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
@@ -85,6 +117,7 @@ export function UserMenu({
   return (
     <div ref={rootRef} className={`relative ${full ? 'w-full' : 'shrink-0'}`}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
@@ -108,12 +141,12 @@ export function UserMenu({
         </span>
       </button>
 
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <div
+          ref={panelRef}
           role="menu"
-          className={`absolute z-50 w-[16rem] overflow-hidden rounded-2xl border border-border bg-surface p-1.5 shadow-xl ${
-            openUp ? 'bottom-[calc(100%+4px)]' : 'top-[calc(100%-6px)]'
-          } ${align === 'end' ? 'right-0' : 'left-0'}`}
+          style={{ position: 'fixed', top: coords?.top ?? -9999, left: coords?.left ?? -9999 }}
+          className="z-[60] w-[16rem] overflow-hidden rounded-2xl border border-border bg-surface p-1.5 shadow-xl"
         >
           <div className="flex items-center gap-3 px-2.5 py-2">
             <span
@@ -171,7 +204,8 @@ export function UserMenu({
             <LogOut size={16} />
             {t('nav.signOut')}
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

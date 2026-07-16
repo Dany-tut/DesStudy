@@ -171,6 +171,25 @@ function walkChildren(el: Element, counter: { n: number }): Layer[] {
         const h = Math.max(...boxes.map((b) => b.y + b.h)) - y;
         props.box = { x, y, w, h };
         props.layout = inferLayout(boxes);
+        // A real frame (props.frame) needs its canonical bounds rect so the
+        // canvas treats a resize as "move the border", not "scale the children".
+        // Imported frames arrive as a bare `<g clip-path>` (clipPath sits in
+        // <defs>, no bg rect), so without this a resize falls through to the
+        // matrix-scale path and stretches the content. The rect is `fill="none"`
+        // (geometry only, never paints) and we leave the existing clip-path
+        // untouched — rewriting it to a bbox rect would break non-rectangular
+        // masks (e.g. circular avatars). Idempotent: skip if one already exists.
+        if (props.frame && !child.querySelector(':scope > rect[data-frame-bg]')) {
+          const ns = 'http://www.w3.org/2000/svg';
+          const bg = child.ownerDocument!.createElementNS(ns, 'rect');
+          bg.setAttribute('x', String(x));
+          bg.setAttribute('y', String(y));
+          bg.setAttribute('width', String(w));
+          bg.setAttribute('height', String(h));
+          bg.setAttribute('fill', 'none');
+          bg.setAttribute('data-frame-bg', '1');
+          child.insertBefore(bg, child.firstChild);
+        }
       }
     }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, FileText, Minus, Star, Pencil, Trash2 } from 'lucide-react';
 import type { PageMeta } from '@/lib/editor/pages';
 
@@ -156,6 +157,7 @@ export function PagesPanel({
           onClose={() => setMenu(null)}
           style={{ left: menu.x, top: menu.y }}
           className="fixed w-48"
+          portal
         >
           {menu.kind === 'page' && (
             <MenuItem
@@ -198,11 +200,14 @@ function Dropdown({
   onClose,
   className = '',
   style,
+  portal = false,
 }: {
   children: React.ReactNode;
   onClose: () => void;
   className?: string;
   style?: React.CSSProperties;
+  /** Render into document.body so `fixed` coords escape clipping ancestors. */
+  portal?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -219,16 +224,18 @@ function Dropdown({
       document.removeEventListener('keydown', onKey);
     };
   }, [onClose]);
-  return (
+  const node = (
     <div
       ref={ref}
       style={style}
-      className={`z-50 rounded-xl border border-border bg-surface p-1 shadow-lg ${className}`}
+      className={`z-[60] rounded-xl border border-border bg-surface p-1 shadow-lg ${className}`}
       onContextMenu={(e) => e.preventDefault()}
     >
       {children}
     </div>
   );
+  if (portal && typeof document !== 'undefined') return createPortal(node, document.body);
+  return node;
 }
 
 function MenuItem({

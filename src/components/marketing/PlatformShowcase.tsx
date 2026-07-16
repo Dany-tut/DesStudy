@@ -28,6 +28,7 @@ import {
   ScanSearch,
   PaintBucket,
   Move,
+  MoveHorizontal,
 } from 'lucide-react';
 import BlurEffect from 'react-progressive-blur';
 import { Confetti } from './Confetti';
@@ -142,7 +143,7 @@ export function PlatformShowcase() {
 
       <div className="grid md:grid-cols-[210px_1fr_220px]">
         {/* Layers panel */}
-        <aside className="border-b border-border bg-surface px-3 py-4 md:flex md:h-[520px] md:flex-col md:overflow-hidden md:border-b-0 md:border-r">
+        <aside className="border-b border-border bg-surface px-3 py-4 md:flex md:h-[534px] md:flex-col md:overflow-hidden md:border-b-0 md:border-r">
           <p className="px-2 pb-2 text-caption uppercase tracking-wider text-tertiary">Слои</p>
           <div className="slim-scroll flex gap-1.5 overflow-x-auto md:min-h-0 md:flex-1 md:flex-col md:gap-0.5 md:overflow-x-visible md:overflow-y-auto md:pr-1">
             {MODES.map((m) => {
@@ -176,8 +177,8 @@ export function PlatformShowcase() {
           data-artboard
           className={`relative flex bg-canvas p-7 ${
             active === 'mentor'
-              ? 'h-[480px] items-stretch pb-7 md:h-[520px]'
-              : 'h-[480px] items-start pb-20 md:h-[520px]'
+              ? 'h-[480px] items-stretch pb-7 md:h-[534px]'
+              : 'h-[480px] items-start pb-20 md:h-[534px]'
           }`}
         >
           <Confetti fireKey={fireKey} />
@@ -1178,12 +1179,54 @@ function QuizMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
 
 /* ── mode: match — pair term ↔ value (`match`) ───────────────────────── */
 
-const PAIRS = [
-  { id: 'space', term: 'space-200', value: '8px' },
-  { id: 'font', term: 'font-size-body', value: '16px' },
-  { id: 'color', term: 'color-fg-muted', value: 'приглушённый серый' },
-  { id: 'radius', term: 'radius-lg', value: '12px' },
-  { id: 'weight', term: 'font-weight-bold', value: '700' },
+/**
+ * Each token maps to a *visual* of what it controls — not a raw px number.
+ * Three px values (space / radius / font-size) all read as "16px" and are
+ * genuinely indistinguishable, turning the match into a number-guessing game.
+ * Showing the effect instead (a rounded corner, a gap, a swatch, glyph size, an
+ * elevation) makes every pair its own category, so nothing can be confused.
+ */
+const PAIRS: { id: string; term: string; visual: React.ReactNode }[] = [
+  {
+    id: 'radius',
+    term: 'radius-lg',
+    // outlined rounded rectangle — the rounded corners themselves read as "radius"
+    visual: <span className="h-7 w-10 rounded-[13px] border-2 border-brand/70" />,
+  },
+  {
+    id: 'space',
+    term: 'space-lg',
+    // two blocks with a ↔ arrow spanning the gap between them
+    visual: (
+      <span className="flex items-center gap-1.5 text-brand/70">
+        <span className="h-6 w-3 rounded-[3px] bg-brand/70" />
+        <MoveHorizontal size={16} strokeWidth={2.25} />
+        <span className="h-6 w-3 rounded-[3px] bg-brand/70" />
+      </span>
+    ),
+  },
+  {
+    id: 'color',
+    term: 'color-fg-muted',
+    // muted foreground swatch
+    visual: <span className="h-6 w-6 rounded-full" style={{ background: 'var(--text-tertiary)' }} />,
+  },
+  {
+    id: 'size',
+    term: 'font-size-lg',
+    // glyph rendered at the token's size
+    visual: (
+      <span className="font-semibold leading-none text-primary" style={{ fontSize: 26 }}>
+        Аа
+      </span>
+    ),
+  },
+  {
+    id: 'shadow',
+    term: 'shadow-md',
+    // elevation / drop shadow
+    visual: <span className="h-7 w-11 rounded-lg bg-elevated shadow-md" />,
+  },
 ];
 
 function MatchMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }) {
@@ -1215,7 +1258,7 @@ function MatchMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }
 
   return (
     <div>
-      <ModeHeader title="Сопоставление" hint="Соедини токен с его значением — тапни слева, затем справа" done={solved} />
+      <ModeHeader title="Сопоставление" hint="Соедини токен с тем, что он задаёт — тапни слева, затем справа" done={solved} />
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
@@ -1229,7 +1272,7 @@ function MatchMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }
                 onClick={() => tapTerm(p.id)}
                 disabled={done}
                 className={[
-                  'flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left font-mono text-caption transition-base',
+                  'flex h-[52px] w-full items-center gap-2 rounded-xl border px-3 text-left font-mono text-caption transition-base',
                   done
                     ? 'border-success bg-success/10 text-success'
                     : isPicked
@@ -1254,16 +1297,16 @@ function MatchMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }
                 onClick={() => tapValue(p.id)}
                 disabled={done}
                 className={[
-                  'flex w-full items-center justify-end gap-2 rounded-xl border px-3 py-2.5 text-right text-caption transition-base',
+                  'relative flex h-[52px] w-full items-center justify-center rounded-xl border px-3 transition-base',
                   done
-                    ? 'border-success bg-success/10 text-success'
+                    ? 'border-success bg-success/10'
                     : isWrong
-                      ? 'border-danger bg-danger/10 text-primary'
-                      : 'border-border bg-surface text-secondary hover:bg-hover',
+                      ? 'border-danger bg-danger/10'
+                      : 'border-border bg-surface hover:bg-hover',
                 ].join(' ')}
               >
-                {p.value}
-                {done && <Check size={13} className="shrink-0" />}
+                {p.visual}
+                {done && <Check size={13} className="absolute right-3 shrink-0 text-success" />}
               </button>
             );
           })}

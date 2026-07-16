@@ -11,7 +11,6 @@ import {
   Target,
   Columns3,
   Rows3,
-  LayoutGrid,
   Trash2,
   Group,
   Copy,
@@ -39,13 +38,14 @@ function iconFor(layer: Layer): typeof Square {
     // A plain group (no own bounds/clip) reads as a group — the dashed selection
     // box, like Figma. Only a real frame gets the frame / auto-layout glyph.
     if (!layer.props.clip) return BoxSelect;
+    // Only explicit auto-layouts (row / column — the two the group menu offers)
+    // get a flow glyph. `grid`/`none` are parse-time inferences, not authored
+    // layouts, so a real frame reads as a frame — not a grid/group.
     switch (layer.props.layout) {
       case 'row':
         return Columns3;
       case 'column':
         return Rows3;
-      case 'grid':
-        return LayoutGrid;
       default:
         return Frame;
     }

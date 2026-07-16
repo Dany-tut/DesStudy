@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   MousePointer2,
   Hand,
@@ -30,10 +30,11 @@ import {
   Code2,
   ChevronDown,
   Check,
+  SquarePen,
+  Share2,
   type LucideIcon,
 } from 'lucide-react';
 import type { EditorTool } from '@/lib/editor/types';
-import { STEPS, type EditorStep } from './StepBar';
 
 /** A selection made from a tool group. `tool` is the underlying canvas tool;
  *  `variant` disambiguates sub-modes the tool exposes (e.g. move → scale). */
@@ -43,17 +44,12 @@ export interface ToolChoice {
 }
 
 /**
- * The floating bottom dock — one glass panel with two faces that morph into each
- * other (framer-motion `layout`):
+ * The floating bottom dock — the Figma-style toolbar (select / frame / shape /
+ * pen / text / comment / components, plus a dimmed mode segment on the right).
  *
- *  · TOOLS face  — the Figma-style toolbar (select / frame / shape / pen / text
- *                  / comment / components, plus a mode segment on the right).
- *  · STEPS face  — the four authoring stages (Экран → … → Доступ).
- *
- * In the TOOLS face a "droplet" mode button detaches to the left; clicking it
- * morphs back to the STEPS face. Picking a stage — or interacting with the
- * canvas — morphs back to TOOLS. The whole thing is one shared layout so widths
- * and corners animate rather than snap.
+ * A second, detached glass pill hangs off the toolbar's right edge with two
+ * static view-mode icons (Редактор / Доступы). It's purely decorative for now —
+ * no click, no animation — mirroring the shape of the toolbar itself.
  */
 
 /** One entry in a tool's variant dropdown. */
@@ -156,26 +152,20 @@ const MODE_SEGMENT: { id: string; label: string; icon: LucideIcon }[] = [
   { id: 'code', label: 'Код', icon: Code2 },
 ];
 
-export type DockFace = 'tools' | 'steps';
+/** The detached right-hand pill — static view modes (cosmetic for now). The
+ *  first is highlighted as the current context (the editor itself). */
+const VIEW_MODES: { id: string; label: string; icon: LucideIcon; active?: boolean }[] = [
+  { id: 'editor', label: 'Редактор', icon: SquarePen, active: true },
+  { id: 'share', label: 'Доступы', icon: Share2 },
+];
 
 export function EditorDock({
-  face,
-  onFace,
-  step,
-  onStep,
-  enabledThrough,
   tool,
   onTool,
 }: {
-  face: DockFace;
-  onFace: (f: DockFace) => void;
-  step: EditorStep;
-  onStep: (s: EditorStep) => void;
-  enabledThrough: EditorStep;
   tool: EditorTool;
   onTool: (choice: ToolChoice) => void;
 }) {
-  const activeStep = STEPS.find((s) => s.id === step) ?? STEPS[0];
   // Which tool's variant dropdown is open + where its anchor button sits (viewport
   // coords), so the menu can be portalled to <body> — out of the dock's glass, so
   // its own backdrop-blur samples the canvas (a nested backdrop-filter doesn't).
@@ -198,61 +188,20 @@ export function EditorDock({
       window.removeEventListener('keydown', onKey);
     };
   }, [menu]);
-  useEffect(() => {
-    if (face !== 'tools') setMenu(null);
-  }, [face]);
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-      <LayoutGroup>
-        {/* The morphing panel is the ONLY centered child, so when its width
-            changes it grows symmetrically about its own centre — no left/right
-            drift. The droplet mode button hangs off its left edge, absolutely
-            positioned, so it never adds to the centred group's width. */}
-        <motion.div
+      {/* A relative wrapper that hugs the toolbar (its only in-flow child), so
+          the toolbar stays centred. The view-mode pill hangs off the right edge,
+          absolutely positioned and out of flow, so it never shifts the centre —
+          and, as a SIBLING of the glass toolbar rather than a descendant, its own
+          backdrop-filter samples the canvas (a nested backdrop-filter is a no-op). */}
+      <div className="relative">
+        <div
           ref={dockRef}
-          layout
-          transition={{ type: 'spring', stiffness: 480, damping: 36 }}
           className="glass pointer-events-auto relative flex items-center gap-1 rounded-2xl p-1.5 shadow-lg"
         >
-          {/* Detached "droplet" mode button — only in the tools face, pinned to
-              the left of the panel and out of flow. Clicking it morphs back to
-              the stage selector. */}
-          <AnimatePresence>
-            {face === 'tools' && (
-              <motion.button
-                type="button"
-                initial={{ opacity: 0, scale: 0.6, x: 12, y: '-50%' }}
-                animate={{ opacity: 1, scale: 1, x: 0, y: '-50%' }}
-                exit={{ opacity: 0, scale: 0.6, x: 12, y: '-50%' }}
-                transition={{ type: 'spring', stiffness: 500, damping: 34 }}
-                onClick={() => onFace('steps')}
-                title={`Этап ${activeStep.id}: ${activeStep.label} — открыть этапы`}
-                className="glass pointer-events-auto absolute right-full top-1/2 mr-2 flex items-center rounded-2xl p-1.5 shadow-lg"
-              >
-                <span className="flex h-9 items-center gap-2 rounded-xl px-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-brand text-caption font-semibold tabular-nums text-on-brand">
-                    {activeStep.id}
-                  </span>
-                  <activeStep.icon size={15} className="text-secondary" />
-                </span>
-              </motion.button>
-            )}
-          </AnimatePresence>
-
-            {/* Both faces stay mounted; the inactive one is lifted out of flow
-                (absolute) and faded, so the active face alone drives the panel's
-                width. `layout="position"` keeps the text crisp — only position
-                animates, never scale — which is what removed the trembling. */}
-            <motion.div
-              layout="position"
-              transition={{ type: 'spring', stiffness: 480, damping: 36 }}
-              aria-hidden={face !== 'tools'}
-              className={[
-                'flex shrink-0 items-center gap-1 whitespace-nowrap transition-[opacity] duration-150',
-                face === 'tools' ? 'opacity-100' : 'pointer-events-none absolute inset-1.5 opacity-0',
-              ].join(' ')}
-            >
+            <div className="flex shrink-0 items-center gap-1 whitespace-nowrap">
                   {TOOLS.map((t, i) => {
                     const active = t.id === tool;
                     const Icon = t.icon;
@@ -446,6 +395,7 @@ export function EditorDock({
                   })}
             </motion.div>
         </motion.div>
+        </div>
       </LayoutGroup>
     </div>
   );

@@ -255,7 +255,7 @@ export function PricingPlans() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="ФИ"
+                placeholder="Фамилия и имя"
                 className="w-full rounded-lg border border-border bg-canvas px-3 py-2.5 text-footnote text-primary outline-none transition-base placeholder:text-tertiary focus:border-brand"
               />
               <input
