@@ -21,6 +21,9 @@ export interface ApplicationInfo {
   planLabel: string;
   status: string;
   at: string;
+  /** Contact captured with the заявка — phone required, telegram optional. */
+  phone: string | null;
+  telegram: string | null;
 }
 
 /** One learner's latest assessment for the teacher: mini radar, per-category
@@ -85,12 +88,27 @@ export function LearnerResultCard({
               </p>
             )}
             {application && (
-              <span
-                className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-3 py-1 text-caption font-medium text-brand"
-                title={`Заявка на «${application.planLabel}» · ${application.at}`}
-              >
-                <Sparkles size={12} /> Заявка: {application.planLabel}
-              </span>
+              <>
+                <span
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-3 py-1 text-caption font-medium text-brand"
+                  title={`Заявка на «${application.planLabel}» · ${application.at}`}
+                >
+                  <Sparkles size={12} /> Заявка: {application.planLabel}
+                </span>
+                {(application.phone || application.telegram) && (
+                  <div className="mt-1.5 space-y-0.5 text-caption text-secondary">
+                    {application.phone && (
+                      <p>
+                        тел.{' '}
+                        <a href={`tel:${application.phone}`} className="text-primary hover:text-brand">
+                          {application.phone}
+                        </a>
+                      </p>
+                    )}
+                    {application.telegram && <p>tg {application.telegram}</p>}
+                  </div>
+                )}
+              </>
             )}
           </div>
           <RadarChart

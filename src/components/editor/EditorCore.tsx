@@ -461,6 +461,25 @@ export function EditorCore() {
   }, [draft.zones]);
   const zoneIds = useMemo(() => new Set(zoneByLayer.keys()), [zoneByLayer]);
 
+  // Auto-diff the selected layer against its эталон twin: locate the top-level
+  // frame it lives in, confirm that frame is «сломанный», find the sibling
+  // reference frame, mirror the index path into it, and compare props. Undefined
+  // when there's no pairing (plain frame / no reference), so the editor hides the
+  // «Из эталона» affordance; [] means «paired, identical». Declared with the
+  // other hooks (before any early return) so hook order stays stable.
+  const autoDeltas = useMemo<DefectDelta[] | undefined>(() => {
+    if (!selected || !result) return undefined;
+    const tops = result.screen.layers;
+    const host = tops.find((t) => pathTo(t, selected.id));
+    if (!host || host.props.frameRole !== 'flawed') return undefined;
+    const ref = tops.find((t) => t.id !== host.id && t.props.frameRole === 'reference');
+    if (!ref) return undefined;
+    const path = pathTo(host, selected.id)!;
+    const twin = atPath(ref, path);
+    if (!twin) return [];
+    return diffLayerProps(twin, selected);
+  }, [selected, result]);
+
   const ingest = useCallback(async (file: File) => {
     const text = await file.text();
     const parsed = parseSvgToLayers(text);
@@ -1525,25 +1544,6 @@ export function EditorCore() {
   }
 
   const selZone = selected ? zoneByLayer.get(selected.id) : undefined;
-
-  // Auto-diff the selected layer against its эталон twin: locate the top-level
-  // frame it lives in, confirm that frame is «сломанный», find the sibling
-  // reference frame, mirror the index path into it, and compare props. Undefined
-  // when there's no pairing (plain frame / no reference), so the editor hides the
-  // «Из эталона» affordance; [] means «paired, identical».
-  const autoDeltas = useMemo<DefectDelta[] | undefined>(() => {
-    if (!selected || !result) return undefined;
-    const tops = result.screen.layers;
-    const host = tops.find((t) => pathTo(t, selected.id));
-    if (!host || host.props.frameRole !== 'flawed') return undefined;
-    const ref = tops.find((t) => t.id !== host.id && t.props.frameRole === 'reference');
-    if (!ref) return undefined;
-    const path = pathTo(host, selected.id)!;
-    const twin = atPath(ref, path);
-    if (!twin) return [];
-    return diffLayerProps(twin, selected);
-  }, [selected, result]);
-
   const showLeft = step === 1;
   const showRight = step === 1;
 

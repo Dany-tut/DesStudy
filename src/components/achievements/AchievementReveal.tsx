@@ -109,7 +109,30 @@ const DEBRIS = Array.from({ length: 22 }, (_, i) => {
   };
 });
 
-const RAYS = Array.from({ length: 12 }, (_, i) => (i * 360) / 12);
+/**
+ * Sparkle rays fanning from the crystal — alternating long/short tapered spokes
+ * so it reads as a soft star-burst rather than a wheel of identical bars. Each is
+ * a slim triangle (base near the core, apex out) that we fade + breathe on hold.
+ */
+const RAY_ORIGIN = { x: 100, y: 104 };
+const RAYS = Array.from({ length: 16 }, (_, i) => {
+  const deg = (i * 360) / 16;
+  const long = i % 2 === 0;
+  const len = long ? 96 : 52;
+  const hw = long ? 2.6 : 1.7; // half-width of the base
+  const r0 = 30; // inner radius where the ray starts
+  const p = (r: number, dx: number) => {
+    const rad = (deg - 90) * (Math.PI / 180);
+    const px = RAY_ORIGIN.x + Math.cos(rad) * r - Math.sin(rad) * dx;
+    const py = RAY_ORIGIN.y + Math.sin(rad) * r + Math.cos(rad) * dx;
+    return `${px.toFixed(1)},${py.toFixed(1)}`;
+  };
+  return {
+    deg,
+    long,
+    points: `${p(r0 + len, 0)} ${p(r0, hw)} ${p(r0, -hw)}`,
+  };
+});
 
 const reduced = () =>
   typeof document !== 'undefined' &&
@@ -212,19 +235,28 @@ export function AchievementReveal({
               }
               transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
             >
-              {/* light bloom flooding outward from the crystal's core */}
+              {/* light bloom flooding outward from the crystal's core — a soft,
+                  edgeless falloff that gently breathes so the halo feels alive */}
               <motion.div
-                className="pointer-events-none absolute aspect-square w-[75vmin] rounded-full"
+                className="pointer-events-none absolute aspect-square w-[92vmin] rounded-full"
                 style={{
                   left: '50%',
                   top: '50%',
-                  marginLeft: '-37.5vmin',
-                  marginTop: '-37.5vmin',
-                  background: `radial-gradient(circle, ${GLOW[tone]}cc 0%, ${GLOW[tone]}55 34%, transparent 66%)`,
+                  marginLeft: '-46vmin',
+                  marginTop: '-46vmin',
+                  background: `radial-gradient(circle, ${GLOW[tone]}b0 0%, ${GLOW[tone]}66 22%, ${GLOW[tone]}26 44%, ${GLOW[tone]}0d 62%, transparent 80%)`,
                 }}
                 initial={{ opacity: 0, scale: 0.2 }}
-                animate={{ opacity: lit ? 1 : 0, scale: lit ? 1 : 0.2 }}
-                transition={{ duration: 0.7, ease: 'easeOut' }}
+                animate={
+                  phase === 'hold'
+                    ? { opacity: [0.9, 1, 0.9], scale: [1, 1.05, 1] }
+                    : { opacity: lit ? 0.9 : 0, scale: lit ? 1 : 0.2 }
+                }
+                transition={
+                  phase === 'hold'
+                    ? { duration: 4.5, repeat: Infinity, ease: 'easeInOut' }
+                    : { duration: 0.7, ease: 'easeOut' }
+                }
               />
 
               {/* shockwave ring — snaps outward at the moment of the break */}
@@ -248,33 +280,51 @@ export function AchievementReveal({
                 transition={{ duration: 0.6, ease: 'easeOut' }}
               />
 
-              {/* light rays fanning out from the crystal */}
-              <svg
+              {/* soft sparkle rays fanning from the crystal — the whole cluster
+                  drifts slowly and the spokes breathe so it never sits still */}
+              <motion.svg
                 viewBox="0 0 200 200"
                 className="pointer-events-none absolute inset-0"
-                style={{ overflow: 'visible' }}
+                style={{ overflow: 'visible', transformOrigin: '100px 104px' }}
                 aria-hidden
+                animate={{ rotate: lit ? 360 : 0 }}
+                transition={
+                  phase === 'hold'
+                    ? { duration: 48, repeat: Infinity, ease: 'linear' }
+                    : { duration: 1.6, ease: 'easeOut' }
+                }
               >
-                {RAYS.map((deg, i) => (
-                  <motion.rect
+                <defs>
+                  <linearGradient id="ray-fade" x1="0" y1="1" x2="0" y2="0">
+                    <stop offset="0%" stopColor={GLOW[tone]} stopOpacity="0.55" />
+                    <stop offset="100%" stopColor={GLOW[tone]} stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {RAYS.map((ray, i) => (
+                  <motion.polygon
                     key={i}
-                    x={98.5}
-                    y={-70}
-                    width={3}
-                    height={170}
-                    rx={1.5}
-                    fill={GLOW[tone]}
+                    points={ray.points}
+                    fill="url(#ray-fade)"
                     style={{ transformOrigin: '100px 104px' }}
-                    initial={{ opacity: 0, scaleY: 0.2, rotate: deg }}
-                    animate={{
-                      opacity: lit ? [0, 0.7, 0.35] : 0,
-                      scaleY: lit ? [0.2, 1.15, 1] : 0.2,
-                      rotate: deg + (lit ? 22 : 0),
-                    }}
-                    transition={{ duration: 1.4, delay: i * 0.012, ease: 'easeOut' }}
+                    initial={{ opacity: 0, scale: 0.3 }}
+                    animate={
+                      phase === 'hold'
+                        ? {
+                            opacity: ray.long ? [0.6, 0.28, 0.6] : [0.32, 0.12, 0.32],
+                            scale: ray.long ? [1, 1.06, 1] : [1, 0.92, 1],
+                          }
+                        : lit
+                          ? { opacity: ray.long ? 0.6 : 0.32, scale: [0.3, 1.12, 1] }
+                          : { opacity: 0, scale: 0.3 }
+                    }
+                    transition={
+                      phase === 'hold'
+                        ? { duration: 2.6 + (i % 4) * 0.4, repeat: Infinity, ease: 'easeInOut' }
+                        : { duration: 1.1, delay: i * 0.02, ease: 'easeOut' }
+                    }
                   />
                 ))}
-              </svg>
+              </motion.svg>
 
               {/* the rock — trembles, cracks along its seams, then splits into chunks */}
               <motion.svg

@@ -156,8 +156,8 @@ export function PlatformShowcase() {
           data-artboard
           className={`relative flex bg-canvas p-7 ${
             active === 'mentor'
-              ? 'h-[440px] items-stretch pb-7 md:h-[480px]'
-              : 'min-h-[440px] items-center pb-20 md:min-h-[480px]'
+              ? 'h-[480px] items-stretch pb-7 md:h-[520px]'
+              : 'h-[480px] items-start pb-20 md:h-[520px]'
           }`}
         >
           <Confetti fireKey={fireKey} />
@@ -331,13 +331,16 @@ function TuneMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
   }
 
   return (
-    <div>
+    <div className="flex min-h-[360px] flex-col">
       <ModeHeader title="Тренажёр отступов" hint="Сделай gap и padding кратными 8pt" done={solved} />
 
-      {/* Selected frame with live Figma-style measurements */}
-      <div className="relative">
+      {/* Selected frame with live Figma-style measurements. The wrapper reserves a
+          fixed height and centres the frame, so growing padding/gap resizes the
+          frame in place instead of shifting everything below (and re-centring the
+          whole artboard) on every click. */}
+      <div className="relative flex h-[128px] items-center">
         <div
-          className={`relative rounded-xl border-2 bg-surface transition-base ${
+          className={`relative w-full rounded-xl border-2 bg-surface transition-base ${
             allOk ? 'border-success' : 'border-brand'
           }`}
           style={{ padding }}
@@ -357,39 +360,43 @@ function TuneMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
             />
           ))}
 
-          <div className="flex items-center" style={{ gap }}>
+          {/* padding label — pinned to the frame so it tracks the frame's edge */}
+          <span
+            className={`absolute right-2 top-2 rounded-[3px] px-1 text-[10px] font-semibold tabular-nums transition-base ${
+              padOk ? 'bg-success/15 text-success' : 'bg-brand/10 text-brand'
+            }`}
+          >
+            padding {padding}
+          </span>
+
+          <div className="relative flex items-center" style={{ gap }}>
             <div className="h-11 w-11 shrink-0 rounded-xl bg-brand/15" />
-            {/* gap measurement chip */}
-            <span
-              className={`flex min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums text-on-brand transition-base ${
-                gapOk ? 'bg-success' : 'bg-brand'
-              }`}
-              style={{ height: 14 }}
-            >
-              {gap}
-            </span>
+            {/* gap measurement chip — overlaid so it never adds width;
+               the visible spacing equals the real gap (0 = truly flush) */}
+            {gap > 0 && (
+              <span
+                className={`pointer-events-none absolute top-1/2 z-10 flex min-w-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums text-on-brand transition-base ${
+                  gapOk ? 'bg-success' : 'bg-brand'
+                }`}
+                style={{ height: 14, left: `calc(2.75rem + ${gap / 2}px)` }}
+              >
+                {gap}
+              </span>
+            )}
             <div className="flex flex-1 flex-col gap-1.5">
               <div className="h-2.5 w-full rounded-full bg-border-strong" />
               <div className="h-2.5 w-3/4 rounded-full bg-border" />
             </div>
           </div>
         </div>
-        {/* padding label */}
-        <span
-          className={`absolute right-2 top-2 rounded-[3px] px-1 text-[10px] font-semibold tabular-nums transition-base ${
-            padOk ? 'bg-success/15 text-success' : 'bg-brand/10 text-brand'
-          }`}
-        >
-          padding {padding}
-        </span>
       </div>
 
       {/* gap slider — design-system Slider (recolors green + celebrates on success) */}
-      <div className="mt-7">
+      <div className="mt-auto pt-7">
         <div className="mb-1 flex items-center justify-between">
           <span className="text-caption text-tertiary">gap</span>
           <span
-            className={`text-footnote font-semibold tabular-nums ${gapOk ? 'text-success' : 'text-primary'}`}
+            className={`min-w-[46px] text-right text-footnote font-semibold tabular-nums ${gapOk ? 'text-success' : 'text-primary'}`}
           >
             {gap}px
           </span>
@@ -568,7 +575,7 @@ function FixMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }) 
   }
 
   return (
-    <div>
+    <div className="flex min-h-[340px] flex-col">
       <ModeHeader title="Почини экран" hint="Две проблемы: контраст текста и размер кнопки" done={solved} />
 
       {/* live preview */}
@@ -586,7 +593,7 @@ function FixMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }) 
       </div>
 
       {/* action 1 — pick text color */}
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-auto flex items-center gap-3 pt-4">
         <span className="w-28 shrink-0 text-caption text-tertiary">цвет текста</span>
         <Seg
           value={textColor}
@@ -662,8 +669,15 @@ function BuildMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }
 
       {/* live preview */}
       <div className="rounded-xl border border-border bg-surface p-4">
-        <div className={`flex flex-col gap-2 ${align === 'center' ? 'items-center' : 'items-start'}`}>
-          <div className="rounded bg-border-strong transition-base" style={{ height: headH, width: '70%' }} />
+        <div
+          className={`flex flex-col gap-2 ${
+            align === 'left' ? 'items-start' : align === 'center' ? 'items-center' : 'items-end'
+          }`}
+        >
+          {/* fixed 18px slot so the taller heading (size L) never grows the card */}
+          <div className="flex h-[18px] items-center" style={{ width: '70%' }}>
+            <div className="w-full rounded bg-border-strong transition-base" style={{ height: headH }} />
+          </div>
           <div className="h-2 w-full rounded bg-border" />
           <div className="h-2 w-2/3 rounded bg-border" />
         </div>
@@ -769,13 +783,16 @@ function QuizMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
         })}
       </div>
 
-      {answered && (
-        <p className={`mt-3 text-caption ${QUIZ.options.find((o) => o.id === picked)?.ok ? 'text-success' : 'text-tertiary'}`}>
-          {QUIZ.options.find((o) => o.id === picked)?.ok
-            ? '✓ Верно — одна доминанта считывается быстрее, чем много равных акцентов'
-            : 'Почти — один явный акцент заметнее, чем несколько конкурирующих. Попробуй ещё'}
-        </p>
-      )}
+      {/* reserved slot (fits the 2-line feedback) so revealing it never nudges the card */}
+      <div className="mt-3 min-h-[40px]">
+        {answered && (
+          <p className={`text-caption ${QUIZ.options.find((o) => o.id === picked)?.ok ? 'text-success' : 'text-tertiary'}`}>
+            {QUIZ.options.find((o) => o.id === picked)?.ok
+              ? '✓ Верно — одна доминанта считывается быстрее, чем много равных акцентов'
+              : 'Почти — один явный акцент заметнее, чем несколько конкурирующих. Попробуй ещё'}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -783,9 +800,9 @@ function QuizMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
 /* ── mode: match — pair term ↔ value (`match`) ───────────────────────── */
 
 const PAIRS = [
-  { id: 'space', term: 'space-200', value: '8px' },
-  { id: 'radius', term: 'radius-lg', value: '16px' },
-  { id: 'text', term: 'text-secondary', value: 'приглушённый серый' },
+  { id: 'space-100', term: 'space-100', value: '4px' },
+  { id: 'space-300', term: 'space-300', value: '12px' },
+  { id: 'radius-lg', term: 'radius-lg', value: '16px' },
 ];
 
 function MatchMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }) {
@@ -1098,16 +1115,22 @@ function MentorProgressiveBlur({
   edge,
   height = 72,
   fill = false,
+  active = true,
 }: {
   edge: 'top' | 'bottom';
   height?: number;
   fill?: boolean;
+  /** When false the fade eases out instead of unmounting — no hard pop as the
+   * scroll reaches an edge. Always kept mounted so opacity can transition. */
+  active?: boolean;
 }) {
   const fadeDir = edge === 'top' ? 'to bottom' : 'to top';
   return (
     <div
       aria-hidden
-      className={`pointer-events-none absolute inset-x-0 z-10 ${edge === 'top' ? 'top-0' : 'bottom-0'}`}
+      className={`pointer-events-none absolute inset-x-0 z-10 transition-opacity duration-300 ${
+        edge === 'top' ? 'top-0' : 'bottom-0'
+      } ${active ? 'opacity-100' : 'opacity-0'}`}
       style={{ height }}
     >
       <BlurEffect position={edge} intensity={70} className="!h-full [pointer-events:none!important]" />
@@ -1289,7 +1312,7 @@ function MentorMode({ solved, onSolve }: { solved: boolean; onSolve: () => void 
         <div
           ref={scrollRef}
           onScroll={updateEdges}
-          className="slim-scroll flex h-full flex-col overflow-y-auto overscroll-contain pl-3 pr-1.5 pt-16 pb-24"
+          className="slim-scroll flex h-full flex-col overflow-y-auto overscroll-contain pl-3 pt-16 pb-24 -mr-4 pr-4"
         >
         {/* mt-auto keeps messages hugging the bottom (next to the composer)
             until they overflow, then it collapses and normal scrolling kicks in. */}
@@ -1330,10 +1353,20 @@ function MentorMode({ solved, onSolve }: { solved: boolean; onSolve: () => void 
         )}
         </div>
         </div>
+        {/* empty-state hint — centred in the free zone between the floating
+            header (top) and the chips + composer (bottom) so it never collides
+            with either. */}
+        {empty && (
+          <div className="pointer-events-none absolute inset-x-0 top-16 bottom-32 flex items-center justify-center px-6">
+            <p className="text-center text-caption text-tertiary">
+              Спроси о своём макете — например, «почему экран выглядит неаккуратно?»
+            </p>
+          </div>
+        )}
         {/* Taller top blur so messages fade out smoothly under the header
             instead of getting clipped by a hard line. */}
-        {edges.top && <MentorProgressiveBlur edge="top" height={96} />}
-        {edges.bottom && <MentorProgressiveBlur edge="bottom" height={96} />}
+        <MentorProgressiveBlur edge="top" height={96} fill active />
+        <MentorProgressiveBlur edge="bottom" height={96} active={edges.bottom} />
         {/* floating header: rendered late + explicit high z (inline — the lib's
             internal blur layers carry their own z, so a Tailwind z-* utility that
             resolves to `auto` here loses to them). Text stays sharp while messages
@@ -1498,29 +1531,30 @@ function ValidateMode({ solved, onSolve }: { solved: boolean; onSolve: () => voi
         })}
       </div>
 
-      {!running && (
-        <button
-          type="button"
-          onClick={run}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-caption font-medium text-on-brand transition-base hover:bg-brand-hover"
-        >
-          <ShieldCheck size={13} /> Запустить проверку
-        </button>
-      )}
+      {/* reserved slot so swapping button ↔ button ↔ success text never jumps the card */}
+      <div className="mt-3 flex min-h-[38px] items-center">
+        {!running && (
+          <button
+            type="button"
+            onClick={run}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-caption font-medium text-on-brand transition-base hover:bg-brand-hover"
+          >
+            <ShieldCheck size={13} /> Запустить проверку
+          </button>
+        )}
 
-      {running && doneScanning && !fixedWarn && (
-        <button
-          type="button"
-          onClick={fixWarning}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-warning bg-warning/10 px-3 py-2 text-caption font-medium text-warning transition-base hover:bg-warning/15"
-        >
-          <Plus size={13} /> Добавить воздух между блоками
-        </button>
-      )}
+        {running && doneScanning && !fixedWarn && (
+          <button
+            type="button"
+            onClick={fixWarning}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-warning bg-warning/10 px-3 py-2 text-caption font-medium text-warning transition-base hover:bg-warning/15"
+          >
+            <Plus size={13} /> Добавить воздух между блоками
+          </button>
+        )}
 
-      {fixedWarn && (
-        <p className="mt-3 text-caption text-success">✓ Все 4 проверки пройдены — макет чист</p>
-      )}
+        {fixedWarn && <p className="text-caption text-success">✓ Все 4 проверки пройдены — макет чист</p>}
+      </div>
     </div>
   );
 }

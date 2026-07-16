@@ -4,6 +4,7 @@ import { PlatformShowcase } from '@/components/marketing/PlatformShowcase';
 import { PlatformFeatures } from '@/components/marketing/PlatformFeatures';
 import { GradeTestPromo } from '@/components/marketing/GradeTestPromo';
 import { PricingPlans } from '@/components/marketing/PricingPlans';
+import { ForceLightTheme } from '@/components/marketing/ForceLightTheme';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic';
 export default function LandingPage() {
   return (
     <main className="mx-auto max-w-[980px] px-6 py-20 md:py-28">
+      <ForceLightTheme />
       {/* Hero — the beautiful centred statement */}
       <section className="text-center">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-caption font-medium text-secondary">

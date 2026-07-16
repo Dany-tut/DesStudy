@@ -117,6 +117,13 @@ model Learner {
   // Null until the learner introduces themselves; "letit prepodu" via /admin/results.
   name String?
 
+  // Contact — captured when the learner picks a tariff on the pricing screen
+  // ("оставить заявку"). `phone` is required at that point, `telegram` optional.
+  // These are how the curator reaches the lead; also pushed to the Telegram bot
+  // notification the moment the заявка is submitted.
+  phone    String?
+  telegram String?
+
   // Credentials — null until the learner claims a LOGIN invite. `email` is
   // unique so it can't collide across learner cards; staff Users live in a
   // separate table, so a person could in theory reuse an address there.
@@ -127,6 +134,13 @@ model Learner {
   // product choice for this teacher-provisioned platform — NOT a security best
   // practice (passwords should normally only ever be hashed).
   passwordPlain String?
+
+  // Set the moment a visitor clicks "Пройти тест на грейд" on the landing
+  // (before they answer anything). `testKey` is a short, human-readable code the
+  // system generates itself and surfaces to the teacher/admin so an unfinished
+  // test-taker shows up as "зашёл на тест"; `startedAt` marks when they entered.
+  testKey   String?   @unique
+  startedAt DateTime?
 
   // The teacher who tested/created this learner. Scopes the testing view +
   // results per teacher (BOSS sees all). SetNull keeps orphaned cards visible

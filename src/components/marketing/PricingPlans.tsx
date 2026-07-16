@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
+import { Check, ArrowRight, Loader2, CheckCircle2, X } from 'lucide-react';
 
 /**
  * Guest-facing tariff cards shown to a learner who finished the grading test but
@@ -60,19 +60,33 @@ export function PricingPlans() {
   const [selected, setSelected] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState(false);
+  // The contact modal collects phone (required) + telegram (optional) before the
+  // заявка goes out — that contact is how the curator reaches the lead.
+  const [contactOpen, setContactOpen] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [telegram, setTelegram] = useState('');
+
+  const selectedPlan = selected ? PLANS.find((p) => p.id === selected) ?? null : null;
+
+  function openContact() {
+    if (!selected) return;
+    setError(false);
+    setContactOpen(true);
+  }
 
   async function submit() {
-    if (!selected || status === 'sending') return;
+    if (!selected || status === 'sending' || !phone.trim()) return;
     setStatus('sending');
     setError(false);
     try {
       const res = await fetch('/api/application', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: selected }),
+        body: JSON.stringify({ plan: selected, phone: phone.trim(), telegram: telegram.trim() || undefined }),
       });
       if (!res.ok) throw new Error('failed');
       setStatus('sent');
+      setContactOpen(false);
     } catch {
       setError(true);
       setStatus('idle');
@@ -151,27 +165,18 @@ export function PricingPlans() {
                     tabIndex={0}
                     onClick={(e) => {
                       e.stopPropagation();
-                      submit();
+                      openContact();
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         e.stopPropagation();
-                        submit();
+                        openContact();
                       }
                     }}
-                    aria-disabled={status === 'sending'}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-transparent bg-brand px-4 py-2.5 text-footnote font-medium text-on-brand transition-base hover:bg-brand-hover"
                   >
-                    {status === 'sending' ? (
-                      <>
-                        <Loader2 size={15} className="animate-spin" /> Отправляем…
-                      </>
-                    ) : (
-                      <>
-                        Оставить заявку <ArrowRight size={15} />
-                      </>
-                    )}
+                    Оставить заявку <ArrowRight size={15} />
                   </span>
                 ) : (
                   <span className="inline-flex w-full items-center justify-center rounded-lg border border-dashed border-border px-4 py-2.5 text-footnote text-tertiary">
@@ -197,6 +202,92 @@ export function PricingPlans() {
         <p className="mt-6 text-center text-caption text-tertiary">
           Выберите тариф — заявка уйдёт куратору. Оплата и тарифы пока черновик.
         </p>
+      )}
+
+      {contactOpen && selectedPlan && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Оставить заявку"
+          onClick={() => status !== 'sending' && setContactOpen(false)}
+        >
+          <div
+            className="w-full max-w-[400px] rounded-2xl border border-border bg-surface p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-callout font-semibold text-primary">Оставить заявку</h3>
+                <p className="mt-1 text-footnote text-secondary">
+                  Тариф «{selectedPlan.name}» — куратор свяжется с вами.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setContactOpen(false)}
+                disabled={status === 'sending'}
+                aria-label="Закрыть"
+                className="rounded-lg p-1 text-tertiary transition-base hover:bg-hover hover:text-secondary"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form
+              className="mt-5 space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                submit();
+              }}
+            >
+              <label className="block">
+                <span className="text-footnote font-medium text-primary">Телефон</span>
+                <input
+                  type="tel"
+                  autoFocus
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+7 999 123-45-67"
+                  className="mt-1.5 w-full rounded-lg border border-border bg-canvas px-3 py-2.5 text-footnote text-primary outline-none transition-base placeholder:text-tertiary focus:border-brand"
+                />
+              </label>
+              <label className="block">
+                <span className="text-footnote font-medium text-primary">
+                  Telegram <span className="text-tertiary">— по желанию</span>
+                </span>
+                <input
+                  type="text"
+                  value={telegram}
+                  onChange={(e) => setTelegram(e.target.value)}
+                  placeholder="@username"
+                  className="mt-1.5 w-full rounded-lg border border-border bg-canvas px-3 py-2.5 text-footnote text-primary outline-none transition-base placeholder:text-tertiary focus:border-brand"
+                />
+              </label>
+
+              {error && (
+                <p className="text-footnote text-danger">Не удалось отправить. Попробуйте ещё раз.</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={status === 'sending' || !phone.trim()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-footnote font-medium text-on-brand transition-base hover:bg-brand-hover disabled:opacity-50"
+              >
+                {status === 'sending' ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" /> Отправляем…
+                  </>
+                ) : (
+                  <>
+                    Отправить заявку <ArrowRight size={15} />
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
       )}
     </section>
   );

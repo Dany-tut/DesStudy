@@ -89,7 +89,7 @@ export function LessonPageClient({
   }
 
   return (
-    <main className="mx-auto max-w-[1200px] px-8 py-12">
+    <main className="mx-auto max-w-[1200px] px-6 py-12 sm:px-10 lg:px-14">
       <AchievementReveal
         open={reveal}
         tone={gemTone}

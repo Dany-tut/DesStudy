@@ -63,6 +63,9 @@ export default async function TeacherTestingPage() {
       grade: latest?.grade ?? null,
       scores,
       takenAt: latest ? formatDate(latest.createdAt) : null,
+      testKey: l.testKey,
+      // Entered the test (has a key) but hasn't a completed assessment yet.
+      startedOnly: !!l.startedAt && !latest,
       enrolledCourseIds: l.enrollments.map((e) => e.courseId),
       application: app
         ? {
@@ -70,6 +73,8 @@ export default async function TeacherTestingPage() {
             planLabel: PLAN_LABEL[app.plan] ?? app.plan,
             status: app.status,
             at: formatDate(app.createdAt),
+            phone: l.phone,
+            telegram: l.telegram,
           }
         : null,
     };

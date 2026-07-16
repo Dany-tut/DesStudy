@@ -1,5 +1,5 @@
-import Link from 'next/link';
-import { ArrowRight, Target, Compass, LineChart } from 'lucide-react';
+import { Target, Compass, LineChart } from 'lucide-react';
+import { StartTestButton } from './StartTestButton';
 
 /**
  * Sells the entry grading test just above the pricing block. It's the funnel's
@@ -42,12 +42,7 @@ export function GradeTestPromo() {
               Прежде чем учиться — узнайте, где вы сейчас. Адаптивный тест определит уровень и построит
               маршрут под ваши слабые места.
             </p>
-            <Link
-              href="/assessment"
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-callout font-medium text-on-brand transition-base hover:bg-brand-hover"
-            >
-              Пройти тест на грейд <ArrowRight size={16} />
-            </Link>
+            <StartTestButton className="mt-6 inline-flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-callout font-medium text-on-brand transition-base hover:bg-brand-hover disabled:opacity-60" />
           </div>
 
           <div className="space-y-3">

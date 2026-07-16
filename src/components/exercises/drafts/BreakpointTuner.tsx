@@ -20,27 +20,25 @@ import { Slider } from '@/components/ui/Slider';
 
 const MIN = 320;
 const MAX = 960;
-const MEASURE = 640; // comfortable max line length for one column
-const TOL = 30; // how close counts as "found the breakpoint"
+const MEASURE = 640; // the breakpoint: past this, one column's line is too long
 
 export function BreakpointTuner() {
   const [width, setWidth] = useState(360);
 
-  // The learner tunes a SINGLE column and watches its text line grow toward a
-  // comfort guide. Solved when the line's end lands on the guide (±TOL). Past it
-  // the line is too long — that's exactly why one would break to 2 columns.
-  const solved = Math.abs(width - MEASURE) <= TOL;
-  const tooNarrow = width < MEASURE - TOL;
+  // A real breakpoint is a threshold, not a narrow trap: while the viewport is
+  // narrower than the comfortable measure it stays ONE column; at MEASURE and
+  // wider it becomes TWO columns and STAYS two as you keep widening. So "solved"
+  // is simply "you've reached (or passed) the breakpoint".
+  const twoCols = width >= MEASURE;
+  const solved = twoCols;
+  const tooNarrow = !twoCols;
 
-  // Everything is drawn proportional to MAX so the preview always fits its card
-  // (no fixed px width that could clip). The growing block is left-aligned and
-  // widens toward a FIXED comfort guide, so the "line overflows the measure"
-  // metaphor reads correctly instead of the guide hugging the block's edge.
-  const blockPct = (width / MAX) * 100; // block width, grows left→right
-  const guidePct = (MEASURE / MAX) * 100; // comfort guide — pinned in place
-
-  // How far the text line overshoots the comfort guide, as % of the column.
-  const overshoot = Math.max(0, ((width - MEASURE) / width) * 100);
+  // The viewport block grows left→right proportional to the width, so dragging
+  // gives real visual feedback. A comfort guide is pinned at the breakpoint; the
+  // block's right edge advances toward it and, once it reaches the guide, the
+  // single card splits into two columns that fill the (now wider) viewport.
+  const blockPct = (width / MAX) * 100; // viewport width, grows left→right
+  const guidePct = (MEASURE / MAX) * 100; // breakpoint guide — pinned in place
 
   return (
     <div className="w-full max-w-[640px] rounded-2xl border border-border bg-surface p-5">
@@ -76,21 +74,29 @@ export function BreakpointTuner() {
             block that grows left→right inside it. The empty area to its right is
             the room it still has to grow — so it reads as head-room, not a break. */}
         <div className="relative min-h-[132px]">
-          {/* Comfortable-measure guide (the reading limit) — pinned in place so
-              the block visibly grows toward it. Labelled so the empty right side
-              reads as "the limit you're growing toward", not dead space. */}
-          {!solved && (
-            <div
-              className="pointer-events-none absolute inset-y-0 z-10 flex flex-col items-start"
-              style={{ left: `${guidePct}%` }}
-              aria-hidden
+          {/* Breakpoint guide — pinned at MEASURE so the block visibly grows
+              toward it. Before the split it reads as "the limit you're growing
+              toward"; after the split it marks where the switch happened. */}
+          <div
+            className="pointer-events-none absolute inset-y-0 z-10 flex flex-col items-start"
+            style={{ left: `${guidePct}%` }}
+            aria-hidden
+          >
+            <span
+              className={[
+                '-ml-px whitespace-nowrap rounded-r-sm px-1.5 py-0.5 text-[10px] font-medium leading-none transition-base',
+                solved ? 'bg-success/15 text-success' : 'bg-muted text-tertiary',
+              ].join(' ')}
             >
-              <span className="-ml-px whitespace-nowrap rounded-r-sm bg-success/15 px-1.5 py-0.5 text-[10px] font-medium leading-none text-success">
-                предел читаемости
-              </span>
-              <div className="w-px flex-1 border-r border-dashed border-success/70" />
-            </div>
-          )}
+              {solved ? 'здесь разбили' : 'предел читаемости'}
+            </span>
+            <div
+              className={[
+                'w-px flex-1 border-r border-dashed transition-base',
+                solved ? 'border-success/70' : 'border-tertiary/50',
+              ].join(' ')}
+            />
+          </div>
           {/* Growing viewport — left-aligned, width proportional to the slider so
               it always fits the card and its right edge advances on the guide.
               Its own border + soft shadow make it read as a real resizable frame
@@ -102,21 +108,15 @@ export function BreakpointTuner() {
             ].join(' ')}
             style={{ width: `${blockPct}%` }}
           >
-            <div className={['grid gap-3', solved ? 'grid-cols-2' : 'grid-cols-1'].join(' ')}>
-              {Array.from({ length: 2 }).map((_, i) => (
+            {/* One column = ONE card; at the breakpoint it splits into TWO cards
+                side by side that fill the (wider) viewport. Each card's content
+                line spans its own column, so after the split every line is short
+                again — the whole reason to break to 2 columns. */}
+            <div className={['grid gap-3', twoCols ? 'grid-cols-2' : 'grid-cols-1'].join(' ')}>
+              {Array.from({ length: twoCols ? 2 : 1 }).map((_, i) => (
                 <div key={i} className="rounded-md bg-canvas p-2.5">
-                  <div className={['mb-2 h-3 rounded-sm bg-brand/60', solved ? 'w-1/2' : 'w-1/3'].join(' ')} />
-                  {/* The content line = full column width. While in one column, the
-                      part spilling past the comfort guide is tinted, so "too long"
-                      is literal. After the split each line is short again. */}
-                  <div className="relative h-2 w-full overflow-hidden rounded-sm bg-tertiary/30">
-                    {!solved && overshoot > 0 && (
-                      <div
-                        className="absolute inset-y-0 right-0 bg-warning/70"
-                        style={{ width: `${overshoot}%` }}
-                      />
-                    )}
-                  </div>
+                  <div className={['mb-2 h-3 rounded-sm bg-brand/60', twoCols ? 'w-1/2' : 'w-1/3'].join(' ')} />
+                  <div className="h-2 w-full rounded-sm bg-tertiary/30" />
                 </div>
               ))}
             </div>
@@ -145,10 +145,8 @@ export function BreakpointTuner() {
 
       <p className="mt-2 text-footnote text-secondary">
         {solved
-          ? `Здесь строка в одну колонку дошла до предела комфортной длины (≈${MEASURE}px). Дальше её лучше разбить на 2 колонки — так каждый элемент снова узкий и читаемый.`
-          : tooNarrow
-            ? 'Пока узко — одна колонка ещё читается спокойно. Тяни шире, пока строка не начнёт «переливаться» за пунктирную границу.'
-            : 'Уже широко — строка растянулась за границу комфорта (жёлтая зона). Именно поэтому здесь пора на 2 колонки; можно чуть назад, к точке перехода.'}
+          ? `На ${MEASURE}px и шире строка в одну колонку стала бы слишком длинной для чтения — поэтому здесь макет разбивается на 2 колонки, и каждый элемент снова узкий и читаемый. Это и есть breakpoint.`
+          : 'Пока узко — одна колонка читается спокойно. Тяни шире, к пунктирной границе: там строка дойдёт до предела и макет перестроится на 2 колонки.'}
       </p>
     </div>
   );

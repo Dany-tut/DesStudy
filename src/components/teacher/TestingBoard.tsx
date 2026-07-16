@@ -30,6 +30,10 @@ export interface StudentCard {
   grade: string | null;
   scores: Scores | null;
   takenAt: string | null;
+  /** Self-generated key stamped when the learner entered the test. */
+  testKey: string | null;
+  /** Entered the test but hasn't a completed result yet. */
+  startedOnly: boolean;
   enrolledCourseIds: string[];
   application: ApplicationInfo | null;
 }
@@ -109,6 +113,8 @@ export function TestingBoard({
             grade: null,
             scores: null,
             takenAt: null,
+            testKey: null,
+            startedOnly: false,
             enrolledCourseIds: [],
             application: null,
           },
@@ -268,11 +274,18 @@ function MiniCard({ student, onOpen }: { student: StudentCard; onOpen: () => voi
           <span className="capitalize text-brand">
             {GRADE_LABEL[student.grade as Grade] ?? student.grade}
           </span>
+        ) : student.startedOnly ? (
+          'зашёл на тест'
         ) : (
           'тест не пройден'
         )}
         {student.takenAt ? ` · ${student.takenAt}` : ''}
       </p>
+      {student.testKey && (
+        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-caption text-tertiary">
+          <KeyRound size={11} /> {student.testKey}
+        </span>
+      )}
       <span
         className={[
           'mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-caption',
