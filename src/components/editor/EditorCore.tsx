@@ -12,7 +12,7 @@ import type { CritiqueZone, DefectDelta } from '@/lib/curriculum/types';
 import { LayerTree, LayerContextMenu, CanvasContextMenu } from './LayerTree';
 import { PagesPanel } from './PagesPanel';
 import { StageCanvas } from './StageCanvas';
-import { EditorDock, type DockFace } from './EditorDock';
+import { EditorDock } from './EditorDock';
 import { PropertiesPanel } from './PropertiesPanel';
 import { type EditorStep } from './StepBar';
 import { ExerciseSetupPanel, ZoneEditor, Step4Access, type EditorDraft } from './EditorSteps';
@@ -291,14 +291,11 @@ export function EditorCore() {
   const clearRenameId = useCallback(() => setRenameId(null), []);
   const [dragging, setDragging] = useState(false);
   const [step, setStep] = useState<EditorStep>(1);
-  // Active canvas tool + which face the bottom dock shows. Interacting with the
-  // canvas flips the dock to tools; the dock's "droplet" flips it back to steps.
+  // Active canvas tool.
   const [tool, setTool] = useState<EditorTool>('move');
   // Scale mode (K): corner handles scale proportionally. Cleared by V / any other
   // tool. Only meaningful while `tool === 'move'`.
   const [scaleMode, setScaleMode] = useState(false);
-  const [dockFace, setDockFace] = useState<DockFace>('tools');
-  const showTools = useCallback(() => setDockFace('tools'), []);
   // Bumped to ask the canvas to refit the scene to the viewport.
   const [fitSignal, setFitSignal] = useState(0);
   const [draft, setDraft] = useState<EditorDraft>(EMPTY_DRAFT);
@@ -1350,14 +1347,12 @@ export function EditorCore() {
       if (e.key.toLowerCase() === 'k') {
         setTool('move');
         setScaleMode(true);
-        setDockFace('tools');
         return;
       }
       const t = keyTool[e.key.toLowerCase()];
       if (!t) return;
       setTool(t);
       setScaleMode(false);
-      setDockFace('tools');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -1675,7 +1670,6 @@ export function EditorCore() {
             onCreateRect={createRect}
             onCreateFrame={createFrame}
             onCreateText={createText}
-            onCanvasActivate={showTools}
             fitSignal={fitSignal}
             zoneIds={zoneIds}
             svgHostRef={svgHostRef}
@@ -1684,11 +1678,6 @@ export function EditorCore() {
           />
         )}
         <EditorDock
-          face={step === 2 ? 'steps' : dockFace}
-          onFace={setDockFace}
-          step={step}
-          onStep={setStep}
-          enabledThrough={2}
           tool={tool}
           onTool={({ tool: t, variant }) => {
             setTool(t);
@@ -1696,7 +1685,6 @@ export function EditorCore() {
             // tool switch. Unimplemented variants still select their parent tool
             // so the canvas falls back gracefully.
             setScaleMode(t === 'move' && variant === 'scale');
-            setDockFace('tools');
           }}
         />
       </section>

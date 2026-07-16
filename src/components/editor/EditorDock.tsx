@@ -171,7 +171,7 @@ export function EditorDock({
   // its own backdrop-blur samples the canvas (a nested backdrop-filter doesn't).
   const [menu, setMenu] = useState<{ id: EditorTool; left: number; top: number } | null>(null);
 
-  // Close the dropdown on outside click / Escape / face change. The portalled menu
+  // Close the dropdown on outside click / Escape. The portalled menu
   // lives outside dockRef, so its own subtree is whitelisted via `[data-tool-menu]`.
   const dockRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -342,61 +342,29 @@ export function EditorDock({
                       );
                     })}
                   </div>
-            </motion.div>
-
-            <motion.div
-              layout="position"
-              transition={{ type: 'spring', stiffness: 480, damping: 36 }}
-              aria-hidden={face !== 'steps'}
-              className={[
-                'flex shrink-0 items-center gap-1 whitespace-nowrap transition-[opacity] duration-150',
-                face === 'steps' ? 'opacity-100' : 'pointer-events-none absolute inset-1.5 opacity-0',
-              ].join(' ')}
-            >
-                  {STEPS.map((s) => {
-                    const active = s.id === step;
-                    const locked = s.id > enabledThrough;
-                    const Icon = s.icon;
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        disabled={locked}
-                        onClick={() => {
-                          onStep(s.id);
-                          onFace('tools');
-                        }}
-                        className={[
-                          'flex items-center gap-2 rounded-xl px-3 py-2 text-left transition-base',
-                          active
-                            ? 'bg-brand text-on-brand'
-                            : locked
-                              ? 'cursor-not-allowed text-tertiary/60'
-                              : 'text-secondary hover:bg-hover hover:text-primary',
-                        ].join(' ')}
-                      >
-                        <span
-                          className={[
-                            'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-caption font-semibold tabular-nums',
-                            active ? 'bg-white/20' : 'bg-hover',
-                          ].join(' ')}
-                        >
-                          {s.id}
-                        </span>
-                        <span className="hidden flex-col leading-tight sm:flex">
-                          <span className="text-footnote font-semibold">{s.label}</span>
-                          <span className={active ? 'text-caption text-on-brand/70' : 'text-caption text-tertiary'}>
-                            {s.hint}
-                          </span>
-                        </span>
-                        <Icon size={15} className="sm:hidden" />
-                      </button>
-                    );
-                  })}
-            </motion.div>
-        </motion.div>
+            </div>
         </div>
-      </LayoutGroup>
+
+        {/* Detached view-mode pill — static, decorative (no click, no animation),
+            hung off the toolbar's right edge and mirroring its glass shape. */}
+        <div className="glass pointer-events-none absolute left-full top-1/2 ml-2 flex -translate-y-1/2 items-center gap-1 rounded-2xl p-1.5 shadow-lg">
+          {VIEW_MODES.map((m) => {
+            const Icon = m.icon;
+            return (
+              <span
+                key={m.id}
+                title={m.label}
+                className={[
+                  'flex h-9 w-9 items-center justify-center rounded-xl',
+                  m.active ? 'bg-brand text-on-brand' : 'text-secondary',
+                ].join(' ')}
+              >
+                <Icon size={18} />
+              </span>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
