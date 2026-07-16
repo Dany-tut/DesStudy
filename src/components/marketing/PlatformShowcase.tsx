@@ -803,6 +803,8 @@ const PAIRS = [
   { id: 'space', term: 'space-200', value: '8px' },
   { id: 'font', term: 'font-size-body', value: '16px' },
   { id: 'color', term: 'color-fg-muted', value: 'приглушённый серый' },
+  { id: 'radius', term: 'radius-lg', value: '12px' },
+  { id: 'weight', term: 'font-weight-bold', value: '700' },
 ];
 
 function MatchMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }) {
