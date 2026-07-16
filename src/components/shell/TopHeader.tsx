@@ -26,7 +26,8 @@ export interface StaffHeader {
 
 interface NavItem {
   href: string;
-  label: string;
+  /** i18n key under the `nav` namespace. */
+  labelKey: string;
   icon: LucideIcon;
   /** Match only the exact path (for section roots that share a prefix). */
   exact?: boolean;
@@ -42,10 +43,10 @@ interface NavItem {
  * invites, school-wide analytics), which teachers never see.
  */
 const NAV: NavItem[] = [
-  { href: '/teacher', label: 'Группы', icon: Users, exact: true },
-  { href: '/teacher/testing', label: 'Тестирование', icon: ClipboardCheck },
-  { href: '/admin/editor', label: 'Уроки', icon: BookOpen },
-  { href: '/admin', label: 'Админ', icon: ShieldCheck, exact: true, only: 'BOSS' },
+  { href: '/teacher', labelKey: 'nav.groups', icon: Users, exact: true },
+  { href: '/teacher/testing', labelKey: 'nav.testing', icon: ClipboardCheck },
+  { href: '/admin/editor', labelKey: 'nav.lessons', icon: BookOpen },
+  { href: '/admin', labelKey: 'nav.admin', icon: ShieldCheck, exact: true, only: 'BOSS' },
 ];
 
 /** On the sign-in page the "Войти" CTA is redundant — hide just the button. */
@@ -96,13 +97,19 @@ export function TopHeader({ staff }: { staff?: StaffHeader | null }) {
                     }`}
                   >
                     <Icon size={16} strokeWidth={active ? 2.4 : 2} />
-                    {item.label}
+                    {t(item.labelKey)}
                   </Link>
                 );
               })}
             </nav>
 
-            <UserMenu user={{ name: staff.name, subtitle: staff.roleLabel }} align="end" />
+            <UserMenu
+              user={{
+                name: staff.name,
+                subtitle: t(staff.role === 'BOSS' ? 'nav.roleBoss' : 'nav.roleTeacher'),
+              }}
+              align="end"
+            />
           </>
         ) : (
           !hideCta && (

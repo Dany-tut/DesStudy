@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { requireBoss } from '@/lib/auth';
+import { getT } from '@/lib/i18n/server';
 import { AdminDashboard, type AdminData } from '@/components/admin/AdminDashboard';
 import type { InviteRow } from '@/components/admin/InvitesPanel';
 
@@ -13,6 +14,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function AdminPage() {
   await requireBoss();
+  const { t } = await getT();
 
   const [
     teacherCount,
@@ -105,10 +107,8 @@ export default async function AdminPage() {
   return (
     <main className="mx-auto max-w-[1200px] px-8 py-12">
       <div className="mb-8">
-        <h1 className="text-title1 font-bold text-primary">Админка</h1>
-        <p className="mt-1 text-footnote text-secondary">
-          Обзор по всей школе: пользователи, заявки, аналитика и ошибки.
-        </p>
+        <h1 className="text-title1 font-bold text-primary">{t('admin.pageTitle')}</h1>
+        <p className="mt-1 text-footnote text-secondary">{t('admin.pageSubtitle')}</p>
       </div>
       <AdminDashboard data={data} />
     </main>

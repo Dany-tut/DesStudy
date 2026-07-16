@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Copy, Check, Link2, Loader2, Plus } from 'lucide-react';
 import { copyText } from '@/lib/clipboard';
+import { useT } from '@/lib/i18n/client';
 
 export interface InviteRow {
   id: string;
@@ -21,6 +22,7 @@ function inviteUrl(token: string): string {
 
 /** BOSS-only: mint single-use teacher invite links and see their status. */
 export function InvitesPanel({ initial }: { initial: InviteRow[] }) {
+  const { t } = useT();
   const [rows, setRows] = useState<InviteRow[]>(initial);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -67,12 +69,12 @@ export function InvitesPanel({ initial }: { initial: InviteRow[] }) {
     <section className="rounded-xl border border-border bg-elevated p-5">
       <div className="mb-4 flex items-center gap-2">
         <Link2 size={16} className="text-brand" />
-        <h2 className="text-callout font-semibold text-primary">Пригласить преподавателя</h2>
+        <h2 className="text-callout font-semibold text-primary">{t('admin.inviteTitle')}</h2>
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-1 flex-col gap-1.5" style={{ minWidth: 220 }}>
-          <span className="text-caption text-tertiary">Email (необязательно — привяжет ссылку)</span>
+          <span className="text-caption text-tertiary">{t('admin.inviteEmailLabel')}</span>
           <input
             type="email"
             value={email}
@@ -88,7 +90,7 @@ export function InvitesPanel({ initial }: { initial: InviteRow[] }) {
           className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand transition-fast hover:opacity-90 disabled:opacity-50"
         >
           {loading ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-          Создать ссылку
+          {t('admin.inviteCreate')}
         </button>
       </div>
 
@@ -101,10 +103,12 @@ export function InvitesPanel({ initial }: { initial: InviteRow[] }) {
             >
               <div className="min-w-0">
                 <p className="truncate text-footnote text-primary">
-                  {r.email ?? 'Ссылка без привязки к email'}
+                  {r.email ?? t('admin.inviteNoEmail')}
                 </p>
                 <p className="text-caption text-tertiary">
-                  {r.used ? `Использована — ${r.usedByEmail ?? 'зарегистрирован'}` : 'Ожидает регистрации'}
+                  {r.used
+                    ? t('admin.inviteUsed', { who: r.usedByEmail ?? t('admin.inviteRegistered') })
+                    : t('admin.inviteWaiting')}
                 </p>
               </div>
               {!r.used && (
@@ -115,11 +119,11 @@ export function InvitesPanel({ initial }: { initial: InviteRow[] }) {
                 >
                   {copied === r.token ? (
                     <>
-                      <Check size={13} className="text-[#3FB950]" /> Скопировано
+                      <Check size={13} className="text-[#3FB950]" /> {t('admin.inviteCopied')}
                     </>
                   ) : (
                     <>
-                      <Copy size={13} /> Копировать ссылку
+                      <Copy size={13} /> {t('admin.inviteCopyLink')}
                     </>
                   )}
                 </button>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Sun, Moon, Check, Sparkles, ArrowRight, Lock } from 'lucide-react';
 import { space, radius, semanticColors } from '@/design/tokens';
+import { useT } from '@/lib/i18n/client';
 import { loadSettings, applySettings, saveSettings } from '@/lib/settings';
 import { Button } from '@/components/ui/Button';
 import { Stepper } from '@/components/ui/Stepper';
@@ -75,6 +76,7 @@ const DEMO_ORDER: OrderExercise = {
  * Everything here is rendered from tokens only. No magic numbers.
  */
 export default function DesignSystemPage() {
+  const { t } = useT();
   const [dark, setDark] = useState(false);
   const [gap, setGap] = useState(16);
   const [tune, setTune] = useState(24);
@@ -115,10 +117,9 @@ export default function DesignSystemPage() {
             <Sparkles size={14} className="text-brand" />
             PROJECT_BIBLE · Chapter 3
           </div>
-          <h1 className="text-display font-bold text-primary">Дизайн-система</h1>
+          <h1 className="text-display font-bold text-primary">{t('designSystem.pageTitle')}</h1>
           <p className="mt-3 max-w-[520px] text-callout text-secondary">
-            Конституция дизайна. Каждый размер, отступ, радиус, цвет и переход
-            берётся из токенов. Magic numbers невозможны.
+            {t('designSystem.pageSubtitle')}
           </p>
         </div>
         <button
@@ -136,10 +137,10 @@ export default function DesignSystemPage() {
           <p className="text-title1 font-semibold text-primary">Title 1 · 32</p>
           <p className="text-title2 font-semibold text-primary">Title 2 · 24</p>
           <p className="text-title3 font-medium text-primary">Title 3 · 20</p>
-          <p className="text-callout text-primary">Callout · 16 — основной интерфейсный текст.</p>
-          <p className="text-body text-secondary">Body · 15 — параграфы и описания.</p>
-          <p className="text-footnote text-tertiary">Footnote · 13 — вспомогательный.</p>
-          <p className="text-caption text-tertiary">Caption · 12 — метки и подписи.</p>
+          <p className="text-callout text-primary">{t('designSystem.typeCallout')}</p>
+          <p className="text-body text-secondary">{t('designSystem.typeBody')}</p>
+          <p className="text-footnote text-tertiary">{t('designSystem.typeFootnote')}</p>
+          <p className="text-caption text-tertiary">{t('designSystem.typeCaption')}</p>
         </div>
       </Section>
 
@@ -170,18 +171,16 @@ export default function DesignSystemPage() {
         </div>
       </Section>
 
-      <Section title="Отступы между блоками — вертикальный ритм">
+      <Section title={t('designSystem.spacingTitle')}>
         <p className="mb-5 max-w-[560px] text-body text-secondary">
-          Расстояние между блоками задаётся теми же токенами. Чем крупнее
-          смысловая граница, тем больше отступ: внутри группы — тесно, между
-          секциями — просторно.
+          {t('designSystem.spacingDesc')}
         </p>
         <div className="flex flex-col gap-6 sm:flex-row">
           {([
-            { token: '3', label: 'Внутри группы', hint: 'подпись под полем' },
-            { token: '4', label: 'Между полями', hint: 'соседние элементы' },
-            { token: '8', label: 'Между группами', hint: 'логические блоки' },
-            { token: '14', label: 'Между секциями', hint: 'крупные разделы' },
+            { token: '3', label: t('designSystem.spacingWithinGroup'), hint: t('designSystem.spacingHintCaption') },
+            { token: '4', label: t('designSystem.spacingBetweenFields'), hint: t('designSystem.spacingHintNeighbors') },
+            { token: '8', label: t('designSystem.spacingBetweenGroups'), hint: t('designSystem.spacingHintLogical') },
+            { token: '14', label: t('designSystem.spacingBetweenSections'), hint: t('designSystem.spacingHintLarge') },
           ] as const).map(({ token, label, hint }) => (
             <div key={token} className="flex-1 rounded-lg border border-border p-4">
               <div className="mb-3 flex items-baseline justify-between">
@@ -227,25 +226,25 @@ export default function DesignSystemPage() {
         </div>
       </Section>
 
-      <Section title="Кнопки">
+      <Section title={t('designSystem.buttonsTitle')}>
         <div className="flex flex-wrap items-center gap-4">
           <Button variant="primary" size="lg">
-            Начать урок <ArrowRight size={16} />
+            {t('designSystem.btnStartLesson')} <ArrowRight size={16} />
           </Button>
           <Button variant="secondary" size="lg">
-            Вторичная
+            {t('designSystem.btnSecondary')}
           </Button>
           <Button variant="success" size="lg">
-            <Check size={16} /> Пройдено
+            <Check size={16} /> {t('designSystem.btnCompleted')}
           </Button>
           <Button variant="danger" size="lg">
-            Сбросить
+            {t('designSystem.btnReset')}
           </Button>
           <Button variant="ghost" size="lg">
-            Пропустить
+            {t('designSystem.btnSkip')}
           </Button>
           <Button variant="primary" size="lg" disabled>
-            <Lock size={16} /> Заблокировано
+            <Lock size={16} /> {t('designSystem.btnLocked')}
           </Button>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -261,38 +260,38 @@ export default function DesignSystemPage() {
         </div>
       </Section>
 
-      <Section title="Степпер — точная настройка на 8pt-сетке">
+      <Section title={t('designSystem.stepperTitle')}>
         <div className="flex flex-wrap items-start gap-10">
           <div className="max-w-[280px]">
-            <Stepper label="Отступ между блоками" value={gap} min={0} max={64} step={4} onChange={setGap} />
+            <Stepper label={t('designSystem.stepperGapLabel')} value={gap} min={0} max={64} step={4} onChange={setGap} />
           </div>
-          <Stepper label="Внутренние поля" value={padding} min={0} max={48} step={4} variant="dots" onChange={setPadding} />
+          <Stepper label={t('designSystem.stepperPaddingLabel')} value={padding} min={0} max={48} step={4} variant="dots" onChange={setPadding} />
         </div>
       </Section>
 
-      <Section title="Ползунок — плавная настройка в диапазоне">
+      <Section title={t('designSystem.sliderTitle')}>
         <div className="max-w-[420px]">
           <Slider value={tune} min={0} max={64} step={2} unit="px" onChange={setTune} />
         </div>
       </Section>
 
-      <Section title="Сегментированный переключатель">
+      <Section title={t('designSystem.segmentedTitle')}>
         <SegmentedControl
           value={density}
           onChange={setDensity}
           options={[
-            { value: 'compact', label: 'Компактно' },
-            { value: 'cozy', label: 'Уютно' },
-            { value: 'roomy', label: 'Просторно' },
+            { value: 'compact', label: t('designSystem.densityCompact') },
+            { value: 'cozy', label: t('designSystem.densityCozy') },
+            { value: 'roomy', label: t('designSystem.densityRoomy') },
           ]}
         />
       </Section>
 
-      <Section title="Свитч">
-        <Switch checked={notifications} onChange={setNotifications} label="Уведомления о прогрессе" />
+      <Section title={t('designSystem.switchTitle')}>
+        <Switch checked={notifications} onChange={setNotifications} label={t('designSystem.switchLabel')} />
       </Section>
 
-      <Section title="Карточки выбора">
+      <Section title={t('designSystem.choiceTitle')}>
         <div className="grid gap-3 sm:grid-cols-2">
           <ChoiceCard label="flex-direction: column" selected={choice === 'flex'} onClick={() => setChoice('flex')} />
           <ChoiceCard label="display: grid" selected={choice === 'grid'} onClick={() => setChoice('grid')} />
@@ -306,22 +305,22 @@ export default function DesignSystemPage() {
         </div>
       </Section>
 
-      <Section title="Пикеры — иконки-плитки и сэмплы">
+      <Section title={t('designSystem.pickersTitle')}>
         <div className="flex flex-col gap-8">
           <div>
-            <p className="mb-3 text-footnote text-secondary">Выравнивание блока</p>
+            <p className="mb-3 text-footnote text-secondary">{t('designSystem.pickerAlignLabel')}</p>
             <TilePicker
               value={align}
               onChange={setAlign}
               options={[
-                { value: 'left', label: 'Слева', icon: AlignLeft },
-                { value: 'center', label: 'Центр', icon: AlignCenter },
-                { value: 'right', label: 'Справа', icon: AlignRight },
+                { value: 'left', label: t('designSystem.alignLeft'), icon: AlignLeft },
+                { value: 'center', label: t('designSystem.alignCenter'), icon: AlignCenter },
+                { value: 'right', label: t('designSystem.alignRight'), icon: AlignRight },
               ]}
             />
           </div>
           <div>
-            <p className="mb-3 text-footnote text-secondary">Какой пример верный?</p>
+            <p className="mb-3 text-footnote text-secondary">{t('designSystem.pickerWhichCorrect')}</p>
             <SwatchPicker
               value={sample}
               onChange={setSample}
@@ -339,126 +338,122 @@ export default function DesignSystemPage() {
       <div className="mb-8 mt-20 border-t border-border pt-10">
         <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-footnote text-brand">
           <Sparkles size={14} />
-          Кристаллы · геймификация
+          {t('designSystem.crystalsBadge')}
         </div>
         <p className="max-w-[600px] text-body text-secondary">
-          Наградные кристаллы: все огранки и состояния, как они выглядят в
-          «Достижениях» и в финале грейд-теста, и полная анимация появления —
-          камень раскалывается, и кристалл вырывается наружу.
+          {t('designSystem.crystalsDesc')}
         </p>
       </div>
 
-      <Section title="Кристаллы наград — варианты, контексты, анимация">
+      <Section title={t('designSystem.crystalsTitle')}>
         <CrystalShowcase />
       </Section>
 
       <div className="mb-8 mt-20 border-t border-border pt-10">
         <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-footnote text-brand">
           <Sparkles size={14} />
-          Новые типы интерактива · черновики
+          {t('designSystem.draftsBadge')}
         </div>
         <p className="max-w-[600px] text-body text-secondary">
-          Кандидаты новых механик для уроков. Все живые — потрогай и выбери, что
-          пойдём доводить до продакшена. Дизайн черновой, важна суть механики.
+          {t('designSystem.draftsDesc')}
         </p>
       </div>
 
-      <Section title="Bar-builder — собери нав/топ-бар как конструктор («bar-builder»)">
+      <Section title={t('designSystem.barBuilderTitle')}>
         <BarBuilder />
       </Section>
 
-      <Section title="Contrast — доведи цвет до WCAG («contrast»)">
+      <Section title={t('designSystem.contrastTitle')}>
         <ContrastTuner />
       </Section>
 
-      <Section title="Align — тащи к гайдам со снапом («align»)">
+      <Section title={t('designSystem.alignTitle')}>
         <AlignSnap />
       </Section>
 
-      <Section title="Match — соедини токен со значением («match»)">
+      <Section title={t('designSystem.matchTitle')}>
         <MatchPairs />
       </Section>
 
-      <Section title="Scale-ramp — собери типографическую шкалу («scale-ramp»)">
+      <Section title={t('designSystem.scaleRampTitle')}>
         <ScaleRamp />
       </Section>
 
-      <Section title="Hotspot — найди проблему на макете («hotspot»)">
+      <Section title={t('designSystem.hotspotTitle')}>
         <Hotspot />
       </Section>
 
-      <Section title="States — состояния компонента («states»)">
+      <Section title={t('designSystem.statesTitle')}>
         <StatesLab />
       </Section>
 
-      <Section title="Trim-zone — подрежь поле шрифта («trim-zone»)">
+      <Section title={t('designSystem.trimZoneTitle')}>
         <TrimZone label="Submit" targetTrim={9} maxTrim={18} value={trim} onChange={setTrim} />
       </Section>
 
-      <Section title="Nested-radius — концентричные скругления («nested-radius»)">
+      <Section title={t('designSystem.nestedRadiusTitle')}>
         <NestedRadius outerRadius={24} padding={8} maxRadius={24} value={innerRadius} onChange={setInnerRadius} />
       </Section>
 
-      <Section title="Fix-the-screen — почини сломанный макет («fix-screen»)">
+      <Section title={t('designSystem.fixScreenTitle')}>
         <FixTheScreen />
       </Section>
 
-      <Section title="Screen-walkthrough — послойный разбор экрана («screen-walkthrough»)">
+      <Section title={t('designSystem.screenWalkthroughTitle')}>
         <ScreenWalkthrough />
       </Section>
 
-      <Section title="Screen-critique — поставь диагноз сам («screen-critique»)">
+      <Section title={t('designSystem.screenCritiqueTitle')}>
         <ScreenCritique />
       </Section>
 
-      <Section title="Screen-critique · редактор критериев для учителя — полный редактор экрана (C)">
+      <Section title={t('designSystem.critiqueEditorTitle')}>
         <CritiqueEditorVariants />
       </Section>
 
-      <Section title="Spot-diff — найди несогласованность («spot-diff»)">
+      <Section title={t('designSystem.spotDiffTitle')}>
         <SpotDiff />
       </Section>
 
-      <Section title="Tap-target — дотяни кнопку до 44px («tap-target»)">
+      <Section title={t('designSystem.tapTargetTitle')}>
         <TapTarget />
       </Section>
 
-      <Section title="Easing-curve — собери кривую анимации («easing-curve»)">
+      <Section title={t('designSystem.easingCurveTitle')}>
         <EasingCurve />
       </Section>
 
-      <Section title="Focus-order — обход по Tab в верном порядке («focus-order»)">
+      <Section title={t('designSystem.focusOrderTitle')}>
         <FocusOrder />
       </Section>
 
-      <Section title="Button-hierarchy — расставь акценты действий («button-hierarchy»)">
+      <Section title={t('designSystem.buttonHierarchyTitle')}>
         <ButtonHierarchy />
       </Section>
 
-      <Section title="Breakpoint-triggers — почему возникают брейкпоинты (теория + 3 демки)">
+      <Section title={t('designSystem.breakpointTriggersTitle')}>
         <BreakpointTriggers />
       </Section>
 
-      <Section title="Breakpoint-tuner — поймай точку перехода раскладки («breakpoint-tuner»)">
+      <Section title={t('designSystem.breakpointTunerTitle')}>
         <BreakpointTuner />
       </Section>
 
-      <Section title="Grid-columns — собери сетку под цель («grid-columns»)">
+      <Section title={t('designSystem.gridColumnsTitle')}>
         <GridColumns />
       </Section>
 
       <div className="mb-8 mt-20 border-t border-border pt-10">
         <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-footnote text-brand">
           <Sparkles size={14} />
-          Интерактивы упражнений
+          {t('designSystem.exercisesBadge')}
         </div>
         <p className="max-w-[560px] text-body text-secondary">
-          Полноценные интерактивные поверхности, которые встречает ученик в
-          уроках. Все живые — можно потрогать прямо здесь.
+          {t('designSystem.exercisesDesc')}
         </p>
       </div>
 
-      <Section title="Build — холст auto-layout (тип «build»)">
+      <Section title={t('designSystem.buildTitle')}>
         <AutoLayoutCanvas
           exercise={DEMO_BUILD}
           value={build}
@@ -467,21 +462,21 @@ export default function DesignSystemPage() {
         />
       </Section>
 
-      <Section title="Order — перетаскивание по порядку (тип «order»)">
+      <Section title={t('designSystem.orderTitle')}>
         <OrderCanvas exercise={DEMO_ORDER} value={order} disabled={false} onChange={setOrder} />
       </Section>
 
-      <Section title="Tune · radius — тяни за угол (тип «tune», visual «radius»)">
+      <Section title={t('designSystem.tuneRadiusTitle')}>
         <div className="max-w-[420px]">
           <RadiusDragTune value={rad} min={0} max={60} onChange={setRad} />
         </div>
       </Section>
 
-      <Section title="Figma-link — сдача ссылки (тип «figma-link»)">
+      <Section title={t('designSystem.figmaLinkTitle')}>
         <FigmaLinkSubmit value={figma} disabled={false} onChange={setFigma} />
       </Section>
 
-      <Section title="File-upload — загрузка файла (тип «file-upload»)">
+      <Section title={t('designSystem.fileUploadTitle')}>
         <FileUploadZone
           lessonSlug="design-system"
           exerciseId="ds-upload"
@@ -493,12 +488,12 @@ export default function DesignSystemPage() {
         />
       </Section>
 
-      <Section title="Video — видео урока (YouTube / Vimeo / файл)">
+      <Section title={t('designSystem.videoTitle')}>
         <div className="max-w-[560px]">
           <VideoEmbed
             video={{
               url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-              caption: 'Пример встроенного видео урока',
+              caption: t('designSystem.videoCaption'),
               provider: 'youtube',
             }}
           />
