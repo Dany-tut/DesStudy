@@ -33,10 +33,8 @@ export default async function TeacherTestingPage() {
 
   // TEMP DIAGNOSTIC — surface the real server error on the page instead of the
   // opaque "server-side exception" digest. Remove once the root cause is known.
-  let learners: Awaited<ReturnType<typeof prisma.learner.findMany>>;
-  let courses: Awaited<ReturnType<typeof prisma.course.findMany>>;
-  try {
-    [learners, courses] = await Promise.all([
+  const fetchData = () =>
+    Promise.all([
       prisma.learner.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -49,6 +47,11 @@ export default async function TeacherTestingPage() {
       }),
       prisma.course.findMany({ orderBy: { title: 'asc' } }),
     ]);
+
+  let learners: Awaited<ReturnType<typeof fetchData>>[0];
+  let courses: Awaited<ReturnType<typeof fetchData>>[1];
+  try {
+    [learners, courses] = await fetchData();
   } catch (err) {
     return (
       <main className="mx-auto max-w-[900px] px-8 py-12">
