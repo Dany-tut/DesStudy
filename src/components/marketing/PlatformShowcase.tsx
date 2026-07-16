@@ -142,9 +142,9 @@ export function PlatformShowcase() {
 
       <div className="grid md:grid-cols-[210px_1fr_220px]">
         {/* Layers panel */}
-        <aside className="border-b border-border bg-surface px-3 py-4 md:border-b-0 md:border-r">
+        <aside className="border-b border-border bg-surface px-3 py-4 md:flex md:flex-col md:overflow-hidden md:border-b-0 md:border-r">
           <p className="px-2 pb-2 text-caption uppercase tracking-wider text-tertiary">Слои</p>
-          <div className="flex gap-1.5 overflow-x-auto md:flex-col md:gap-0.5">
+          <div className="slim-scroll flex gap-1.5 overflow-x-auto md:min-h-0 md:flex-1 md:flex-col md:gap-0.5 md:overflow-x-visible md:overflow-y-auto md:pr-1">
             {MODES.map((m) => {
               const isActive = active === m.id;
               const done = solved[m.id];
