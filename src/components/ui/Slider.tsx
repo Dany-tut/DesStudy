@@ -267,6 +267,47 @@ export function Slider({
   const [live, setLive] = useState(value);
   const draggingRef = useRef(false);
 
+  // --- step feedback: a light tick (haptic + subtle sound) each time the drag
+  // crosses a grid step, instead of magnetizing the thumb to the step position.
+  const audioRef = useRef<AudioContext | null>(null);
+  const lastStepRef = useRef<number | null>(null);
+  const stepFeedback = () => {
+    // Feel it more than hear it: a short buzzy pulse instead of a single tap.
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate([12, 8, 12]);
+    try {
+      const Ctx =
+        window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = audioRef.current ?? (audioRef.current = new Ctx());
+      if (ctx.state === 'suspended') void ctx.resume();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      // Low sine + a gentle downward glide reads as a soft "thud/buzz",
+      // not a bright click. Slower attack & longer tail = vibration-like.
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(150, now);
+      osc.frequency.exponentialRampToValueAtTime(90, now + 0.12);
+      // A subtle amplitude tremor gives the tone a physical "vibration" texture.
+      const lfo = ctx.createOscillator();
+      const lfoGain = ctx.createGain();
+      lfo.type = 'sine';
+      lfo.frequency.setValueAtTime(55, now);
+      lfoGain.gain.setValueAtTime(0.02, now);
+      lfo.connect(lfoGain).connect(gain.gain);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.07, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now);
+      lfo.start(now);
+      osc.stop(now + 0.16);
+      lfo.stop(now + 0.16);
+    } catch {
+      /* audio unavailable — haptic alone is fine */
+    }
+  };
+
   // --- pixel-accurate bubble position + inertial tilt ---
   const trackRef = useRef<HTMLDivElement>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
@@ -344,6 +385,7 @@ export function Slider({
     } else return;
     e.preventDefault();
     const next = snap(live + delta);
+    if (next !== snap(live)) stepFeedback();
     setLive(next);
     onChange(next);
   }
@@ -377,7 +419,7 @@ export function Slider({
           style={{ left: centerX, bottom: 'calc(100% + 10px)' }}
           aria-hidden
         >
-          <ValueBubble text={`${Math.round(live)}${unit}`} />
+          <ValueBubble text={`${snap(live)}${unit}`} />
         </div>
         <input
           type="range"
@@ -390,16 +432,25 @@ export function Slider({
           disabled={disabled}
           onPointerDown={() => {
             draggingRef.current = true;
+            lastStepRef.current = snap(live);
           }}
           onPointerUp={() => {
             draggingRef.current = false;
+            // No magnet — the thumb stays where released; we only emit the
+            // snapped grid value so validation sees exact steps.
             onChange(snap(live));
           }}
           onKeyDown={handleKeyDown}
           onChange={(e) => {
             const raw = Number(e.target.value);
             setLive(raw);
-            onChange(snap(raw));
+            const snapped = snap(raw);
+            // Tick once per crossed step during the drag.
+            if (draggingRef.current && snapped !== lastStepRef.current) {
+              lastStepRef.current = snapped;
+              stepFeedback();
+            }
+            onChange(snapped);
           }}
         />
       </div>

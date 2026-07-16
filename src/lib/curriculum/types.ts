@@ -218,6 +218,28 @@ export interface StatesExercise {
 }
 
 /**
+ * L1: catch a layout breakpoint by its *trigger*. The learner drags a virtual
+ * viewport width (min→max) and the preview reflows in place. Three variants,
+ * one per reason a breakpoint exists (see `./breakpoint` for the shared math):
+ *   - 'measure'   → land on the point where a text line gets too long and the
+ *                   column splits 1 → 2 (goal: the ±tol break band).
+ *   - 'min-width' → reach a target column count as cards keep a min width.
+ *   - 'fit'       → drive the nav to the target state (full row vs burger).
+ * The captured answer is the current width (px); validation derives the state.
+ */
+export interface BreakpointExercise {
+  id: string;
+  type: 'breakpoint';
+  prompt: string;
+  variant: 'measure' | 'min-width' | 'fit';
+  /** Target column count — required for `variant: 'min-width'`. */
+  targetColumns?: number;
+  /** Target nav state — required for `variant: 'fit'`. */
+  targetState?: 'row' | 'burger';
+  explanation: string;
+}
+
+/**
  * L1: click the problem area on a mockup. Validated by whether the click lands
  * inside the target zone (percentages of the mockup box). (Promoted from
  * the draft "Hotspot".)
@@ -483,6 +505,35 @@ export interface CritiqueFixOption {
   correct?: boolean;
 }
 
+/**
+ * A concrete, per-property difference between the эталон (reference) layer and
+ * its сломанный (flawed) twin — the fine-grained «что именно сломалось» that
+ * sits under the coarse `defect` tag. Authored on the flawed frame: the teacher
+ * duplicates the reference layer, breaks a property, and records the delta so
+ * the learner can be graded on the exact change (кегль/цвет/скругление/…).
+ */
+export type DefectProp =
+  | 'font'
+  | 'fontSize'
+  | 'fontWeight'
+  | 'lineHeight'
+  | 'color'
+  | 'fill'
+  | 'radius'
+  | 'padding'
+  | 'gap'
+  | 'size'
+  | 'position'
+  | 'opacity';
+
+export interface DefectDelta {
+  prop: DefectProp;
+  /** Correct value on the эталон (human-readable, e.g. "16px", "#6C5CE7"). */
+  was?: string;
+  /** Broken value on the сломанный twin. */
+  now?: string;
+}
+
 export interface CritiqueZone {
   id: string;
   /** Human label shown when the zone is selected, e.g. "Чипы карты". */
@@ -504,6 +555,12 @@ export interface CritiqueZone {
   // ── Reconstruction ──
   /** Candidate fixes (one `correct`). Omit for a clean zone. */
   fixes?: CritiqueFixOption[];
+  /**
+   * Fine-grained property changes vs. the эталон twin (кегль/цвет/скругление/…).
+   * Authored on a flawed frame; empty/undefined for a clean zone. Sits under the
+   * coarse `defect` tag and lets the player grade the exact broken property.
+   */
+  deltas?: DefectDelta[];
   /**
    * Bounding box in % of the screen (0..100), top-left → bottom-right. Used only
    * by the `image` scene to place the clickable overlay; DOM scenes ignore it.
@@ -571,6 +628,7 @@ export type Exercise =
   | SpotDiffExercise
   | TapTargetExercise
   | ScreenCritiqueExercise
+  | BreakpointExercise
   | FixScreenExercise;
 
 // ─────────────────────────────────────────────────────────────

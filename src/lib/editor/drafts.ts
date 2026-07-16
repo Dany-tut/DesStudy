@@ -8,11 +8,26 @@
 
 import type { ParseResult } from './types';
 import type { EditorDraft } from '@/components/editor/EditorSteps';
+import type { EditorPage, PageItem } from './pages';
 
 const KEY = 'desstudy.editor.drafts.v1';
 
-/** One saved file: the parsed screen + the authoring draft that rides on it. */
+/**
+ * One saved file: a set of pages (each its own canvas) plus optional dividers.
+ * `coverPageId` marks which page's render is the file's thumbnail. `activePageId`
+ * remembers which page was open so re-loading lands where you left off.
+ */
 export interface EditorDraftEntry {
+  id: string;
+  fileName: string;
+  items: PageItem[];
+  activePageId: string;
+  coverPageId: string | null;
+  updatedAt: number;
+}
+
+/** The pre-pages shape (single screen per file) — migrated on read. */
+interface LegacyDraftEntry {
   id: string;
   fileName: string;
   result: ParseResult;
@@ -20,12 +35,33 @@ export interface EditorDraftEntry {
   updatedAt: number;
 }
 
+/** Fold an old single-screen entry into a one-page draft. */
+function migrate(e: EditorDraftEntry | LegacyDraftEntry): EditorDraftEntry {
+  if ('items' in e && Array.isArray(e.items)) return e;
+  const legacy = e as LegacyDraftEntry;
+  const pageId = `${legacy.id}-p1`;
+  return {
+    id: legacy.id,
+    fileName: legacy.fileName,
+    items: [{ id: pageId, kind: 'page', name: 'Страница 1', result: legacy.result, draft: legacy.draft }],
+    activePageId: pageId,
+    coverPageId: pageId,
+    updatedAt: legacy.updatedAt,
+  };
+}
+
+/** The page marked as the file's Title/cover, else the first page (or null). */
+export function coverPageOf(entry: EditorDraftEntry): EditorPage | null {
+  const pages = entry.items.filter((i): i is EditorPage => i.kind === 'page');
+  return pages.find((p) => p.id === entry.coverPageId) ?? pages[0] ?? null;
+}
+
 function read(): EditorDraftEntry[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(KEY);
-    const arr = raw ? (JSON.parse(raw) as EditorDraftEntry[]) : [];
-    return Array.isArray(arr) ? arr : [];
+    const arr = raw ? (JSON.parse(raw) as (EditorDraftEntry | LegacyDraftEntry)[]) : [];
+    return Array.isArray(arr) ? arr.map(migrate) : [];
   } catch {
     return [];
   }

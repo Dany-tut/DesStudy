@@ -9,6 +9,7 @@ import type {
   CritiqueZone,
   CritiqueRoleId,
   CritiqueDefectId,
+  DefectProp,
 } from './types';
 
 export type Verdict = 'right' | 'debatable' | 'wrong';
@@ -48,6 +49,35 @@ export const CRITIQUE_DEFECTS: CritiqueDefect[] = [
 
 export const roleById = (id?: CritiqueRoleId) => CRITIQUE_ROLES.find((r) => r.id === id);
 export const defectById = (id?: CritiqueDefectId) => CRITIQUE_DEFECTS.find((d) => d.id === id);
+
+export interface DefectPropDef {
+  id: DefectProp;
+  label: string;
+  /** Unit hint shown as a placeholder in the было/стало inputs. */
+  unit?: string;
+}
+
+/**
+ * The concrete properties a defect can change between the эталон and its
+ * сломанный twin. Drives the per-delta property dropdown in the editor and,
+ * for the auto-diff, maps `Layer.props` keys onto human labels.
+ */
+export const DEFECT_PROPS: DefectPropDef[] = [
+  { id: 'font', label: 'Шрифт' },
+  { id: 'fontSize', label: 'Кегль', unit: 'px' },
+  { id: 'fontWeight', label: 'Начертание' },
+  { id: 'lineHeight', label: 'Межстрочный', unit: 'px' },
+  { id: 'color', label: 'Цвет текста' },
+  { id: 'fill', label: 'Цвет фона' },
+  { id: 'radius', label: 'Скругление', unit: 'px' },
+  { id: 'padding', label: 'Внутр. отступ', unit: 'px' },
+  { id: 'gap', label: 'Интервал', unit: 'px' },
+  { id: 'size', label: 'Размер', unit: 'px' },
+  { id: 'position', label: 'Положение', unit: 'px' },
+  { id: 'opacity', label: 'Прозрачность' },
+];
+
+export const defectPropById = (id?: DefectProp) => DEFECT_PROPS.find((p) => p.id === id);
 
 // ── Grading ────────────────────────────────────────────────────────────────
 
@@ -90,6 +120,31 @@ export const defectiveZones = (ex: ScreenCritiqueExercise) =>
 
 export const correctFixId = (zone: CritiqueZone) => zone.fixes?.find((f) => f.correct)?.id;
 
+/** Zones with teacher-authored per-property deltas (the «найди отличие» step). */
+export const deltaZones = (ex: ScreenCritiqueExercise) =>
+  ex.zones.filter((z) => z.deltas && z.deltas.length > 0);
+
+/** The set of properties actually changed in a zone (its ground truth). */
+export const deltaProps = (zone: CritiqueZone) =>
+  Array.from(new Set((zone.deltas ?? []).map((d) => d.prop)));
+
+/**
+ * Grade the learner's guess of WHICH properties are broken in a zone against
+ * its authored deltas. `right` — the picked set matches the truth exactly;
+ * `debatable` — some hits but incomplete or padded with misses; `wrong` — no
+ * overlap. Undefined when the zone has no deltas or nothing was picked.
+ */
+export function gradeDeltaProps(zone: CritiqueZone, picked: DefectProp[]): Verdict | undefined {
+  const truth = new Set(deltaProps(zone));
+  if (truth.size === 0 || !picked || picked.length === 0) return undefined;
+  const pickedSet = new Set(picked);
+  const hits = [...pickedSet].filter((p) => truth.has(p)).length;
+  const extras = [...pickedSet].filter((p) => !truth.has(p)).length;
+  if (hits === truth.size && extras === 0) return 'right';
+  if (hits > 0) return 'debatable';
+  return 'wrong';
+}
+
 // ── Learner answer ───────────────────────────────────────────────────────────
 
 export interface CritiqueAnswer {
@@ -99,6 +154,8 @@ export interface CritiqueAnswer {
   defects: Record<string, CritiqueDefectId[]>;
   /** zoneId → picked fix option id (reconstruction). */
   fixes: Record<string, string>;
+  /** zoneId → picked broken properties (the «найди отличие» step). */
+  props: Record<string, DefectProp[]>;
   /** zoneId → optional free-text note (AI-coached). */
   notes: Record<string, string>;
 }
@@ -107,6 +164,7 @@ export const emptyCritiqueAnswer = (): CritiqueAnswer => ({
   roles: {},
   defects: {},
   fixes: {},
+  props: {},
   notes: {},
 });
 
@@ -122,7 +180,9 @@ export function critiqueSolved(ex: ScreenCritiqueExercise, answer: CritiqueAnswe
     return picked !== undefined && gradeRole(z, picked) !== 'wrong';
   });
   const rebuiltOk = defectiveZones(ex).every((z) => answer.fixes[z.id] === correctFixId(z));
-  return rolesOk && rebuiltOk;
+  // Every zone with authored deltas must have its broken properties named exactly.
+  const deltasOk = deltaZones(ex).every((z) => gradeDeltaProps(z, answer.props[z.id] ?? []) === 'right');
+  return rolesOk && rebuiltOk && deltasOk;
 }
 
 /** How many defective zones the learner has already reconstructed correctly. */

@@ -95,6 +95,7 @@ const PATH_DEFS: PathDef[] = [
       { slug: 'micro-typography', emoji: '✍️' },
       { slug: 'grids-composition', emoji: '🔲', popular: true },
       { slug: 'responsive-layout', emoji: '📱' },
+      { slug: 'breakpoint-triggers', emoji: '📐' },
       { slug: 'nav-bars', emoji: '🧱' },
     ],
   },

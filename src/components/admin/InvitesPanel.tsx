@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Copy, Check, Link2, Loader2, Plus } from 'lucide-react';
+import { copyText } from '@/lib/clipboard';
 
 export interface InviteRow {
   id: string;
@@ -56,9 +57,10 @@ export function InvitesPanel({ initial }: { initial: InviteRow[] }) {
   }
 
   async function copy(token: string) {
-    await navigator.clipboard.writeText(inviteUrl(token));
-    setCopied(token);
-    setTimeout(() => setCopied((c) => (c === token ? null : c)), 1500);
+    if (await copyText(inviteUrl(token))) {
+      setCopied(token);
+      setTimeout(() => setCopied((c) => (c === token ? null : c)), 1500);
+    }
   }
 
   return (

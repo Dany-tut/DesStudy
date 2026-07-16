@@ -24,6 +24,7 @@ import {
   type CritiqueAnswer,
 } from './screenCritique';
 import { SPOT_ROUNDS } from './spotDiff';
+import { MEASURE, MEASURE_TOL, measureSolved, columnsForWidth, navState } from './breakpoint';
 
 /** Per-axis tolerance when matching an easing curve's control points. */
 export const EASING_TOL = 0.12;
@@ -314,6 +315,47 @@ export function validate(exercise: Exercise, answer: unknown): ValidationOutcome
           : width < exercise.targetWidth
             ? `Сейчас ${Math.round(width)}px — уже цели ${exercise.targetWidth}px. Потяни рамку шире.`
             : `Сейчас ${Math.round(width)}px — шире цели ${exercise.targetWidth}px. Сузь рамку.`,
+      };
+    }
+    case 'breakpoint': {
+      const width = Number(answer);
+      if (exercise.variant === 'measure') {
+        return {
+          correct: measureSolved(width),
+          explanation: exercise.explanation,
+          hint: measureSolved(width)
+            ? undefined
+            : width < MEASURE - MEASURE_TOL
+              ? `Сейчас ${Math.round(width)}px — строка ещё короткая. Тяни шире, пока она не перельётся за пунктир (~${MEASURE}px).`
+              : `Сейчас ${Math.round(width)}px — уже широко, строка перелилась. Вернись к точке перехода (~${MEASURE}px).`,
+        };
+      }
+      if (exercise.variant === 'min-width') {
+        const cols = columnsForWidth(width);
+        const target = exercise.targetColumns ?? 2;
+        return {
+          correct: cols === target,
+          explanation: exercise.explanation,
+          hint:
+            cols === target
+              ? undefined
+              : cols < target
+                ? `Сейчас ${cols} — колонок мало. Расширь экран, чтобы поместилось ${target}.`
+                : `Сейчас ${cols} — колонок слишком много. Сузь экран до ${target}.`,
+        };
+      }
+      // variant === 'fit'
+      const state = navState(width);
+      const target = exercise.targetState ?? 'burger';
+      return {
+        correct: state === target,
+        explanation: exercise.explanation,
+        hint:
+          state === target
+            ? undefined
+            : target === 'burger'
+              ? 'Меню ещё помещается в строку. Сузь экран, чтобы оно свернулось в бургер.'
+              : 'Сейчас бургер. Расширь экран, чтобы все пункты встали в строку.',
       };
     }
     case 'elevation': {

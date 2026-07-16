@@ -37,9 +37,11 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
             {invite!.learner!.name ? `${invite!.learner!.name}, создайте вход` : 'Создайте вход'}
           </h1>
           <p className="mt-1 text-footnote text-secondary">
-            Задайте email и пароль — по ним вы будете входить и видеть свои результаты.
+            {invite!.learner!.name
+              ? 'Задайте email и пароль — по ним вы будете входить и видеть свои результаты.'
+              : 'Укажите имя, email и пароль — по ним вы будете входить и видеть свои результаты.'}
           </p>
-          <LearnerRegisterForm token={token} />
+          <LearnerRegisterForm token={token} hasName={!!invite!.learner!.name} />
         </>
       )}
     </main>

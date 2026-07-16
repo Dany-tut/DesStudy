@@ -17,7 +17,7 @@ export const runtime = 'nodejs';
  * spent twice — same lock the staff register route uses.
  */
 export async function POST(req: NextRequest) {
-  let body: { token?: string; email?: string; password?: string };
+  let body: { token?: string; name?: string; email?: string; password?: string };
   try {
     body = await req.json();
   } catch {
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
   }
 
   const token = body.token?.trim();
+  const name = body.name?.trim() || null;
   const email = body.email?.trim().toLowerCase();
   const password = body.password ?? '';
 
@@ -63,7 +64,9 @@ export async function POST(req: NextRequest) {
         where: { id: learnerId },
         // passwordPlain is stored so the teacher can recover credentials for a
         // student in the admin — see the field comment in schema.prisma.
-        data: { email, passwordHash, passwordPlain: password },
+        // Name is set when the student typed one (blank card from a link
+        // invite); an existing name from a test card is left untouched.
+        data: { email, passwordHash, passwordPlain: password, ...(name ? { name } : {}) },
       });
     });
   } catch (e) {

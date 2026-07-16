@@ -72,10 +72,18 @@ export function CrystalGem({
   tone,
   locked = false,
   size = 96,
+  charge,
 }: {
   tone: GemTone;
   locked?: boolean;
   size?: number;
+  /**
+   * Optional 0..1 fill level. When provided (and unlocked), the stone reads as a
+   * vessel that charges from the bottom up: the portion below the rising liquid
+   * line glows in full colour, the un-charged portion above sits dim and empty.
+   * Omit for the classic always-vibrant gem.
+   */
+  charge?: number;
 }) {
   const p = locked ? LOCKED : PALETTES[tone];
   const t = PALETTES[tone]; // native colour, used to hint the locked "sleeping ore"
@@ -96,6 +104,29 @@ export function CrystalGem({
     setTilt({ x: -dy * 8, y: dx * 8 });
   };
   const onLeave = () => setTilt({ x: 0, y: 0 });
+
+  // hover embers — [cx, cy, r, driftX, driftY, delay]; they rise up and fan out
+  const SPARKS: [number, number, number, number, number, number][] = [
+    [44, 40, 1.7, -18, -40, 0],
+    [56, 44, 2, 22, -46, 0.12],
+    [50, 34, 1.5, 4, -54, 0.24],
+    [40, 52, 1.8, -26, -32, 0.36],
+    [60, 56, 1.6, 28, -34, 0.48],
+    [50, 60, 1.9, -6, -50, 0.6],
+    [46, 46, 1.4, -12, -58, 0.72],
+    [54, 38, 1.6, 14, -60, 0.84],
+    [50, 50, 2.1, 0, -66, 0.96],
+    [38, 44, 1.5, -30, -44, 1.08],
+  ];
+
+  // liquid charge line: the stone's body runs y≈6 (crown tip) → y≈90 (base).
+  // A charge of 0 leaves the line at the base; 1 lifts it to the crown.
+  const hasCharge = !locked && typeof charge === 'number';
+  const c = hasCharge ? Math.max(0, Math.min(1, charge as number)) : 1;
+  const fillY = 90 - c * (90 - 6);
+  // Glow, floor caustic and reflection track the charge: an empty stone gives off
+  // no coloured light, and the bloom grows as it fills.
+  const glowScale = hasCharge ? c : 1;
 
   const showBeam = !locked && rarity !== 'common';
   const showHalo = !locked && rarity === 'legendary';
@@ -120,6 +151,7 @@ export function CrystalGem({
       ref={wrapRef}
       onPointerMove={onMove}
       onPointerLeave={onLeave}
+      className="gem-wrap"
       style={{ perspective: '460px', display: 'inline-block', lineHeight: 0 }}
     >
       <svg
@@ -179,6 +211,13 @@ export function CrystalGem({
             <stop offset="0%" stopColor={p.glow} stopOpacity={locked ? 0 : 0.32} />
             <stop offset="100%" stopColor={p.glow} stopOpacity="0" />
           </linearGradient>
+          {/* liquid charge — a bright pool that reads as stored energy */}
+          <linearGradient id={`fill-${uid}`} x1="0.5" y1="0" x2="0.5" y2="1">
+            <stop offset="0%" stopColor={p.hi} stopOpacity="0.85" />
+            <stop offset="30%" stopColor={p.glow} stopOpacity="0.6" />
+            <stop offset="100%" stopColor={p.glow} stopOpacity="0.3" />
+          </linearGradient>
+
           <linearGradient id={`sweep-${uid}`} x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
             <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.9" />
@@ -205,31 +244,50 @@ export function CrystalGem({
             <feGaussianBlur stdDeviation="3.2" />
           </filter>
 
+          {/* soft blur so the ambient bloom melts at its edge instead of ending */}
+          <filter id={`bloom-${uid}`} x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="5" />
+          </filter>
+
           {/* clip everything interior to the stone's silhouette */}
           <clipPath id={`clip-${uid}`}>
             <polygon points="50,6 76,30 76,82 58,90 42,88 24,82 24,30" />
           </clipPath>
         </defs>
 
-        {/* ambient bloom */}
-        <circle cx="50" cy="44" r="48" fill={`url(#glow-${uid})`} />
+        {/* ambient bloom — breathes so the halo of light feels alive. Wrapped in a
+            group whose opacity tracks the charge (the animation drives the child's
+            own opacity, so the group multiplies over it). */}
+        <g opacity={glowScale} style={{ transition: 'opacity 0.6s ease' }}>
+          <circle
+            cx="50"
+            cy="44"
+            r="48"
+            fill={`url(#glow-${uid})`}
+            filter={`url(#bloom-${uid})`}
+            className={locked ? undefined : 'gem-glow'}
+            style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+          />
+        </g>
 
         {/* (3) coloured caustic pooled on the floor */}
         {!locked && (
-          <ellipse
-            cx="50"
-            cy="99"
-            rx="30"
-            ry="7"
-            fill={p.glow}
-            opacity="0.45"
-            filter={`url(#blur-${uid})`}
-            className="gem-core"
-          />
+          <g opacity={glowScale} style={{ transition: 'opacity 0.6s ease' }}>
+            <ellipse
+              cx="50"
+              cy="99"
+              rx="30"
+              ry="7"
+              fill={p.glow}
+              opacity="0.45"
+              filter={`url(#blur-${uid})`}
+              className="gem-core"
+            />
+          </g>
         )}
 
         {/* floor reflection — a faded, squashed echo of the stone */}
-        <g opacity={locked ? 0.18 : 0.4}>
+        <g opacity={locked ? 0.18 : 0.4 * glowScale}>
           <polygon points="42,92 58,92 54,104 46,104" fill={`url(#refl-${uid})`} />
           <ellipse cx="50" cy="98" rx="26" ry="5" fill={`url(#refl-${uid})`} />
         </g>
@@ -258,6 +316,13 @@ export function CrystalGem({
         <polygon points="42,36 58,36 58,90 42,88" fill={`url(#fFront-${uid})`} />
         <polygon points="58,36 76,30 76,82 58,90" fill={`url(#fRight-${uid})`} />
 
+        {/* charge — dim the un-charged portion above the liquid line */}
+        {hasCharge && c < 1 && (
+          <g clipPath={`url(#clip-${uid})`}>
+            <rect x="0" y="0" width="100" height={fillY} fill="#0B1220" opacity="0.6" />
+          </g>
+        )}
+
         {/* (6) sleeping ore — a faint breath of native colour under the lock */}
         {locked && (
           <g clipPath={`url(#clip-${uid})`}>
@@ -267,9 +332,38 @@ export function CrystalGem({
 
         {/* (1) internal glow core — screen-blended so it reads as light, not paint */}
         {!locked && (
-          <g clipPath={`url(#clip-${uid})`} style={{ mixBlendMode: 'screen' }}>
+          <g clipPath={`url(#clip-${uid})`} style={{ mixBlendMode: 'screen' }} opacity={glowScale}>
             <ellipse cx="50" cy="70" rx="24" ry="30" fill={`url(#core-${uid})`} className="gem-core" />
           </g>
+        )}
+
+        {/* charge — the bright liquid pool below the line, plus a glinting surface */}
+        {hasCharge && c > 0 && (
+          <>
+            <g clipPath={`url(#clip-${uid})`} style={{ mixBlendMode: 'screen' }}>
+              <rect
+                x="0"
+                y={fillY}
+                width="100"
+                height={90 - fillY}
+                fill={`url(#fill-${uid})`}
+                style={{ transition: 'y 0.6s cubic-bezier(0.2,0.7,0.3,1), height 0.6s cubic-bezier(0.2,0.7,0.3,1)' }}
+              />
+            </g>
+            {c < 1 && (
+              <g clipPath={`url(#clip-${uid})`}>
+                <rect
+                  x="0"
+                  y={fillY - 0.6}
+                  width="100"
+                  height="1.2"
+                  fill={p.hi}
+                  opacity="0.9"
+                  style={{ transition: 'y 0.6s cubic-bezier(0.2,0.7,0.3,1)' }}
+                />
+              </g>
+            )}
+          </>
         )}
 
         {/* (5) rotating light beam, clipped to the stone */}
@@ -346,6 +440,30 @@ export function CrystalGem({
               fill={`url(#sweep-${uid})`}
               transform="skewX(-14)"
             />
+          </g>
+        )}
+
+        {/* hover sparks — tiny embers that drift up and out of the stone */}
+        {!locked && (
+          <g fill={p.hi} className="gem-sparks">
+            {SPARKS.map(([cx, cy, r, dx, dy, delay], i) => (
+              <circle
+                key={i}
+                cx={cx}
+                cy={cy}
+                r={r}
+                className="gem-spark"
+                style={
+                  {
+                    '--sx': `${dx}px`,
+                    '--sy': `${dy}px`,
+                    animationDelay: `${delay}s`,
+                    transformBox: 'fill-box',
+                    transformOrigin: 'center',
+                  } as React.CSSProperties
+                }
+              />
+            ))}
           </g>
         )}
 

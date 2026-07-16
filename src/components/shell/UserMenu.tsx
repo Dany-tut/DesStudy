@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { LogOut, Settings, User, Sun, Moon } from 'lucide-react';
-import { useT } from '@/lib/i18n/client';
+import { useI18n } from '@/lib/i18n/client';
+import { LOCALES, LOCALE_NAMES } from '@/lib/i18n/config';
 import { loadSettings, saveSettings, applySettings, type ThemePref } from '@/lib/settings';
 
 export interface UserMenuUser {
@@ -43,7 +44,7 @@ export function UserMenu({
   /** Stretch the trigger to fill its container (sidebar footer). */
   full?: boolean;
 }) {
-  const { t } = useT();
+  const { t, locale, setLocale } = useI18n();
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<ThemePref>('light');
   const [busy, setBusy] = useState(false);
@@ -88,7 +89,7 @@ export function UserMenu({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`flex items-center gap-2.5 rounded-full p-0.5 pr-1 transition-base hover:bg-hover ${
+        className={`flex items-center gap-2.5 rounded-full p-0.5 pr-4 transition-base hover:bg-hover ${
           full ? 'w-full rounded-xl' : ''
         }`}
       >
@@ -110,8 +111,8 @@ export function UserMenu({
       {open && (
         <div
           role="menu"
-          className={`absolute z-50 w-64 overflow-hidden rounded-2xl border border-border bg-surface p-1.5 shadow-xl ${
-            openUp ? 'bottom-[calc(100%+8px)]' : 'top-[calc(100%+8px)]'
+          className={`absolute z-50 w-[16rem] overflow-hidden rounded-2xl border border-border bg-surface p-1.5 shadow-xl ${
+            openUp ? 'bottom-[calc(100%+4px)]' : 'top-[calc(100%-6px)]'
           } ${align === 'end' ? 'right-0' : 'left-0'}`}
         >
           <div className="flex items-center gap-3 px-2.5 py-2">
@@ -144,6 +145,17 @@ export function UserMenu({
             />
           </div>
 
+          <div className="mb-1.5 flex items-center gap-1 rounded-xl bg-muted p-1">
+            {LOCALES.map((loc) => (
+              <ThemeChip
+                key={loc}
+                active={locale === loc}
+                onClick={() => setLocale(loc)}
+                label={LOCALE_NAMES[loc]}
+              />
+            ))}
+          </div>
+
           <MenuLink href="/settings" icon={<User size={16} />} label={t('nav.profile')} onClick={() => setOpen(false)} />
           <MenuLink href="/settings" icon={<Settings size={16} />} label={t('nav.settings')} onClick={() => setOpen(false)} />
 
@@ -173,7 +185,7 @@ function ThemeChip({
 }: {
   active: boolean;
   onClick: () => void;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   label: string;
 }) {
   return (

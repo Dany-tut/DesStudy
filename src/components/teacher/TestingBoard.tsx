@@ -19,6 +19,7 @@ import {
   type CourseOption,
   type ApplicationInfo,
 } from '@/components/admin/LearnerResultCard';
+import { copyText } from '@/lib/clipboard';
 import { CATEGORIES, GRADE_LABEL, type Grade } from '@/lib/assessment/taxonomy';
 import { computeGrade, type Scores } from '@/lib/assessment/grade';
 
@@ -360,12 +361,9 @@ function DetailModal({
 function LinkModal({ link, onClose }: { link: LinkState; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
-    try {
-      await navigator.clipboard.writeText(link.url);
+    if (await copyText(link.url)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard blocked — the field is selectable as a fallback */
     }
   }
   return (

@@ -10,6 +10,11 @@
 
 export type LayerType = 'frame' | 'text' | 'block' | 'image' | 'vector';
 
+/** The active canvas tool. `move` = select/drag (default); the rest draw new
+ *  layers. Wired incrementally — `shape` and `text` draw today, the others are
+ *  selectable and fall back to move behaviour until their draw logic lands. */
+export type EditorTool = 'move' | 'frame' | 'shape' | 'pen' | 'text' | 'comment' | 'components';
+
 /** The subset of visual attributes surfaced in the properties panel. */
 export interface LayerProps {
   /** Corner radius (rect rx), in SVG user units. */
@@ -29,6 +34,22 @@ export interface LayerProps {
   /** Auto-layout flow inferred from children geometry — how the group arranges
    *  its immediate children. `none` = free/absolute (a plain group). */
   layout?: 'row' | 'column' | 'grid' | 'none';
+  /** Whether the frame/group clips its children to its own bounds (Figma's
+   *  "Clip content"). When true the canvas hides anything overflowing the frame
+   *  rather than letting the bounds grow to enclose it. */
+  clip?: boolean;
+  /** Whether this `frame`-typed node is a REAL frame (its own bounds, own clip)
+   *  vs a plain group. Every `<g>` parses to `type: 'frame'`, but only genuine
+   *  frames — an explicit auto-layout, or a group the teacher converted via
+   *  "group → frame" (framify, persisted as `data-frame` on the SVG) — get
+   *  frame-only affordances like "Clip content". A plain group has this unset,
+   *  matching Figma where groups have no clip toggle. */
+  frame?: boolean;
+  /** Role of a `frame` layer in a critique exercise, shown as an icon in the
+   *  on-canvas frame chrome. `reference` = эталон (the correct original),
+   *  `flawed` = косячный (the version with planted defects). Undefined = plain
+   *  frame. Only meaningful on `frame` layers; toggled by the teacher. */
+  frameRole?: 'reference' | 'flawed';
   /** Numeric bounding box when statically known (rect/image). Absolute
    *  positioning for highlights is computed at render time via the DOM, so this
    *  is best-effort metadata, not the source of truth for geometry. */

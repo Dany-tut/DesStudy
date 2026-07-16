@@ -21,8 +21,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
 
-  const name = body.name?.trim();
-  if (!name) return NextResponse.json({ error: 'missing_name' }, { status: 400 });
+  // Name is optional — for link invites the student sets their own name when
+  // they create their login, so the card starts blank.
+  const name = body.name?.trim() || null;
 
   const learner = await prisma.learner.create({
     data: { name, teacherId: user.id },

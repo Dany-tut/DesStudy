@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Plus, ExternalLink, Globe, Lock, Loader2, Check } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
+import type { Translator } from '@/lib/i18n/translator';
 import type { GroupView, LearnerOption } from './GroupsManager';
 
 export interface LessonView {
@@ -15,7 +17,8 @@ export interface LessonView {
   learnerIds: string[];
 }
 
-const learnerLabel = (l: LearnerOption) => l.name?.trim() || `Ученик ${l.id.slice(0, 6)}`;
+const learnerLabel = (l: LearnerOption, t: Translator['t']) =>
+  l.name?.trim() || t('teacher.learnerFallback', { id: l.id.slice(0, 6) });
 
 export function MyLessons({
   lessons,
@@ -26,6 +29,7 @@ export function MyLessons({
   groups: GroupView[];
   learners: LearnerOption[];
 }) {
+  const { t } = useT();
   const [rows, setRows] = useState(lessons);
 
   function patch(id: string, next: Partial<LessonView>) {
@@ -39,13 +43,13 @@ export function MyLessons({
           href="/admin"
           className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-caption font-medium text-on-brand transition-fast hover:opacity-90"
         >
-          <Plus size={14} /> Собрать урок
+          <Plus size={14} /> {t('teacher.buildLesson')}
         </Link>
       </div>
 
       {rows.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border bg-surface px-4 py-6 text-center text-footnote text-tertiary">
-          У тебя пока нет уроков. Нажми «Собрать урок».
+          {t('teacher.noLessons')}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -58,14 +62,14 @@ export function MyLessons({
   );
 }
 
-function accessSummary(l: LessonView, groups: GroupView[]): string {
-  if (l.access === 'PUBLIC') return 'Виден всем';
+function accessSummary(l: LessonView, t: Translator['t'], tp: Translator['tp']): string {
+  if (l.access === 'PUBLIC') return t('teacher.accessPublic');
   const g = l.groupIds.length;
   const s = l.learnerIds.length;
-  if (g === 0 && s === 0) return 'Никому (нет доступов)';
+  if (g === 0 && s === 0) return t('teacher.accessNobody');
   const parts: string[] = [];
-  if (g > 0) parts.push(`${g} ${g === 1 ? 'группа' : 'групп'}`);
-  if (s > 0) parts.push(`${s} ${s === 1 ? 'ученик' : 'учеников'}`);
+  if (g > 0) parts.push(tp('teacher.groupsCount', g));
+  if (s > 0) parts.push(tp('teacher.learnersCount', s));
   return parts.join(' · ');
 }
 
@@ -80,6 +84,7 @@ function LessonRow({
   learners: LearnerOption[];
   onChange: (next: Partial<LessonView>) => void;
 }) {
+  const { t, tp } = useT();
   const [open, setOpen] = useState(false);
   const restricted = lesson.access === 'RESTRICTED';
 
@@ -97,7 +102,7 @@ function LessonRow({
               lesson.published ? 'bg-[#3FB950]/10 text-[#3FB950]' : 'bg-border/60 text-tertiary',
             ].join(' ')}
           >
-            {lesson.published ? 'Опубликован' : 'Черновик'}
+            {lesson.published ? t('teacher.published') : t('teacher.draft')}
           </span>
           <button
             type="button"
@@ -108,13 +113,13 @@ function LessonRow({
             ].join(' ')}
           >
             {restricted ? <Lock size={12} /> : <Globe size={12} />}
-            {accessSummary(lesson, groups)}
+            {accessSummary(lesson, t, tp)}
           </button>
           <Link
             href={`/admin/lessons/${lesson.id}`}
             className="inline-flex items-center gap-1 text-caption font-medium text-secondary transition-fast hover:text-brand"
           >
-            Редактировать <ExternalLink size={12} />
+            {t('teacher.edit')} <ExternalLink size={12} />
           </Link>
         </div>
       </div>
@@ -145,6 +150,7 @@ function AccessEditor({
   learners: LearnerOption[];
   onSaved: (next: Partial<LessonView>) => void;
 }) {
+  const { t, tp } = useT();
   const [access, setAccess] = useState<LessonView['access']>(lesson.access);
   const [groupIds, setGroupIds] = useState<Set<string>>(new Set(lesson.groupIds));
   const [learnerIds, setLearnerIds] = useState<Set<string>>(new Set(lesson.learnerIds));
@@ -183,8 +189,8 @@ function AccessEditor({
       <div className="mb-3 inline-flex rounded-lg border border-border bg-surface p-0.5">
         {(
           [
-            { v: 'PUBLIC' as const, icon: Globe, label: 'Виден всем' },
-            { v: 'RESTRICTED' as const, icon: Lock, label: 'По доступу' },
+            { v: 'PUBLIC' as const, icon: Globe, label: t('teacher.accessPublic') },
+            { v: 'RESTRICTED' as const, icon: Lock, label: t('teacher.accessRestricted') },
           ]
         ).map(({ v, icon: Icon, label }) => (
           <button
@@ -204,15 +210,15 @@ function AccessEditor({
       {access === 'RESTRICTED' && (
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <p className="mb-1.5 text-caption font-medium text-secondary">Группы</p>
+            <p className="mb-1.5 text-caption font-medium text-secondary">{t('teacher.groupsHeader')}</p>
             {groups.length === 0 ? (
-              <p className="text-caption text-tertiary">Нет групп — создай ниже.</p>
+              <p className="text-caption text-tertiary">{t('teacher.noGroupsCreateBelow')}</p>
             ) : (
               <ul className="space-y-1">
                 {groups.map((g) => (
                   <CheckRow
                     key={g.id}
-                    label={`${g.name} · ${g.members.length} чел.`}
+                    label={`${g.name} · ${tp('teacher.membersCount', g.members.length)}`}
                     checked={groupIds.has(g.id)}
                     onToggle={() => toggle(groupIds, setGroupIds, g.id)}
                   />
@@ -221,15 +227,15 @@ function AccessEditor({
             )}
           </div>
           <div>
-            <p className="mb-1.5 text-caption font-medium text-secondary">Отдельные ученики</p>
+            <p className="mb-1.5 text-caption font-medium text-secondary">{t('teacher.separateLearners')}</p>
             {learners.length === 0 ? (
-              <p className="text-caption text-tertiary">Учеников пока нет.</p>
+              <p className="text-caption text-tertiary">{t('teacher.noLearnersYet')}</p>
             ) : (
               <ul className="max-h-40 space-y-1 overflow-y-auto pr-1">
                 {learners.map((l) => (
                   <CheckRow
                     key={l.id}
-                    label={learnerLabel(l)}
+                    label={learnerLabel(l, t)}
                     checked={learnerIds.has(l.id)}
                     onToggle={() => toggle(learnerIds, setLearnerIds, l.id)}
                   />
@@ -248,7 +254,7 @@ function AccessEditor({
           className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-caption font-medium text-on-brand transition-fast hover:opacity-90 disabled:opacity-50"
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-          Сохранить доступ
+          {t('teacher.saveAccess')}
         </button>
       </div>
     </div>

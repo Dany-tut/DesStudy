@@ -3,14 +3,18 @@
 import { useMemo, useState } from 'react';
 import { Check, CircleHelp, Lightbulb, RotateCcw, Tag, Sparkles, Loader2, Wrench } from 'lucide-react';
 import type { ScreenCritiqueExercise as ScreenCritiqueExerciseType } from '@/lib/curriculum/types';
-import type { CritiqueRoleId, CritiqueDefectId } from '@/lib/curriculum/types';
+import type { CritiqueRoleId, CritiqueDefectId, DefectProp } from '@/lib/curriculum/types';
 import {
   CRITIQUE_ROLES,
   CRITIQUE_DEFECTS,
+  DEFECT_PROPS,
+  defectPropById,
   roleById,
   defectById,
   gradeRole,
   gradeDefects,
+  gradeDeltaProps,
+  deltaProps,
   worseVerdict,
   correctFixId,
   defectiveZones,
@@ -85,19 +89,22 @@ export function ScreenCritiqueExercise({
   const solved = critiqueSolved(exercise, answer);
   const rebuilt = rebuiltCount(exercise, answer);
   const defectedIds = Object.keys(answer.defects).filter((id) => (answer.defects[id]?.length ?? 0) > 0);
-  const diagnosedCount = new Set([...Object.keys(answer.roles), ...defectedIds]).size;
+  const propIds = Object.keys(answer.props).filter((id) => (answer.props[id]?.length ?? 0) > 0);
+  const diagnosedCount = new Set([...Object.keys(answer.roles), ...defectedIds, ...propIds]).size;
 
   // Per-zone verdicts, computed only after "Проверить".
   const verdicts = useMemo(() => {
-    if (!checked) return {} as Record<string, { role?: Verdict; defect?: Verdict; worst?: Verdict }>;
-    const out: Record<string, { role?: Verdict; defect?: Verdict; worst?: Verdict }> = {};
+    if (!checked) return {} as Record<string, { role?: Verdict; defect?: Verdict; diff?: Verdict; worst?: Verdict }>;
+    const out: Record<string, { role?: Verdict; defect?: Verdict; diff?: Verdict; worst?: Verdict }> = {};
     zones.forEach((z) => {
       const role = answer.roles[z.id] ? gradeRole(z, answer.roles[z.id]) : undefined;
       const defect = gradeDefects(z, answer.defects[z.id] ?? []);
-      if (role || defect) out[z.id] = { role, defect, worst: worseVerdict(role, defect) };
+      // A zone with authored deltas is always graded on them (missing pick = wrong).
+      const diff = z.deltas && z.deltas.length > 0 ? (gradeDeltaProps(z, answer.props[z.id] ?? []) ?? 'wrong') : undefined;
+      if (role || defect || diff) out[z.id] = { role, defect, diff, worst: worseVerdict(worseVerdict(role, defect), diff) };
     });
     return out;
-  }, [checked, zones, answer.roles, answer.defects]);
+  }, [checked, zones, answer.roles, answer.defects, answer.props]);
 
   const worstByZone = useMemo(() => {
     const m: Record<string, Verdict | undefined> = {};
@@ -125,6 +132,14 @@ export function ScreenCritiqueExercise({
     });
   const setFix = (fixId: string) =>
     selected && setAnswer((a) => ({ ...a, fixes: { ...a.fixes, [selected]: fixId } }));
+  // Toggle a broken-property guess in/out of the zone's «найди отличие» set.
+  const toggleProp = (prop: DefectProp) =>
+    selected &&
+    setAnswer((a) => {
+      const cur = a.props[selected] ?? [];
+      const next = cur.includes(prop) ? cur.filter((p) => p !== prop) : [...cur, prop];
+      return { ...a, props: { ...a.props, [selected]: next } };
+    });
   const setNote = (note: string) =>
     selected && setAnswer((a) => ({ ...a, notes: { ...a.notes, [selected]: note } }));
 
@@ -194,7 +209,7 @@ export function ScreenCritiqueExercise({
   }
 
   const summary = useMemo(() => {
-    const vals = Object.values(verdicts).flatMap((v) => [v.role, v.defect].filter(Boolean) as Verdict[]);
+    const vals = Object.values(verdicts).flatMap((v) => [v.role, v.defect, v.diff].filter(Boolean) as Verdict[]);
     return {
       right: vals.filter((v) => v === 'right').length,
       debatable: vals.filter((v) => v === 'debatable').length,
@@ -318,6 +333,43 @@ export function ScreenCritiqueExercise({
                       })}
                     </div>
                   </div>
+
+                  {/* Найди отличие — which properties changed vs. the эталон */}
+                  {sel.deltas && sel.deltas.length > 0 && (
+                    <div className="mt-4 border-t border-border pt-4">
+                      <p className="mb-3 text-caption text-tertiary">
+                        {t('exercises.critiqueExercise.diffQuestion')} <span className="text-tertiary/70">{t('exercises.critiqueExercise.defectMulti')}</span>
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {DEFECT_PROPS.map((p) => {
+                          const active = (answer.props[sel.id] ?? []).includes(p.id);
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => toggleProp(p.id)}
+                              aria-pressed={active}
+                              className={[
+                                'flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-footnote font-medium transition-fast',
+                                active ? 'border-brand bg-brand/10 text-brand' : 'border-border bg-surface text-primary hover:border-brand/40',
+                              ].join(' ')}
+                            >
+                              <span
+                                className={[
+                                  'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-fast',
+                                  active ? 'border-brand bg-brand text-on-brand' : 'border-border',
+                                ].join(' ')}
+                                aria-hidden
+                              >
+                                {active && <Check size={11} strokeWidth={3} />}
+                              </span>
+                              {p.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Reconstruct */}
                   {sel.fixes && sel.fixes.length > 0 && (
@@ -518,6 +570,34 @@ export function ScreenCritiqueExercise({
                             )}
                           </p>
                           {vd.defect !== 'right' && <p className="mt-0.5 text-footnote text-secondary">{z.defectNote}</p>}
+                        </div>
+                      )}
+
+                      {vd.diff && z.deltas && z.deltas.length > 0 && (
+                        <div className="mb-1.5">
+                          <p className="text-caption text-tertiary">
+                            <span className={['font-medium', VERDICT_UI[vd.diff].text].join(' ')}>{verdictLabel(vd.diff)}</span>{' '}
+                            · {t('exercises.critiqueExercise.diffColon')}{' '}
+                            <span className="text-secondary">
+                              {(answer.props[z.id] ?? []).map((p) => defectPropById(p)?.label).filter(Boolean).join(', ') || '—'}
+                            </span>
+                          </p>
+                          {vd.diff !== 'right' && (
+                            <p className="mt-0.5 text-footnote text-secondary">
+                              {t('exercises.critiqueExercise.diffActually')}{' '}
+                              {deltaProps(z).map((p) => defectPropById(p)?.label).filter(Boolean).join(', ')}
+                            </p>
+                          )}
+                          <ul className="mt-1.5 flex flex-col gap-1">
+                            {z.deltas.map((d, i) => (
+                              <li key={i} className="flex items-center gap-1.5 text-caption">
+                                <span className="min-w-[92px] font-medium text-primary">{defectPropById(d.prop)?.label ?? d.prop}</span>
+                                <span className="text-[#3FB950]">{d.was || '—'}</span>
+                                <span className="text-tertiary">→</span>
+                                <span className="text-[#E0785F]">{d.now || '—'}</span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       )}
 

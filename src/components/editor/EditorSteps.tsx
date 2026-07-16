@@ -1,9 +1,9 @@
 'use client';
 
 import { useRef } from 'react';
-import { UploadCloud, Trash2, Target, Check, Lock, Globe, FileText, Send, GitCompare, Crop, Wrench } from 'lucide-react';
-import { CRITIQUE_ROLES, CRITIQUE_DEFECTS } from '@/lib/curriculum/screenCritique';
-import type { CritiqueZone, CritiqueRoleId, CritiqueDefectId } from '@/lib/curriculum/types';
+import { UploadCloud, Trash2, Target, Check, Lock, Globe, FileText, Send, GitCompare, Crop, Wrench, Plus, GitCompareArrows } from 'lucide-react';
+import { CRITIQUE_ROLES, CRITIQUE_DEFECTS, DEFECT_PROPS } from '@/lib/curriculum/screenCritique';
+import type { CritiqueZone, CritiqueRoleId, CritiqueDefectId, DefectDelta, DefectProp } from '@/lib/curriculum/types';
 import type { Layer } from '@/lib/editor/types';
 
 export type ExerciseKind = 'critique' | 'spot-diff' | 'fix-screen';
@@ -26,153 +26,115 @@ const KINDS: { id: ExerciseKind; label: string; hint: string; icon: typeof GitCo
   { id: 'fix-screen', label: 'Почини экран', hint: 'из сломанного собрать правильный', icon: Wrench },
 ];
 
-/* ─────────────────────────── Step 2 — two variants ─────────────────────────── */
+/* ───────────────── Unified editor — exercise-type + broken variant ───────────────── */
 
-export function Step2Variants({
+/**
+ * Compact setup shown at the top of the merged editor's right panel (when no
+ * layer is selected): pick the exercise type, and — for spot-diff / fix-screen
+ * — attach the intentionally-broken variant. Эталон/косячный roles are now set
+ * per-frame on the canvas, so this only carries the exercise kind and the
+ * optional legacy broken-SVG upload.
+ */
+export function ExerciseSetupPanel({
   draft,
-  referenceSvg,
-  width,
-  height,
   onKind,
   onBroken,
 }: {
   draft: EditorDraft;
-  referenceSvg: string;
-  width: number;
-  height: number;
   onKind: (k: ExerciseKind) => void;
   onBroken: (svg: string | undefined) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const needsBroken = draft.kind !== 'critique';
-
   return (
-    <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-6 overflow-y-auto p-8 pb-24">
-      <div>
-        <p className="text-callout font-semibold text-primary">Тип задания</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          {KINDS.map((k) => {
-            const active = draft.kind === k.id;
-            const Icon = k.icon;
-            return (
-              <button
-                key={k.id}
-                type="button"
-                onClick={() => onKind(k.id)}
-                className={[
-                  'flex flex-col gap-1.5 rounded-xl border p-3 text-left transition-base',
-                  active ? 'border-brand bg-brand/5' : 'border-border bg-surface hover:border-brand/40',
-                ].join(' ')}
-              >
-                <Icon size={18} className={active ? 'text-brand' : 'text-tertiary'} />
-                <span className="text-footnote font-semibold text-primary">{k.label}</span>
-                <span className="text-caption text-tertiary">{k.hint}</span>
-              </button>
-            );
-          })}
-        </div>
+    <div className="flex flex-col gap-3 px-1">
+      <p className="text-caption font-medium uppercase tracking-wide text-tertiary">Тип задания</p>
+      <div className="flex flex-col gap-1.5">
+        {KINDS.map((k) => {
+          const active = draft.kind === k.id;
+          const Icon = k.icon;
+          return (
+            <button
+              key={k.id}
+              type="button"
+              onClick={() => onKind(k.id)}
+              className={[
+                'flex items-start gap-2 rounded-lg border p-2 text-left transition-base',
+                active ? 'border-brand bg-brand/5' : 'border-border bg-surface hover:border-brand/40',
+              ].join(' ')}
+            >
+              <Icon size={15} className={active ? 'mt-0.5 text-brand' : 'mt-0.5 text-tertiary'} />
+              <span className="flex min-w-0 flex-col">
+                <span className="text-caption font-semibold text-primary">{k.label}</span>
+                <span className="text-caption leading-tight text-tertiary">{k.hint}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      <div>
-        <p className="text-callout font-semibold text-primary">
-          {needsBroken ? 'Эталон и сломанный вариант' : 'Эталонный экран'}
-        </p>
-        <p className="mt-0.5 text-caption text-tertiary">
-          {needsBroken
-            ? 'Слева — «ровный» экран (импортированный). Справа загрузи «кривой» — с намеренными дефектами.'
-            : 'Для критики достаточно одного экрана — дефекты отметишь на шаге 3.'}
-        </p>
-        <div className={['mt-3 grid gap-3', needsBroken ? 'sm:grid-cols-2' : ''].join(' ')}>
-          <Preview svg={referenceSvg} width={width} height={height} label="Эталон · ровный" tone="ok" />
-          {needsBroken &&
-            (draft.brokenSvg ? (
-              <Preview
-                svg={draft.brokenSvg}
-                width={width}
-                height={height}
-                label="Сломанный · кривой"
-                tone="broken"
-                onClear={() => onBroken(undefined)}
-              />
-            ) : (
+      {needsBroken && (
+        <>
+          <p className="mt-1 text-caption font-medium uppercase tracking-wide text-tertiary">Сломанный вариант</p>
+          {draft.brokenSvg ? (
+            <div className="flex items-center justify-between rounded-lg border border-border bg-surface px-2.5 py-2">
+              <span className="flex items-center gap-1.5 text-caption text-secondary">
+                <span className="h-2 w-2 rounded-full bg-warning" /> Загружен
+              </span>
               <button
                 type="button"
-                onClick={() => fileRef.current?.click()}
-                className="flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-surface text-center transition-base hover:border-brand/40"
+                onClick={() => onBroken(undefined)}
+                className="text-tertiary transition-fast hover:text-danger"
+                title="Убрать"
               >
-                <UploadCloud size={22} className="text-brand" />
-                <span className="text-footnote font-medium text-primary">Загрузить сломанный SVG</span>
-                <span className="text-caption text-tertiary">экспорт из Figma с дефектами</span>
+                <Trash2 size={13} />
               </button>
-            ))}
-        </div>
-      </div>
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".svg,image/svg+xml"
-        className="hidden"
-        onChange={async (e) => {
-          const f = e.target.files?.[0];
-          if (f) onBroken(await f.text());
-          e.target.value = '';
-        }}
-      />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border bg-surface py-4 text-center transition-base hover:border-brand/40"
+            >
+              <UploadCloud size={18} className="text-brand" />
+              <span className="text-caption font-medium text-primary">Загрузить «кривой» SVG</span>
+            </button>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".svg,image/svg+xml"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (f) onBroken(await f.text());
+              e.target.value = '';
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }
 
-function Preview({
-  svg,
-  width,
-  height,
-  label,
-  tone,
-  onClear,
-}: {
-  svg: string;
-  width: number;
-  height: number;
-  label: string;
-  tone: 'ok' | 'broken';
-  onClear?: () => void;
-}) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-border bg-canvas">
-      <div className="flex items-center justify-between border-b border-border bg-elevated px-3 py-1.5">
-        <span className="flex items-center gap-1.5 text-caption font-medium text-secondary">
-          <span className={['h-2 w-2 rounded-full', tone === 'ok' ? 'bg-[#3FB950]' : 'bg-warning'].join(' ')} />
-          {label}
-        </span>
-        {onClear && (
-          <button type="button" onClick={onClear} className="text-tertiary hover:text-danger" title="Убрать">
-            <Trash2 size={13} />
-          </button>
-        )}
-      </div>
-      <div className="canvas-grid flex items-center justify-center p-4">
-        <div
-          className="max-h-[300px] w-auto shadow-md [&>svg]:h-auto [&>svg]:max-h-[280px] [&>svg]:w-auto"
-          style={{ aspectRatio: `${width} / ${height}` }}
-          dangerouslySetInnerHTML={{ __html: svg }}
-        />
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────── Step 3 — zone editor ─────────────────────────── */
+/* ─────────────────────────── Unified editor — zone editor ─────────────────────────── */
 
 export function ZoneEditor({
   layer,
   zone,
+  autoDeltas,
   onAdd,
   onRemove,
   onPatch,
 }: {
   layer: Layer;
   zone?: CritiqueZone;
+  /**
+   * Property diffs auto-detected against the эталон twin (undefined when the
+   * layer isn't inside a flawed frame or there's no matching reference layer).
+   * An empty array means «paired, but nothing differs».
+   */
+  autoDeltas?: DefectDelta[];
   onAdd: () => void;
   onRemove: () => void;
   onPatch: (patch: Partial<CritiqueZone>) => void;
@@ -246,6 +208,12 @@ export function ZoneEditor({
             />
           </label>
 
+          <DeltaEditor
+            deltas={zone.deltas ?? []}
+            autoDeltas={autoDeltas}
+            onChange={(deltas) => onPatch({ deltas })}
+          />
+
           <button
             type="button"
             onClick={onRemove}
@@ -255,6 +223,99 @@ export function ZoneEditor({
           </button>
         </>
       )}
+    </div>
+  );
+}
+
+/* ───────────── Per-property defect deltas (эталон → сломанный) ───────────── */
+
+/**
+ * Records the concrete property changes vs. the эталон twin. Each row is a
+ * property + было/стало pair. «Заполнить из эталона» pre-fills rows from the
+ * auto-diff (when the layer is paired with a reference layer).
+ */
+function DeltaEditor({
+  deltas,
+  autoDeltas,
+  onChange,
+}: {
+  deltas: DefectDelta[];
+  autoDeltas?: DefectDelta[];
+  onChange: (deltas: DefectDelta[]) => void;
+}) {
+  const patchAt = (i: number, patch: Partial<DefectDelta>) =>
+    onChange(deltas.map((d, j) => (j === i ? { ...d, ...patch } : d)));
+  const removeAt = (i: number) => onChange(deltas.filter((_, j) => j !== i));
+  const add = () => onChange([...deltas, { prop: 'fontSize', was: '', now: '' }]);
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-border pt-3">
+      <div className="flex items-center justify-between">
+        <span className="text-caption font-medium uppercase tracking-wide text-tertiary">Что сломано</span>
+        {autoDeltas && autoDeltas.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange(autoDeltas)}
+            title="Сравнить с эталоном и подставить отличия"
+            className="flex items-center gap-1 text-caption font-medium text-brand transition-fast hover:text-brand-hover"
+          >
+            <GitCompareArrows size={12} /> Из эталона
+          </button>
+        )}
+      </div>
+
+      {autoDeltas && autoDeltas.length === 0 && deltas.length === 0 && (
+        <p className="text-caption leading-tight text-tertiary">Слой совпадает с эталоном — отличий нет.</p>
+      )}
+
+      {deltas.map((d, i) => (
+        <div key={i} className="flex flex-col gap-1 rounded-lg border border-border bg-surface p-2">
+          <div className="flex items-center gap-1.5">
+            <select
+              value={d.prop}
+              onChange={(e) => patchAt(i, { prop: e.target.value as DefectProp })}
+              className="min-w-0 flex-1 rounded-md border border-border bg-canvas px-2 py-1 text-caption text-primary"
+            >
+              {DEFECT_PROPS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => removeAt(i)}
+              className="shrink-0 rounded p-1 text-tertiary transition-fast hover:text-danger"
+              title="Убрать отличие"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              value={d.was ?? ''}
+              onChange={(e) => patchAt(i, { was: e.target.value })}
+              placeholder="эталон"
+              className="min-w-0 flex-1 rounded-md border border-success/40 bg-canvas px-2 py-1 text-caption text-primary"
+            />
+            <span className="shrink-0 text-caption text-tertiary">→</span>
+            <input
+              value={d.now ?? ''}
+              onChange={(e) => patchAt(i, { now: e.target.value })}
+              placeholder="сломано"
+              className="min-w-0 flex-1 rounded-md border border-warning/50 bg-canvas px-2 py-1 text-caption text-primary"
+            />
+          </div>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={add}
+        className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-1.5 text-caption font-medium text-secondary transition-fast hover:border-brand/40 hover:text-primary"
+      >
+        <Plus size={13} /> Добавить отличие
+      </button>
     </div>
   );
 }
@@ -323,6 +384,7 @@ export function Step4Access({
         <ul className="space-y-1 text-caption text-secondary">
           <li>Тип: <b className="text-primary">{KINDS.find((k) => k.id === draft.kind)?.label}</b></li>
           <li>Зон критики: <b className="text-primary">{zoneCount}</b></li>
+          <li>Отмечено отличий: <b className="text-primary">{draft.zones.reduce((n, z) => n + (z.deltas?.length ?? 0), 0)}</b></li>
           <li>Сломанный вариант: <b className="text-primary">{draft.brokenSvg ? 'есть' : 'нет'}</b></li>
           <li>Доступ: <b className="text-primary">{restricted ? 'ограниченный' : 'публичный'}</b></li>
         </ul>

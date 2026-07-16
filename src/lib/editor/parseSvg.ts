@@ -84,6 +84,18 @@ function extractProps(el: Element, tag: string): LayerProps {
   const op = num(attrOrStyle(el, 'opacity'));
   if (op != null && op < 1) props.opacity = op;
 
+  // A group/frame carrying a clip-path reads as "clip content" enabled.
+  const clipped = !!(el.getAttribute('clip-path') || attrOrStyle(el, 'clip-path'));
+  if (clipped) props.clip = true;
+
+  // A real frame (own bounds/clip) vs a plain group. A `<g>` is a frame when it
+  // was created via "group → frame" (`data-frame`) OR already clips its content
+  // (a clip-path) — Figma imports a clipped group as a frame. Only frames get the
+  // clip toggle; plain groups don't, matching Figma.
+  if ((tag === 'g' || tag === 'svg') && (el.getAttribute('data-frame') || clipped)) {
+    props.frame = true;
+  }
+
   if (tag === 'rect') {
     props.radius = num(el.getAttribute('rx')) ?? num(el.getAttribute('ry'));
     if (fill && fill !== 'none') props.fill = fill;

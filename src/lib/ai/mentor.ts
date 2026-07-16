@@ -278,6 +278,79 @@ export async function coachFix(input: FixInput): Promise<FixReply> {
   }
 }
 
+// ── Landing chat coach ───────────────────────────────────────────────────────
+// The mentor chat on the marketing landing: a visitor types a free-form question
+// about design and gets a short *coaching* reply. Uses a light, fast model
+// (Haiku 4.5) — this is a teaser, not the full lesson mentor. Falls back to a
+// canned guiding question when no API key is set, so the demo never breaks.
+
+const CHAT_SYSTEM = `Ты — AI-ментор платформы DesStudy, где учатся UI/UX-дизайну на практике.
+
+Твоя роль: КОУЧ. Ты реально помогаешь — объясняешь принцип и даёшь конкретное направление, но не делаешь работу за человека.
+
+Правила:
+- Дай по существу вопроса пользу СРАЗУ: назови принцип, приём или ориентир, который двигает человека вперёд. Можно привести конкретные значения/примеры как ориентир (напр. шкала отступов 4/8/16). Не отвечай одним лишь встречным вопросом.
+- Единственное, что ты НЕ делаешь, — не выполняешь за человека конкретное задание из урока целиком (не «вот финальный ответ, копируй»). Во всём остальном будь максимально полезным.
+- Если вопрос слишком общий и без деталей на него не ответить — дай короткий полезный ориентир И одним вопросом уточни контекст. Не начинай ответ с вопроса.
+- Будь конкретным, тёплым и лаконичным: 2–4 коротких предложения, без воды и преамбулы.
+- Это чат: пиши обычным текстом сплошными предложениями. Без markdown — никаких звёздочек, **жирного**, заголовков, нумерованных и маркированных списков.
+- Голос платформы: спокойный, профессиональный, ободряющий. Не сюсюкай.
+- Если вопрос не про дизайн — мягко верни к теме дизайна/интерфейсов.
+- Отвечай на русском.`;
+
+/** Offline fallback — a generic guiding question (never solves it for them). */
+function chatFallback(): { reply: string; offline: true } {
+  return {
+    reply:
+      'Хороший вопрос. Прежде чем подсказать — что ты уже пробовал и какой результат смущает сильнее всего? Давай начнём оттуда.',
+    offline: true,
+  };
+}
+
+export async function coachChat(
+  message: string,
+  history: { role: 'user' | 'assistant'; content: string }[] = [],
+): Promise<{ reply: string; offline?: boolean }> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) return chatFallback();
+
+  // We call the proxy with a plain fetch rather than the SDK, for two reasons:
+  //  1. Auth — the proxy expects `Authorization: Bearer`, not Anthropic's
+  //     `x-api-key` (which returns a wrapped 401).
+  //  2. WAF — the proxy 403s ("request was blocked") on the SDK's telemetry
+  //     headers/User-Agent. A minimal fetch with only the required headers gets
+  //     through cleanly.
+  // Base URL from a dedicated var (default: the proxy) so a global
+  // ANTHROPIC_BASE_URL pointing at api.anthropic.com can't shadow it.
+  const base = process.env.MENTOR_BASE_URL || 'https://api.kie.ai/claude';
+
+  try {
+    const res = await fetch(`${base}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        system: CHAT_SYSTEM,
+        messages: [...history.slice(-6), { role: 'user', content: message }],
+      }),
+    });
+
+    const data = (await res.json()) as {
+      content?: { type: string; text?: string }[];
+    };
+    const text = data.content?.find((b) => b.type === 'text');
+    if (text?.text?.trim()) return { reply: text.text.trim() };
+    return chatFallback();
+  } catch {
+    return chatFallback();
+  }
+}
+
 export async function coach(input: MentorInput): Promise<MentorReply> {
   if (!process.env.ANTHROPIC_API_KEY) return fallback(input);
 

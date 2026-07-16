@@ -6,7 +6,6 @@ import { prisma } from '@/lib/db';
 import { RadarChart } from '@/components/assessment/RadarChart';
 import { CATEGORIES, GRADE_LABEL, type Grade } from '@/lib/assessment/taxonomy';
 import { computeGrade, SALARY_BANDS, type Scores } from '@/lib/assessment/grade';
-import { SignOutButton } from '@/components/auth/SignOutButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,12 +36,9 @@ export default async function StudentHome() {
 
   return (
     <main className="mx-auto max-w-[900px] px-6 py-12">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-footnote text-tertiary">С возвращением</p>
-          <h1 className="text-title1 font-bold text-primary">{learner.name ?? 'Ученик'}</h1>
-        </div>
-        <SignOutButton />
+      <div>
+        <p className="text-footnote text-tertiary">С возвращением</p>
+        <h1 className="text-title1 font-bold text-primary">{learner.name ?? 'Ученик'}</h1>
       </div>
 
       {result && scores ? (

@@ -32,6 +32,13 @@ export function BreakpointTuner() {
   const solved = Math.abs(width - MEASURE) <= TOL;
   const tooNarrow = width < MEASURE - TOL;
 
+  // Everything is drawn proportional to MAX so the preview always fits its card
+  // (no fixed px width that could clip). The growing block is left-aligned and
+  // widens toward a FIXED comfort guide, so the "line overflows the measure"
+  // metaphor reads correctly instead of the guide hugging the block's edge.
+  const blockPct = (width / MAX) * 100; // block width, grows left→right
+  const guidePct = (MEASURE / MAX) * 100; // comfort guide — pinned in place
+
   // How far the text line overshoots the comfort guide, as % of the column.
   const overshoot = Math.max(0, ((width - MEASURE) / width) * 100);
 
@@ -65,33 +72,54 @@ export function BreakpointTuner() {
           solved ? 'border-success/30 bg-success/10' : 'border-border bg-canvas',
         ].join(' ')}
       >
-        <div className="relative mx-auto" style={{ width }}>
-          {/* Comfortable-measure guide (the reading limit) — only meaningful
-              while we're still in one column, tuning the line up to it. */}
+        {/* The whole card is the "canvas"; the viewport is a distinctly-framed
+            block that grows left→right inside it. The empty area to its right is
+            the room it still has to grow — so it reads as head-room, not a break. */}
+        <div className="relative min-h-[132px]">
+          {/* Comfortable-measure guide (the reading limit) — pinned in place so
+              the block visibly grows toward it. Labelled so the empty right side
+              reads as "the limit you're growing toward", not dead space. */}
           {!solved && (
             <div
-              className="pointer-events-none absolute inset-y-0 z-10 border-r border-dashed border-success/70"
-              style={{ left: Math.min(width, MEASURE) }}
+              className="pointer-events-none absolute inset-y-0 z-10 flex flex-col items-start"
+              style={{ left: `${guidePct}%` }}
               aria-hidden
-            />
+            >
+              <span className="-ml-px whitespace-nowrap rounded-r-sm bg-success/15 px-1.5 py-0.5 text-[10px] font-medium leading-none text-success">
+                предел читаемости
+              </span>
+              <div className="w-px flex-1 border-r border-dashed border-success/70" />
+            </div>
           )}
-          <div className={['grid gap-3', solved ? 'grid-cols-2' : 'grid-cols-1'].join(' ')}>
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="rounded-lg border border-border bg-surface p-3">
-                <div className={['mb-2 h-3 rounded-sm bg-brand/60', solved ? 'w-1/2' : 'w-1/3'].join(' ')} />
-                {/* The content line = full column width. While in one column, the
-                    part spilling past the comfort guide is tinted, so "too long"
-                    is literal. After the split each line is short again. */}
-                <div className="relative h-2 w-full overflow-hidden rounded-sm bg-tertiary/30">
-                  {!solved && overshoot > 0 && (
-                    <div
-                      className="absolute inset-y-0 right-0 bg-warning/70"
-                      style={{ width: `${overshoot}%` }}
-                    />
-                  )}
+          {/* Growing viewport — left-aligned, width proportional to the slider so
+              it always fits the card and its right edge advances on the guide.
+              Its own border + soft shadow make it read as a real resizable frame
+              sitting on the canvas rather than content stranded at the edge. */}
+          <div
+            className={[
+              'rounded-lg border bg-surface p-3 shadow-sm transition-base',
+              solved ? 'border-success/40' : 'border-border',
+            ].join(' ')}
+            style={{ width: `${blockPct}%` }}
+          >
+            <div className={['grid gap-3', solved ? 'grid-cols-2' : 'grid-cols-1'].join(' ')}>
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="rounded-md bg-canvas p-2.5">
+                  <div className={['mb-2 h-3 rounded-sm bg-brand/60', solved ? 'w-1/2' : 'w-1/3'].join(' ')} />
+                  {/* The content line = full column width. While in one column, the
+                      part spilling past the comfort guide is tinted, so "too long"
+                      is literal. After the split each line is short again. */}
+                  <div className="relative h-2 w-full overflow-hidden rounded-sm bg-tertiary/30">
+                    {!solved && overshoot > 0 && (
+                      <div
+                        className="absolute inset-y-0 right-0 bg-warning/70"
+                        style={{ width: `${overshoot}%` }}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>

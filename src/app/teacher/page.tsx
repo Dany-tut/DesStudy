@@ -1,9 +1,9 @@
 import { BookOpen } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { requireTeacher } from '@/lib/auth';
-import { SignOutButton } from '@/components/auth/SignOutButton';
 import { GroupsManager, type GroupView, type LearnerOption } from '@/components/teacher/GroupsManager';
 import { MyLessons, type LessonView } from '@/components/teacher/MyLessons';
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic';
  */
 export default async function TeacherPage() {
   const user = await requireTeacher();
+  const { t } = await getT();
 
   const [lessons, groups, learners] = await Promise.all([
     prisma.authoredLesson.findMany({
@@ -79,25 +80,15 @@ export default async function TeacherPage() {
 
   return (
     <main className="mx-auto max-w-[1100px] px-8 py-12">
-      <div className="mb-8 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-title1 font-bold text-primary">Кабинет преподавателя</h1>
-          <p className="mt-1 text-footnote text-secondary">
-            Твои уроки, группы и ученики. Задания собираются в конструкторе уроков.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <span className="rounded-full border border-border px-3 py-1 text-caption text-secondary">
-            {user.name || user.email} · {user.role === 'BOSS' ? 'админ' : 'препод'}
-          </span>
-          <SignOutButton />
-        </div>
+      <div className="mb-8">
+        <h1 className="text-title1 font-bold text-primary">{t('teacher.title')}</h1>
+        <p className="mt-1 text-footnote text-secondary">{t('teacher.subtitle')}</p>
       </div>
 
       {/* My lessons + per-lesson access control */}
       <section className="mb-10">
         <h2 className="mb-3 flex items-center gap-2 text-callout font-semibold text-primary">
-          <BookOpen size={16} className="text-brand" /> Мои уроки
+          <BookOpen size={16} className="text-brand" /> {t('teacher.myLessons')}
         </h2>
         <MyLessons lessons={lessonViews} groups={groupViews} learners={learnerOptions} />
       </section>

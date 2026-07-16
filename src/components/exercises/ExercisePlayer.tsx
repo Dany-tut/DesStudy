@@ -37,6 +37,8 @@ import { NestedRadius } from './NestedRadius';
 import { ResizeFrame } from './ResizeFrame';
 import { Elevation } from './Elevation';
 import { FixTheScreen } from './FixTheScreen';
+import { BreakpointDemo } from './BreakpointDemo';
+import { BP_MIN } from '@/lib/curriculum/breakpoint';
 import { ScreenCritiqueExercise } from './ScreenCritiqueExercise';
 import { FIX_INITIAL, fixSolvedCount, type FixScreenAnswer } from '@/lib/curriculum/fixScreen';
 import { Button } from '@/components/ui/Button';
@@ -117,9 +119,11 @@ export function ExercisePlayer({
                             ? { w: 30, h: 28 }
                             : exercise.type === 'spot-diff'
                               ? null
-                              : exercise.type === 'fix-screen'
-                                ? FIX_INITIAL
-                                : null;
+                              : exercise.type === 'breakpoint'
+                                ? BP_MIN
+                                : exercise.type === 'fix-screen'
+                                  ? FIX_INITIAL
+                                  : null;
   const [choice, setChoice] = useState<Answer>(initialChoice);
   const [outcome, setOutcome] = useState<ValidationOutcome | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -221,6 +225,8 @@ export function ExercisePlayer({
         const v = value as TapTargetAnswer;
         return v ? `${v.w}×${v.h}px` : t('exercises.player.noSize');
       }
+      case 'breakpoint':
+        return t('exercises.player.width', { value: Math.round(value as number) });
       case 'fix-screen': {
         const solved = fixSolvedCount(value as FixScreenAnswer);
         return t('exercises.player.fixed', { count: solved });
@@ -539,6 +545,15 @@ export function ExercisePlayer({
             value={(choice as TapTargetAnswer) ?? { w: 30, h: 28 }}
             disabled={solved}
             onChange={(v) => setChoice(v)}
+          />
+        );
+      case 'breakpoint':
+        return (
+          <BreakpointDemo
+            variant={exercise.variant}
+            value={typeof choice === 'number' ? choice : BP_MIN}
+            disabled={solved}
+            onChange={(w) => setChoice(w)}
           />
         );
       case 'fix-screen':

@@ -35,10 +35,12 @@ import { EasingCurve } from '@/components/exercises/drafts/EasingCurve';
 import { FocusOrder } from '@/components/exercises/drafts/FocusOrder';
 import { ButtonHierarchy } from '@/components/exercises/drafts/ButtonHierarchy';
 import { BreakpointTuner } from '@/components/exercises/drafts/BreakpointTuner';
+import { BreakpointTriggers } from '@/components/exercises/drafts/BreakpointTriggers';
 import { GridColumns } from '@/components/exercises/drafts/GridColumns';
 import { FixTheScreen } from '@/components/exercises/FixTheScreen';
 import { ScreenWalkthrough } from '@/components/exercises/ScreenWalkthrough';
 import { ScreenCritique } from '@/components/exercises/ScreenCritique';
+import { CrystalShowcase } from '@/components/achievements/CrystalShowcase';
 import type { BuildAnswer, BuildExercise, OrderExercise } from '@/lib/curriculum/types';
 
 /** Sample exercises used only to render the interactive surfaces in the showcase. */
@@ -337,6 +339,22 @@ export default function DesignSystemPage() {
       <div className="mb-8 mt-20 border-t border-border pt-10">
         <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-footnote text-brand">
           <Sparkles size={14} />
+          Кристаллы · геймификация
+        </div>
+        <p className="max-w-[600px] text-body text-secondary">
+          Наградные кристаллы: все огранки и состояния, как они выглядят в
+          «Достижениях» и в финале грейд-теста, и полная анимация появления —
+          камень раскалывается, и кристалл вырывается наружу.
+        </p>
+      </div>
+
+      <Section title="Кристаллы наград — варианты, контексты, анимация">
+        <CrystalShowcase />
+      </Section>
+
+      <div className="mb-8 mt-20 border-t border-border pt-10">
+        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-footnote text-brand">
+          <Sparkles size={14} />
           Новые типы интерактива · черновики
         </div>
         <p className="max-w-[600px] text-body text-secondary">
@@ -415,6 +433,10 @@ export default function DesignSystemPage() {
 
       <Section title="Button-hierarchy — расставь акценты действий («button-hierarchy»)">
         <ButtonHierarchy />
+      </Section>
+
+      <Section title="Breakpoint-triggers — почему возникают брейкпоинты (теория + 3 демки)">
+        <BreakpointTriggers />
       </Section>
 
       <Section title="Breakpoint-tuner — поймай точку перехода раскладки («breakpoint-tuner»)">

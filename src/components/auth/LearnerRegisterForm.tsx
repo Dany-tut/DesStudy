@@ -11,8 +11,9 @@ const ERRORS: Record<string, string> = {
   default: 'Не удалось создать вход. Попробуйте ещё раз.',
 };
 
-/** Sets email + password for an existing learner card (LOGIN invite). */
-export function LearnerRegisterForm({ token }: { token: string }) {
+/** Sets name + email + password for an existing learner card (LOGIN invite). */
+export function LearnerRegisterForm({ token, hasName }: { token: string; hasName?: boolean }) {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -31,7 +32,7 @@ export function LearnerRegisterForm({ token }: { token: string }) {
       const res = await fetch('/api/auth/learner-register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, email, password }),
+        body: JSON.stringify({ token, name: name.trim() || undefined, email, password }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -49,19 +50,27 @@ export function LearnerRegisterForm({ token }: { token: string }) {
 
   return (
     <form onSubmit={submit} className="mt-8 flex flex-col gap-4">
-      <label className="flex flex-col gap-1.5">
-        <span className="text-caption text-tertiary">Email</span>
+      {!hasName && (
         <input
-          type="email"
-          autoComplete="email"
+          type="text"
+          autoComplete="name"
           required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Имя и фамилия"
           className="rounded-lg border border-border bg-surface px-3 py-2.5 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
         />
-      </label>
+      )}
+      <input
+        type="email"
+        autoComplete="email"
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+        className="rounded-lg border border-border bg-surface px-3 py-2.5 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
+      />
       <label className="flex flex-col gap-1.5">
-        <span className="text-caption text-tertiary">Пароль (минимум 8 символов)</span>
         <div className="relative">
           <input
             type={showPassword ? 'text' : 'password'}
@@ -70,6 +79,7 @@ export function LearnerRegisterForm({ token }: { token: string }) {
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            placeholder="Пароль (минимум 8 символов)"
             className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 pr-10 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
           />
           <button

@@ -1,16 +1,17 @@
 'use client';
 
-import { Layers, GitCompare, Target, Send, type LucideIcon } from 'lucide-react';
+import { Layers, Send, type LucideIcon } from 'lucide-react';
 
 /**
- * The floating bottom step-bar — the assignment authoring flow, mirrored from
- * the teacher-platform roadmap:
- *  ① Экран      — импорт SVG + правка слоёв (this editor)
- *  ② Два варианта — эталон («ровный») + сломанный («кривой»)
- *  ③ Дефекты и роли — что сломано, кто прав, заметки ментора
- *  ④ Доступ      — группы / ученики / публично + публикация
+ * The floating bottom step-bar — the assignment authoring flow. The former
+ * import / two-variants / defects stages are now one unified «Редактор»: you
+ * lay out the screen, mark frames as эталон/косячный right on the canvas, and
+ * promote layers to critique zones — all in one place. Publishing stays its
+ * own final stage.
+ *  ① Редактор — слои, роли фреймов (эталон/косячный), зоны критики
+ *  ② Доступ   — тип задания, кому открыть, публикация
  */
-export type EditorStep = 1 | 2 | 3 | 4;
+export type EditorStep = 1 | 2;
 
 interface Step {
   id: EditorStep;
@@ -20,10 +21,8 @@ interface Step {
 }
 
 export const STEPS: Step[] = [
-  { id: 1, label: 'Экран', hint: 'Импорт и слои', icon: Layers },
-  { id: 2, label: 'Два варианта', hint: 'Эталон + сломанный', icon: GitCompare },
-  { id: 3, label: 'Дефекты и роли', hint: 'Критика и заметки', icon: Target },
-  { id: 4, label: 'Доступ', hint: 'Кому и публикация', icon: Send },
+  { id: 1, label: 'Редактор', hint: 'Слои, роли, зоны', icon: Layers },
+  { id: 2, label: 'Доступ', hint: 'Тип и публикация', icon: Send },
 ];
 
 export function StepBar({

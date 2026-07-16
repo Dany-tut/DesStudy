@@ -12,7 +12,9 @@ import {
   LayoutGrid,
   MousePointer2,
   Plus,
+  Scissors,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import type { Layer, ParsedScreen } from '@/lib/editor/types';
 
 /**
@@ -31,6 +33,8 @@ export function PropertiesPanel({
   onRadius,
   onFill,
   onText,
+  onResize,
+  onToggleClip,
   footer,
 }: {
   layer: Layer;
@@ -38,11 +42,17 @@ export function PropertiesPanel({
   onRadius?: (v: number) => void;
   onFill?: (v: string) => void;
   onText?: (v: string) => void;
+  onResize?: (w: number, h: number) => void;
+  onToggleClip?: (on: boolean) => void;
   footer?: React.ReactNode;
 }) {
   const { props } = layer;
   const box = props.box;
   const isFrame = layer.type === 'frame';
+  // A REAL frame (explicit auto-layout or a framified group) vs a plain group.
+  // Only real frames get frame-only affordances like "Clip content" — a plain
+  // group has no clip toggle, matching Figma.
+  const isRealFrame = isFrame && !!props.frame;
 
   return (
     <div className="flex flex-col">
@@ -84,9 +94,21 @@ export function PropertiesPanel({
           </div>
         )}
         <div className="grid grid-cols-2 gap-1.5">
-          <Field label="Ш" value={box ? round(box.w) : 'Mixed'} />
-          <Field label="В" value={box ? round(box.h) : 'Mixed'} />
+          {onResize && box ? (
+            <>
+              <CommitField label="Ш" value={round(box.w)} onCommit={(v) => onResize(v, Math.round(box.h))} />
+              <CommitField label="В" value={round(box.h)} onCommit={(v) => onResize(Math.round(box.w), v)} />
+            </>
+          ) : (
+            <>
+              <Field label="Ш" value={box ? round(box.w) : 'Mixed'} />
+              <Field label="В" value={box ? round(box.h) : 'Mixed'} />
+            </>
+          )}
         </div>
+        {isRealFrame && onToggleClip && (
+          <ClipToggle checked={!!props.clip} onChange={onToggleClip} />
+        )}
       </Section>
 
       {/* ── Appearance ── */}
@@ -153,6 +175,9 @@ export function PropertiesPanel({
 
 function typeLabel(layer: Layer): string {
   if (layer.type === 'frame') {
+    // Plain groups (no explicit frame flag) read as "Group"; only real frames
+    // are "Auto"/"Frame". The `layout` heuristic alone doesn't make a frame.
+    if (!layer.props.frame) return 'Group';
     return layer.props.layout && layer.props.layout !== 'none' ? 'Auto' : 'Frame';
   }
   const map: Record<string, string> = { text: 'Text', block: 'Block', image: 'Image', vector: 'Vector' };
@@ -211,6 +236,31 @@ function EditableField({ label, value, onChange }: { label: string; value: numbe
   );
 }
 
+/** Numeric field that commits on Enter/blur (not per keystroke) — for W/H so the
+ *  artboard doesn't resize on every digit. Re-syncs when the value changes. */
+function CommitField({ label, value, onCommit }: { label: string; value: string; onCommit: (v: number) => void }) {
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+  const commit = () => {
+    const n = Number(text);
+    if (Number.isFinite(n) && n > 0 && String(Math.round(n)) !== value) onCommit(Math.round(n));
+    else setText(value);
+  };
+  return (
+    <label className="flex items-center gap-1.5 rounded-md border border-border bg-canvas px-2 py-1.5 focus-within:border-brand">
+      <span className="text-caption text-tertiary">{label}</span>
+      <input
+        type="number"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+        onBlur={commit}
+        className="w-full min-w-0 bg-transparent text-caption tabular-nums text-primary outline-none"
+      />
+    </label>
+  );
+}
+
 function ColorRow({ value, onChange }: { value: string; onChange?: (v: string) => void }) {
   const hex = /^#[0-9a-f]{6}$/i.test(value) ? value : '#000000';
   return (
@@ -259,6 +309,34 @@ function FlowChip({ Icon, label, active }: { Icon: typeof MousePointer2; label: 
     >
       <Icon size={13} />
     </span>
+  );
+}
+
+/** Figma-style "Обрезать содержимое" row: a label + a switch that clips the
+ *  frame's children to its bounds. */
+function ClipToggle({ checked, onChange }: { checked: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="mt-2 flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-footnote text-secondary transition-fast hover:text-primary"
+    >
+      <Scissors size={13} className="text-tertiary" />
+      <span className="flex-1">Обрезать содержимое</span>
+      <span
+        className={[
+          'relative h-4 w-7 shrink-0 rounded-full transition-fast',
+          checked ? 'bg-brand' : 'bg-border',
+        ].join(' ')}
+      >
+        <span
+          className={[
+            'absolute top-0.5 h-3 w-3 rounded-full bg-white transition-fast',
+            checked ? 'left-3.5' : 'left-0.5',
+          ].join(' ')}
+        />
+      </span>
+    </button>
   );
 }
 

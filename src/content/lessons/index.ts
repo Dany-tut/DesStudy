@@ -30,6 +30,7 @@ import { researchMethods } from './research-methods';
 import { insightsToConcept } from './insights-to-concept';
 import { paletteElements } from './palette-elements';
 import { responsiveLayout } from './responsive-layout';
+import { breakpointTriggers } from './breakpoint-triggers';
 import { microcopy } from './microcopy';
 import { editingMilchin } from './editing-milchin';
 import { jtbdJobs } from './jtbd-jobs';
@@ -47,6 +48,7 @@ export const lessons: Record<string, Lesson> = {
   [microTypography.slug]: microTypography,
   [gridsComposition.slug]: gridsComposition,
   [responsiveLayout.slug]: responsiveLayout,
+  [breakpointTriggers.slug]: breakpointTriggers,
   [navBars.slug]: navBars,
   [motionEasing.slug]: motionEasing,
   [uxHeuristics.slug]: uxHeuristics,
@@ -106,6 +108,7 @@ export {
   insightsToConcept,
   paletteElements,
   responsiveLayout,
+  breakpointTriggers,
   microcopy,
   editingMilchin,
   jtbdJobs,
