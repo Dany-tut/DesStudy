@@ -58,15 +58,20 @@ function bubblePathTop(W: number, H: number): string {
 /**
  * The value chip: text measured, then a single SVG path drawn behind it as the
  * whole silhouette. One shape — pill and tail share the same fill, no overlap.
+ *
+ * The pill is sized to `reserve` (the widest value the slider can show), NOT to
+ * the live `text` — so the silhouette width stays constant while dragging and
+ * the bubble never jitters/re-measures as the number changes. The live text is
+ * centered inside that reserved box.
  */
-function ValueBubble({ text }: { text: string }) {
-  const labelRef = useRef<HTMLSpanElement>(null);
+function ValueBubble({ text, reserve }: { text: string; reserve: string }) {
+  const sizerRef = useRef<HTMLSpanElement>(null);
   const [dims, setDims] = useState({ w: 0, h: 0 });
 
   useLayoutEffect(() => {
-    const el = labelRef.current;
+    const el = sizerRef.current;
     if (el) setDims({ w: el.offsetWidth, h: el.offsetHeight });
-  }, [text]);
+  }, [reserve]);
 
   const { w: W, h: H } = dims;
   const d = W > 0 && H > 0 ? bubblePathTop(W, H) : '';
@@ -84,10 +89,16 @@ function ValueBubble({ text }: { text: string }) {
           <path d={d} fill="rgb(var(--brand-rgb))" />
         </svg>
       )}
+      {/* invisible sizer at the widest value — reserves a stable pill width */}
       <span
-        ref={labelRef}
-        className="relative block whitespace-nowrap px-3 py-1 text-callout font-semibold tabular-nums text-on-brand"
+        ref={sizerRef}
+        aria-hidden
+        className="invisible block whitespace-nowrap px-3 py-1 text-callout font-semibold tabular-nums"
       >
+        {reserve}
+      </span>
+      {/* live value, centered inside the reserved box */}
+      <span className="absolute inset-0 flex items-center justify-center whitespace-nowrap text-callout font-semibold tabular-nums text-on-brand">
         {text}
       </span>
     </span>
@@ -319,6 +330,13 @@ export function Slider({
     if (!draggingRef.current) setLive(value);
   }, [value]);
 
+  // Widest value the bubble can ever show → reserve its width so the pill never
+  // resizes (and jitters) as the number changes while dragging. With tabular
+  // digits, width tracks character count, so the longest string is widest.
+  const reserveText = [min, max].reduce((a, b) =>
+    `${b}${unit}`.length > `${a}${unit}`.length ? b : a,
+  ) + unit;
+
   const pct = ((live - min) / (max - min)) * 100;
   const snap = (raw: number) =>
     Math.min(max, Math.max(min, Math.round((raw - min) / step) * step + min));
@@ -419,7 +437,7 @@ export function Slider({
           style={{ left: centerX, bottom: 'calc(100% + 10px)' }}
           aria-hidden
         >
-          <ValueBubble text={`${snap(live)}${unit}`} />
+          <ValueBubble text={`${snap(live)}${unit}`} reserve={reserveText} />
         </div>
         <input
           type="range"

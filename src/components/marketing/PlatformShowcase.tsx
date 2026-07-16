@@ -361,7 +361,7 @@ function TuneMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
             <div className="h-11 w-11 shrink-0 rounded-xl bg-brand/15" />
             {/* gap measurement chip */}
             <span
-              className={`flex items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums text-on-brand transition-base ${
+              className={`flex min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums text-on-brand transition-base ${
                 gapOk ? 'bg-success' : 'bg-brand'
               }`}
               style={{ height: 14 }}
@@ -465,11 +465,14 @@ function StepBtn({
 function ValLine({ ok, label }: { ok: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2 text-caption">
-      {ok ? (
-        <Check size={13} className="shrink-0 text-success" />
-      ) : (
-        <span className="h-3 w-3 shrink-0 rounded-full border border-border-strong" />
-      )}
+      {/* fixed 14px icon slot so the label doesn't shift when ok toggles */}
+      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+        {ok ? (
+          <Check size={13} className="text-success" />
+        ) : (
+          <span className="h-3 w-3 rounded-full border border-border-strong" />
+        )}
+      </span>
       <span className={ok ? 'text-success' : 'text-tertiary'}>
         {label}
         {ok && ' — пройдено'}
@@ -1278,22 +1281,19 @@ function MentorMode({ solved, onSolve }: { solved: boolean; onSolve: () => void 
 
   return (
     <div className="flex h-full flex-col">
-      {/* chat log — the header floats over it (no background plate) so messages
-          scroll underneath and dissolve into the top progressive blur. */}
-      <div className="relative mb-2 min-h-0 flex-1">
+      {/* Chat log. Both the header (top) and the composer (bottom) float over it
+          with no background plate, so messages scroll underneath and dissolve
+          into the progressive blur at each edge. pt/pb reserve the space they
+          occupy so content never hides fully behind them. */}
+      <div className="relative min-h-0 flex-1">
         <div
           ref={scrollRef}
           onScroll={updateEdges}
-          className="slim-scroll flex h-full flex-col overflow-y-auto overscroll-contain pl-3 pr-1.5 pt-16 pb-1"
+          className="slim-scroll flex h-full flex-col overflow-y-auto overscroll-contain pl-3 pr-1.5 pt-16 pb-24"
         >
         {/* mt-auto keeps messages hugging the bottom (next to the composer)
             until they overflow, then it collapses and normal scrolling kicks in. */}
         <div className="mt-auto space-y-2.5">
-        {empty && (
-          <p className="pt-8 text-center text-caption text-tertiary">
-            Спроси о своём макете — например, «почему экран выглядит неаккуратно?»
-          </p>
-        )}
         {msgs.map((m) =>
           m.role === 'me' ? (
             <div key={m.id} data-msg-id={m.id} className="flex justify-end">
@@ -1330,9 +1330,11 @@ function MentorMode({ solved, onSolve }: { solved: boolean; onSolve: () => void 
         )}
         </div>
         </div>
-        {edges.top && <MentorProgressiveBlur edge="top" height={64} />}
-        {edges.bottom && <MentorProgressiveBlur edge="bottom" height={72} fill />}
-        {/* floating header: rendered last + explicit high z (inline — the lib's
+        {/* Taller top blur so messages fade out smoothly under the header
+            instead of getting clipped by a hard line. */}
+        {edges.top && <MentorProgressiveBlur edge="top" height={96} />}
+        {edges.bottom && <MentorProgressiveBlur edge="bottom" height={96} />}
+        {/* floating header: rendered late + explicit high z (inline — the lib's
             internal blur layers carry their own z, so a Tailwind z-* utility that
             resolves to `auto` here loses to them). Text stays sharp while messages
             dissolve under it. */}
@@ -1346,62 +1348,70 @@ function MentorMode({ solved, onSolve }: { solved: boolean; onSolve: () => void 
           </div>
           {solved && <DoneBadge />}
         </div>
+
+        {/* floating composer: same idea at the bottom — the wrapper ignores
+            pointer events so scrolling works over the fade; the controls
+            re-enable them. High z so it sits above the bottom blur. */}
+        <div
+          style={{ zIndex: 40 }}
+          className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 pl-3 pr-1.5 pb-1"
+        >
+          {/* quick suggestions */}
+          {msgs.length === 0 && (
+            <div className="pointer-events-auto flex flex-wrap gap-2">
+              {MENTOR_QA.map((item) => (
+                <button
+                  key={item.q}
+                  type="button"
+                  onClick={() => send(item.q, item.a)}
+                  className="rounded-full border border-border bg-surface px-3 py-1.5 text-caption font-medium text-secondary transition-fast hover:bg-hover"
+                >
+                  {item.q}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* composer — type your own message (capped: this is a teaser). */}
+          {limitReached ? (
+            <div className="pointer-events-auto flex h-14 items-center justify-center rounded-xl border border-dashed border-border bg-surface px-4 text-center text-caption text-tertiary">
+              Это демо-ментор. Полный диалог открывается после регистрации.
+            </div>
+          ) : (
+            <div className="pointer-events-auto flex items-center gap-2">
+              <textarea
+                ref={inputRef}
+                value={input}
+                rows={1}
+                maxLength={MENTOR_MAX_CHARS}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  const el = e.target;
+                  el.style.height = 'auto';
+                  el.style.height = `${Math.min(el.scrollHeight, 72)}px`;
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
+                }}
+                placeholder="Напиши сообщение ментору…"
+                className="max-h-[4.5rem] min-h-[3.5rem] flex-1 resize-none overflow-y-auto rounded-xl border border-border bg-surface px-4 py-[1.125rem] text-footnote leading-snug text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand focus-visible:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => send()}
+                aria-label="Отправить"
+                disabled={!input.trim() || typing}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-on-brand transition-base hover:bg-brand-hover disabled:bg-muted disabled:text-tertiary"
+              >
+                <ArrowUp size={18} strokeWidth={2.5} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-
-      {/* quick suggestions */}
-      {msgs.length === 0 && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {MENTOR_QA.map((item) => (
-            <button
-              key={item.q}
-              type="button"
-              onClick={() => send(item.q, item.a)}
-              className="rounded-full border border-border px-3 py-1.5 text-caption font-medium text-secondary transition-fast hover:bg-hover"
-            >
-              {item.q}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* composer — type your own message (capped: this is a teaser, not a chat) */}
-      {limitReached ? (
-        <div className="flex h-14 items-center justify-center rounded-xl border border-dashed border-border bg-surface px-4 text-center text-caption text-tertiary">
-          Это демо-ментор. Полный диалог открывается после регистрации.
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <textarea
-            ref={inputRef}
-            value={input}
-            rows={1}
-            maxLength={MENTOR_MAX_CHARS}
-            onChange={(e) => {
-              setInput(e.target.value);
-              const el = e.target;
-              el.style.height = 'auto';
-              el.style.height = `${Math.min(el.scrollHeight, 72)}px`;
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            placeholder="Напиши сообщение ментору…"
-            className="max-h-[4.5rem] min-h-[3.5rem] flex-1 resize-none overflow-y-auto rounded-xl border border-border bg-surface px-4 py-[1.125rem] text-footnote leading-snug text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand focus-visible:outline-none"
-          />
-          <button
-            type="button"
-            onClick={() => send()}
-            aria-label="Отправить"
-            disabled={!input.trim() || typing}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-on-brand transition-base hover:bg-brand-hover disabled:bg-muted disabled:text-tertiary"
-          >
-            <ArrowUp size={18} strokeWidth={2.5} />
-          </button>
-        </div>
-      )}
 
       {sendFly && (
         <FlyingSendBubble
