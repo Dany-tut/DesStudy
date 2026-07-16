@@ -7,8 +7,12 @@
  * Configured entirely through env so no secrets live in the repo:
  *   TELEGRAM_BOT_TOKEN — the bot's API token (from @BotFather)
  *   TELEGRAM_CHAT_ID   — the curator chat/channel id the bot posts into
- * If either is missing the sender is a silent no-op, so заявки keep working in
- * dev/CI where the bot isn't wired up.
+ *   TELEGRAM_BOT_USERNAME — the bot's @username (no @), for the applicant chat
+ *                           deep link `t.me/<username>?start=<token>`
+ *   TELEGRAM_WEBHOOK_SECRET — shared secret Telegram echoes back in the
+ *                           X-Telegram-Bot-Api-Secret-Token header on the webhook
+ * If either of the first two is missing the sender is a silent no-op, so заявки
+ * keep working in dev/CI where the bot isn't wired up.
  */
 
 const API = 'https://api.telegram.org';
@@ -42,6 +46,42 @@ export async function sendTelegramMessage(text: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Send a message to a specific chat — used for the two-way curator↔applicant
+ * chat, where `chatId` is the applicant's private bot chat captured on Start.
+ * Best-effort like {@link sendTelegramMessage}: returns whether it delivered.
+ */
+export async function sendTelegramTo(chatId: string, text: string): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !chatId) return false;
+
+  try {
+    const res = await fetch(`${API}/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Build the applicant chat deep link `t.me/<bot>?start=<token>`. Returns null
+ * when the bot username isn't configured, so callers can hide the CTA in dev.
+ */
+export function botChatLink(token: string): string | null {
+  const username = process.env.TELEGRAM_BOT_USERNAME;
+  if (!username) return null;
+  return `https://t.me/${username.replace(/^@/, '')}?start=${encodeURIComponent(token)}`;
 }
 
 /** Escape user-supplied text for Telegram HTML parse mode. */

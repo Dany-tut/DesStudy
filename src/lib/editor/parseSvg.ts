@@ -51,8 +51,10 @@ function num(v: string | null | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** Name from the most explicit source available, else a type-derived fallback. */
-function nameOf(el: Element, tag: string, index: number): string {
+/** Name from the most explicit source available, else a type-derived fallback.
+ *  `isFrame` splits the `<g>` fallback: a real frame reads as «Фрейм», a plain
+ *  group as «Группа», so the name matches the frame/group icon and badge. */
+function nameOf(el: Element, tag: string, index: number, isFrame: boolean): string {
   const explicit =
     el.getAttribute('data-name') ||
     el.getAttribute('aria-label') ||
@@ -68,7 +70,7 @@ function nameOf(el: Element, tag: string, index: number): string {
   }
 
   const fallback: Record<LayerType, string> = {
-    frame: 'Группа', text: 'Текст', block: 'Блок', image: 'Картинка', vector: 'Вектор',
+    frame: isFrame ? 'Фрейм' : 'Группа', text: 'Текст', block: 'Блок', image: 'Картинка', vector: 'Вектор',
   };
   return `${fallback[typeOf(tag)]} ${index + 1}`;
 }
@@ -171,6 +173,26 @@ function walkChildren(el: Element, counter: { n: number }): Layer[] {
         const h = Math.max(...boxes.map((b) => b.y + b.h)) - y;
         props.box = { x, y, w, h };
         props.layout = inferLayout(boxes);
+        // A frame has no fill of its own in SVG — its background is the first
+        // full-bounds child rect (a dark artboard rect, a card surface). Surface
+        // that as the frame's fill so the inspector shows a colour instead of
+        // "Нет заливки", matching how Figma treats a frame's background. Only
+        // adopt a child that actually spans the frame (≈ its box) and paints.
+        if (!props.fill) {
+          const bgFill = children.find((c) => {
+            const b = c.props.box;
+            return (
+              c.type === 'block' &&
+              c.props.fill &&
+              b &&
+              Math.abs(b.x - x) <= 1 &&
+              Math.abs(b.y - y) <= 1 &&
+              Math.abs(b.w - w) <= 1 &&
+              Math.abs(b.h - h) <= 1
+            );
+          })?.props.fill;
+          if (bgFill) props.fill = bgFill;
+        }
         // A real frame (props.frame) needs its canonical bounds rect so the
         // canvas treats a resize as "move the border", not "scale the children".
         // Imported frames arrive as a bare `<g clip-path>` (clipPath sits in
@@ -195,7 +217,7 @@ function walkChildren(el: Element, counter: { n: number }): Layer[] {
 
     out.push({
       id,
-      name: nameOf(child, tag, siblingIndex),
+      name: nameOf(child, tag, siblingIndex, !!props.frame),
       type,
       props,
       children,

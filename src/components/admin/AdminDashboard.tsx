@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Users,
   GraduationCap,
@@ -14,6 +14,8 @@ import {
   Check,
   MessageCircle,
   Phone,
+  Send,
+  X,
 } from 'lucide-react';
 import { InvitesPanel, type InviteRow } from '@/components/admin/InvitesPanel';
 
@@ -87,9 +89,33 @@ const TABS: { key: TabKey; label: string; icon: typeof Users }[] = [
 
 // ── Top-level ────────────────────────────────────────────────────────────────
 
+const TAB_KEYS = TABS.map((t) => t.key);
+
+function readTabFromHash(): TabKey {
+  if (typeof window === 'undefined') return 'users';
+  const hash = window.location.hash.replace(/^#/, '') as TabKey;
+  return TAB_KEYS.includes(hash) ? hash : 'users';
+}
+
 export function AdminDashboard({ data }: { data: AdminData }) {
-  const [tab, setTab] = useState<TabKey>('users');
+  const [tab, setTabState] = useState<TabKey>('users');
   const newLeads = data.applications.filter((a) => a.status === 'new').length;
+
+  // Restore the active tab from the URL hash on mount (survives F5) and keep
+  // in sync when the user navigates with the browser back/forward buttons.
+  useEffect(() => {
+    setTabState(readTabFromHash());
+    const onHashChange = () => setTabState(readTabFromHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const setTab = (key: TabKey) => {
+    setTabState(key);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `#${key}`);
+    }
+  };
 
   return (
     <div>
@@ -263,6 +289,7 @@ function ApplicationCard({
   onStatus: (id: string, status: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const tg = row.telegram?.replace(/^@/, '').trim() || null;
   const tgUrl = tg ? `https://t.me/${tg}` : null;
   const date = useMemo(
@@ -331,17 +358,20 @@ function ApplicationCard({
             </a>
           )}
 
-          {tgUrl && (
-            <a
-              href={tgUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-footnote text-secondary transition-base hover:border-border-strong hover:text-primary"
-            >
-              <MessageCircle size={14} />
-              Написать в чат
-            </a>
-          )}
+          <button
+            type="button"
+            onClick={() => setChatOpen((o) => !o)}
+            aria-expanded={chatOpen}
+            className={[
+              'mt-3 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-footnote transition-base',
+              chatOpen
+                ? 'border-brand bg-brand/5 text-brand'
+                : 'border-border text-secondary hover:border-border-strong hover:text-primary',
+            ].join(' ')}
+          >
+            <MessageCircle size={14} />
+            {chatOpen ? 'Скрыть чат' : 'Написать в чат'}
+          </button>
         </div>
 
         {/* Status pipeline */}
@@ -367,6 +397,228 @@ function ApplicationCard({
               </button>
             );
           })}
+        </div>
+      </div>
+
+      {chatOpen && <ChatPanel applicationId={row.id} name={row.name} />}
+    </div>
+  );
+}
+
+// ── In-admin curator↔applicant chat ──────────────────────────────────────────
+
+interface ChatMessageRow {
+  id: string;
+  direction: string; // 'in' | 'out'
+  text: string;
+  createdAt: string;
+}
+
+/**
+ * The conversation behind one заявка, opened inline in its card. Loads history
+ * from /api/admin/applications/[id]/messages and polls it every few seconds so
+ * the applicant's Telegram replies show up without a refresh. Sending posts to
+ * the same route, which relays over the bot.
+ *
+ * When the applicant hasn't pressed Start on the bot yet there's no chat id to
+ * message, so we show the deep link to share instead of the composer.
+ */
+function ChatPanel({ applicationId, name }: { applicationId: string; name: string | null }) {
+  const [messages, setMessages] = useState<ChatMessageRow[]>([]);
+  const [connected, setConnected] = useState(false);
+  const [chatLink, setChatLink] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  // Load once, then poll for inbound replies while the panel stays open.
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      try {
+        const res = await fetch(`/api/admin/applications/${applicationId}/messages`);
+        if (!res.ok) throw new Error('failed');
+        const data = (await res.json()) as {
+          connected: boolean;
+          chatLink: string | null;
+          messages: ChatMessageRow[];
+        };
+        if (!alive) return;
+        setMessages(data.messages);
+        setConnected(data.connected);
+        setChatLink(data.chatLink);
+        setLoaded(true);
+      } catch {
+        if (alive) setLoaded(true);
+      }
+    }
+    load();
+    const t = setInterval(load, 4000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [applicationId]);
+
+  // Keep the newest message in view as history grows.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [messages.length]);
+
+  async function send() {
+    const text = draft.trim();
+    if (!text || sending) return;
+    setSending(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/applications/${applicationId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (res.status === 409) {
+        setConnected(false);
+        setError('Заявитель ещё не открыл чат с ботом.');
+        return;
+      }
+      if (!res.ok) throw new Error('failed');
+      const data = (await res.json()) as { message: ChatMessageRow };
+      setMessages((m) => [...m, data.message]);
+      setDraft('');
+    } catch {
+      setError('Не удалось отправить. Попробуйте ещё раз.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function copyLink() {
+    if (!chatLink) return;
+    navigator.clipboard?.writeText(chatLink).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1500);
+    });
+  }
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-xl border border-border bg-canvas">
+      <div className="border-b border-border px-4 py-2.5 text-caption font-medium text-secondary">
+        Чат с {name || 'заявителем'}
+        {!connected && loaded && (
+          <span className="ml-2 rounded-full bg-warning/10 px-2 py-0.5 text-caption font-normal text-warning">
+            бот не подключён
+          </span>
+        )}
+      </div>
+
+      {/* Not connected: nothing to message yet — share the deep link. */}
+      {loaded && !connected ? (
+        <div className="px-4 py-4 text-footnote text-secondary">
+          <p>
+            Чтобы переписываться прямо здесь, заявитель должен открыть бота по ссылке и нажать{' '}
+            <b>Start</b>. После этого его ответы появятся в этом окне.
+          </p>
+          {chatLink ? (
+            <div className="mt-3 flex items-center gap-2">
+              <a
+                href={chatLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="truncate rounded-lg border border-border bg-surface px-3 py-1.5 text-caption text-brand hover:border-border-strong"
+              >
+                {chatLink}
+              </a>
+              <button
+                type="button"
+                onClick={copyLink}
+                aria-label="Скопировать ссылку"
+                className="shrink-0 rounded p-1 text-tertiary transition-base hover:text-secondary"
+              >
+                {linkCopied ? <Check size={14} className="text-brand" /> : <Copy size={14} />}
+              </button>
+            </div>
+          ) : (
+            <p className="mt-2 text-caption text-tertiary">
+              Ссылка недоступна — не задан <code>TELEGRAM_BOT_USERNAME</code>.
+            </p>
+          )}
+        </div>
+      ) : (
+        <>
+          <div
+            ref={scrollRef}
+            className="slim-scroll flex max-h-64 flex-col gap-2 overflow-y-auto px-4 py-3"
+          >
+            {!loaded ? (
+              <p className="py-6 text-center text-caption text-tertiary">Загрузка…</p>
+            ) : messages.length === 0 ? (
+              <p className="py-6 text-center text-caption text-tertiary">
+                Сообщений пока нет — напишите первым.
+              </p>
+            ) : (
+              messages.map((m) => <ChatBubble key={m.id} msg={m} />)
+            )}
+          </div>
+
+          <div className="flex items-end gap-2 border-t border-border p-3">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              rows={1}
+              placeholder="Сообщение…"
+              className="min-h-[38px] max-h-28 flex-1 resize-none rounded-lg border border-border bg-surface px-3 py-2 text-footnote text-primary outline-none transition-base focus:border-brand"
+            />
+            <button
+              type="button"
+              onClick={send}
+              disabled={sending || draft.trim() === ''}
+              aria-label="Отправить"
+              className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg bg-brand text-on-brand transition-base hover:bg-brand-hover disabled:opacity-40"
+            >
+              <Send size={16} />
+            </button>
+          </div>
+        </>
+      )}
+
+      {error && (
+        <div className="flex items-center gap-1.5 border-t border-border px-4 py-2 text-caption text-danger">
+          <X size={13} />
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChatBubble({ msg }: { msg: ChatMessageRow }) {
+  const out = msg.direction === 'out';
+  const time = new Date(msg.createdAt).toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return (
+    <div className={out ? 'flex justify-end' : 'flex justify-start'}>
+      <div
+        className={[
+          'max-w-[78%] rounded-2xl px-3 py-2 text-footnote',
+          out
+            ? 'rounded-br-sm bg-brand text-on-brand'
+            : 'rounded-bl-sm bg-surface text-primary border border-border',
+        ].join(' ')}
+      >
+        <div className="whitespace-pre-wrap break-words">{msg.text}</div>
+        <div className={['mt-0.5 text-right text-caption', out ? 'text-on-brand/70' : 'text-tertiary'].join(' ')}>
+          {time}
         </div>
       </div>
     </div>

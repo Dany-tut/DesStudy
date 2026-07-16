@@ -175,10 +175,11 @@ export function PropertiesPanel({
 
 function typeLabel(layer: Layer): string {
   if (layer.type === 'frame') {
-    // Plain groups (no explicit frame flag) read as "Group"; only real frames
-    // are "Auto"/"Frame". The `layout` heuristic alone doesn't make a frame.
+    // Plain groups (no explicit frame flag) read as "Group". A real frame is
+    // "Auto" only for an explicit auto-layout (row / column — the two the menu
+    // offers); `grid`/`none` are parse-time inferences, so it reads as "Frame".
     if (!layer.props.frame) return 'Group';
-    return layer.props.layout && layer.props.layout !== 'none' ? 'Auto' : 'Frame';
+    return layer.props.layout === 'row' || layer.props.layout === 'column' ? 'Auto' : 'Frame';
   }
   const map: Record<string, string> = { text: 'Text', block: 'Block', image: 'Image', vector: 'Vector' };
   return map[layer.type] ?? layer.type;

@@ -81,7 +81,7 @@ export function LayerTree({
   /** Selected layer ids; the last is the "primary" (drives centering). */
   selectedIds: string[];
   /** Select a layer. `additive` (Shift/Cmd) toggles it within the current set. */
-  onSelect: (id: string, additive?: boolean) => void;
+  onSelect: (id: string, additive?: boolean, range?: boolean) => void;
   onHover: (id: string | null) => void;
   /** Commit a new name for a layer (double-click a row to edit). */
   onRename?: (id: string, name: string) => void;
@@ -100,11 +100,22 @@ export function LayerTree({
   const noop = () => {};
   return (
     <div onMouseLeave={() => onHover(null)} className="flex flex-col">
-      {layers.map((l) => (
-        <LayerRow key={l.id} layer={l} depth={0} selectedIds={selectedIds} primaryId={primaryId} onSelect={onSelect} onHover={onHover} onRename={onRename} onDelete={onDelete} onContextMenu={onContextMenu ?? noop} renameId={renameId ?? null} onRenameHandled={onRenameHandled ?? noop} zoneIds={zoneIds} />
+      {layers.map((l, i) => (
+        <LayerRow key={l.id} layer={l} depth={0} selectedIds={selectedIds} primaryId={primaryId} runTop={!runNeighbourHi(layers, i - 1, selectedIds, false)} runBottom={!runNeighbourHi(layers, i + 1, selectedIds, false)} onSelect={onSelect} onHover={onHover} onRename={onRename} onDelete={onDelete} onContextMenu={onContextMenu ?? noop} renameId={renameId ?? null} onRenameHandled={onRenameHandled ?? noop} zoneIds={zoneIds} />
       ))}
     </div>
   );
+}
+
+/** Whether the sibling at `i` carries the selection highlight — a row is
+ *  highlighted when it's selected itself, or its parent group is (ctxHi). Used to
+ *  merge a contiguous run of highlighted siblings into one rounded block instead
+ *  of a scalloped stack of pills. Out-of-range indices count as un-highlighted so
+ *  a run's ends round off. */
+function runNeighbourHi(siblings: Layer[], i: number, selectedIds: string[], ctxHi: boolean): boolean {
+  const l = siblings[i];
+  if (!l) return false;
+  return ctxHi || selectedIds.includes(l.id);
 }
 
 /** Shared right-click-menu shell: fixed at the cursor, nudged back inside the
@@ -298,6 +309,8 @@ function LayerRow({
   selectedIds,
   primaryId,
   inSelectedGroup = false,
+  runTop = true,
+  runBottom = true,
   onSelect,
   onHover,
   onRename,
@@ -314,7 +327,11 @@ function LayerRow({
   /** True when an ancestor group of this row is selected — the whole subtree of a
    *  picked group is highlighted, mirroring the canvas selection. */
   inSelectedGroup?: boolean;
-  onSelect: (id: string, additive?: boolean) => void;
+  /** Ends of a contiguous highlighted run: round the top / bottom corners only at
+   *  the run's edges so adjacent selected rows read as one block, not pills. */
+  runTop?: boolean;
+  runBottom?: boolean;
+  onSelect: (id: string, additive?: boolean, range?: boolean) => void;
   onHover: (id: string | null) => void;
   onRename?: (id: string, name: string) => void;
   onDelete?: (id: string) => void;
@@ -374,7 +391,7 @@ function LayerRow({
     <>
       <div
         ref={rowRef}
-        onClick={(e) => onSelect(layer.id, e.shiftKey || e.metaKey)}
+        onClick={(e) => onSelect(layer.id, e.metaKey || e.ctrlKey, e.shiftKey)}
         onDoubleClick={() => onRename && setEditing(true)}
         onContextMenu={(e) => onContextMenu(e, layer.id)}
         onMouseEnter={() => {
@@ -382,7 +399,16 @@ function LayerRow({
           playHover();
         }}
         className={[
-          'group relative flex cursor-pointer select-none items-center gap-1.5 rounded-md py-1.5 pr-2 text-footnote transition-fast',
+          'group relative flex cursor-pointer select-none items-center gap-1.5 py-1.5 pr-2 text-footnote transition-fast',
+          // A highlighted row rounds only the ends of its run; unselected rows keep
+          // a plain rounded box for the hover chip.
+          active || inSelectedGroup
+            ? `${runTop ? 'rounded-t-md' : ''} ${
+                // An open highlighted group flows into its (also-highlighted)
+                // children, so its bottom stays square to merge with them.
+                runBottom && !(open && hasChildren) ? 'rounded-b-md' : ''
+              }`
+            : 'rounded-md',
           editing
             ? 'text-primary'
             : active
@@ -466,9 +492,19 @@ function LayerRow({
       </div>
       {hasChildren && open && (
         <>
-          {layer.children.map((c) => (
-            <LayerRow key={c.id} layer={c} depth={depth + 1} selectedIds={selectedIds} primaryId={primaryId} inSelectedGroup={active || inSelectedGroup} onSelect={onSelect} onHover={onHover} onRename={onRename} onDelete={onDelete} onContextMenu={onContextMenu} renameId={renameId} onRenameHandled={onRenameHandled} zoneIds={zoneIds} />
-          ))}
+          {layer.children.map((c, i) => {
+            const ctxHi = active || inSelectedGroup;
+            // Neighbour highlight — for the first child the row above is this
+            // (highlighted-if-ctxHi) group, so its run continues from the parent.
+            const hiPrev = i > 0 ? ctxHi || selectedIds.includes(layer.children[i - 1].id) : ctxHi;
+            const hiNext =
+              i < layer.children.length - 1
+                ? ctxHi || selectedIds.includes(layer.children[i + 1].id)
+                : false;
+            return (
+              <LayerRow key={c.id} layer={c} depth={depth + 1} selectedIds={selectedIds} primaryId={primaryId} inSelectedGroup={ctxHi} runTop={!hiPrev} runBottom={!hiNext} onSelect={onSelect} onHover={onHover} onRename={onRename} onDelete={onDelete} onContextMenu={onContextMenu} renameId={renameId} onRenameHandled={onRenameHandled} zoneIds={zoneIds} />
+            );
+          })}
         </>
       )}
     </>

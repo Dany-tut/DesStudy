@@ -43,7 +43,7 @@ interface Box {
 
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 8;
-/** Snap distance for Shift-drag alignment, in screen px. */
+/** Magnet distance for move/resize alignment snapping, in screen px. */
 const SNAP_PX = 6;
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
@@ -207,6 +207,10 @@ export function StageCanvas({
         lockAspect: boolean;
         lastMatrix: string | null;
         lastRadius: number | null;
+        // Neighbour + content edges the resized frame's moving border magnetises
+        // to (a frame's own children so its border can hug the content, plus its
+        // siblings). Empty for rotate/radius. Snap is on by default; Shift bypasses.
+        targets: SnapBox[];
         // Frame-border resize: when the sole selected node is a top-level frame
         // with an explicit bg/clip rect, we move its edges instead of scaling its
         // children (Figma's frame vs group distinction). Null for plain groups.
@@ -297,7 +301,12 @@ export function StageCanvas({
       const node = content.querySelector<SVGGraphicsElement>(`[data-layer-id="${id}"]`);
       if (!node) return null;
       const cr = content.getBoundingClientRect();
-      const r = node.getBoundingClientRect();
+      // A frame is bounded by its own rect (data-frame-bg), not the union of its
+      // children — otherwise content overflowing the frame inflates the box, and
+      // shrinking the border below the content makes the selection snap back to
+      // the children's extent. Plain layers measure their own bbox as before.
+      const bounds = node.querySelector<SVGGraphicsElement>(':scope > rect[data-frame-bg]');
+      const r = (bounds ?? node).getBoundingClientRect();
       return {
         left: (r.left - cr.left) / v.scale,
         top: (r.top - cr.top) / v.scale,
@@ -423,9 +432,36 @@ export function StageCanvas({
           el.style.height = `${g.box.h}px`;
         }
       } else if (g.kind === 'transform') {
-        const px = (p.x - g.crLeft) / g.scale;
-        const py = (p.y - g.crTop) / g.scale;
+        let px = (p.x - g.crLeft) / g.scale;
+        let py = (p.y - g.crTop) / g.scale;
         if (g.sub === 'resize') {
+          // Magnetise the moving edge to the nearest neighbour/content edge — on
+          // by default (Shift or aspect-lock bypasses it). Snapping `px`/`py` here
+          // feeds the same scale maths below, so it works for both frame-border
+          // and matrix-scale resizes. `guide*` marks the matched line for the rule.
+          let guideX: number | null = null;
+          let guideY: number | null = null;
+          if (!g.lockAspect && !p.shift && g.targets.length) {
+            const T = SNAP_PX / g.scale;
+            if (g.movesE || g.movesW) {
+              let best = T;
+              for (const t of g.targets) for (const tv of [t.left, t.cx, t.right]) {
+                const d = Math.abs(tv - px);
+                if (d < best) { best = d; px = tv; guideX = tv; }
+              }
+            }
+            if (g.movesN || g.movesS) {
+              let best = T;
+              for (const t of g.targets) for (const tv of [t.top, t.cy, t.bottom]) {
+                const d = Math.abs(tv - py);
+                if (d < best) { best = d; py = tv; guideY = tv; }
+              }
+            }
+          }
+          const vg = vGuideRef.current;
+          if (vg) { vg.style.display = guideX == null ? 'none' : 'block'; if (guideX != null) vg.style.left = `${guideX}px`; }
+          const hg = hGuideRef.current;
+          if (hg) { hg.style.display = guideY == null ? 'none' : 'block'; if (guideY != null) hg.style.top = `${guideY}px`; }
           let sx = 1, sy = 1;
           if (g.movesE) sx = (px - g.anchorX) / g.box.width;
           else if (g.movesW) sx = (g.anchorX - px) / g.box.width;
@@ -523,9 +559,10 @@ export function StageCanvas({
         let dy = (p.y - g.startY) / g.scale;
         let guideX: number | null = null;
         let guideY: number | null = null;
-        // Shift-drag: snap the dragged box's edges/centre to any neighbour's
-        // edges/centre within a small threshold, and remember the matched line.
-        if (p.shift && g.targets.length) {
+        // Snap the dragged box's edges/centre to any neighbour's edges/centre
+        // within a small threshold, and remember the matched line for the guide.
+        // On by default (Figma-style); holding Shift bypasses it for free placement.
+        if (!p.shift && g.targets.length) {
           const T = SNAP_PX / g.scale;
           const b = g.baseBox;
           let bestX = T;
@@ -629,6 +666,8 @@ export function StageCanvas({
           else if (hits.length) onSelect(hits[0], false);
         }
       } else if (g.kind === 'transform') {
+        if (vGuideRef.current) vGuideRef.current.style.display = 'none';
+        if (hGuideRef.current) hGuideRef.current.style.display = 'none';
         const hi = selHiRef.current;
         if (hi) {
           hi.style.transform = '';
@@ -878,9 +917,26 @@ export function StageCanvas({
       }
     }
 
+    // Edges the moving border magnetises to: the resized node's own children
+    // (so the frame border can hug its content), plus its unselected siblings.
+    const targets: SnapBox[] = [];
+    if (sub === 'resize') {
+      const selected = new Set(ids);
+      for (const { node } of nodes) {
+        for (const ch of node.querySelectorAll(':scope > [data-layer-id]')) {
+          targets.push(snapBoxOf(ch, cr.left, cr.top, view.scale));
+        }
+        for (const sib of node.parentElement?.querySelectorAll(':scope > [data-layer-id]') ?? []) {
+          if (!selected.has(sib.getAttribute('data-layer-id') ?? '')) {
+            targets.push(snapBoxOf(sib, cr.left, cr.top, view.scale));
+          }
+        }
+      }
+    }
+
     drag.current = {
       kind: 'transform', sub, ids, nodes, scale: view.scale, crLeft: cr.left, crTop: cr.top, box,
-      frameRects, frameId, lastFrameBox: null, chromes,
+      frameRects, frameId, lastFrameBox: null, chromes, targets,
       movesE, movesW, movesN, movesS,
       anchorX: movesE ? box.left : movesW ? right : cx,
       anchorY: movesS ? box.top : movesN ? bottom : cy,
@@ -951,7 +1007,7 @@ export function StageCanvas({
         >
           <div
             ref={svgHostRef}
-            className="relative [&>svg]:block [&>svg]:h-full [&>svg]:w-full [&>svg]:overflow-visible"
+            className="editor-svg-host relative [&>svg]:block [&>svg]:h-full [&>svg]:w-full [&>svg]:overflow-visible"
             style={{ width, height }}
             dangerouslySetInnerHTML={{ __html: svg }}
           />

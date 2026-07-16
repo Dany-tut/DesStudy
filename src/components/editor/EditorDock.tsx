@@ -152,10 +152,12 @@ const MODE_SEGMENT: { id: string; label: string; icon: LucideIcon }[] = [
   { id: 'code', label: 'Код', icon: Code2 },
 ];
 
-/** The detached right-hand pill — static view modes (cosmetic for now). The
- *  first is highlighted as the current context (the editor itself). */
-const VIEW_MODES: { id: string; label: string; icon: LucideIcon; active?: boolean }[] = [
-  { id: 'editor', label: 'Редактор', icon: SquarePen, active: true },
+type ViewMode = 'editor' | 'share';
+
+/** The detached right-hand pill — view modes. Clickable (toggles which is
+ *  active); the actual surfaces arrive with the platform work. */
+const VIEW_MODES: { id: ViewMode; label: string; icon: LucideIcon }[] = [
+  { id: 'editor', label: 'Редактор', icon: SquarePen },
   { id: 'share', label: 'Доступы', icon: Share2 },
 ];
 
@@ -170,6 +172,7 @@ export function EditorDock({
   // coords), so the menu can be portalled to <body> — out of the dock's glass, so
   // its own backdrop-blur samples the canvas (a nested backdrop-filter doesn't).
   const [menu, setMenu] = useState<{ id: EditorTool; left: number; top: number } | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('editor');
 
   // Close the dropdown on outside click / Escape. The portalled menu
   // lives outside dockRef, so its own subtree is whitelisted via `[data-tool-menu]`.
@@ -345,22 +348,26 @@ export function EditorDock({
             </div>
         </div>
 
-        {/* Detached view-mode pill — static, decorative (no click, no animation),
-            hung off the toolbar's right edge and mirroring its glass shape. */}
-        <div className="glass pointer-events-none absolute left-full top-1/2 ml-2 flex -translate-y-1/2 items-center gap-1 rounded-2xl p-1.5 shadow-lg">
+        {/* Detached view-mode pill — hung off the toolbar's right edge and
+            mirroring its glass shape. Clickable: picking one highlights it. */}
+        <div className="glass pointer-events-auto absolute left-full top-1/2 ml-2 flex -translate-y-1/2 items-center gap-1 rounded-2xl p-1.5 shadow-lg">
           {VIEW_MODES.map((m) => {
             const Icon = m.icon;
+            const active = viewMode === m.id;
             return (
-              <span
+              <button
                 key={m.id}
+                type="button"
                 title={m.label}
+                aria-pressed={active}
+                onClick={() => setViewMode(m.id)}
                 className={[
-                  'flex h-9 w-9 items-center justify-center rounded-xl',
-                  m.active ? 'bg-brand text-on-brand' : 'text-secondary',
+                  'flex h-9 w-9 items-center justify-center rounded-xl transition-fast',
+                  active ? 'bg-brand text-on-brand' : 'text-secondary hover:bg-hover hover:text-primary',
                 ].join(' ')}
               >
                 <Icon size={18} />
-              </span>
+              </button>
             );
           })}
         </div>

@@ -127,6 +127,37 @@ function setBoxInTree(layers: Layer[], id: string, box: NonNullable<Layer['props
   );
 }
 
+/** Paint a frame's background. A `<g>` frame has no fill of its own — its
+ *  background is a full-bounds rect child (the parser adopts that rect's fill as
+ *  the frame fill). To keep the panel and the canvas in sync we write the colour
+ *  back to that same rect: prefer the frame's own `data-frame-bg` chrome rect
+ *  (drawn frames — flip it from `fill="none"` to a real colour), else the first
+ *  full-bounds painted child rect (imported frames). If neither exists, fall
+ *  back to setting `fill` on the `<g>` itself. */
+function setFrameFill(el: Element, v: string, box?: Layer['props']['box']): void {
+  const rects = Array.from(el.querySelectorAll(':scope > rect')) as Element[];
+  const bg = rects.find((r) => r.getAttribute('data-frame-bg'));
+  const near = (a: number | undefined, b: number | undefined) =>
+    a != null && b != null && Math.abs(a - b) <= 1;
+  const spansFrame = (r: Element) =>
+    box != null &&
+    near(parseFloat(r.getAttribute('x') || ''), box.x) &&
+    near(parseFloat(r.getAttribute('y') || ''), box.y) &&
+    near(parseFloat(r.getAttribute('width') || ''), box.w) &&
+    near(parseFloat(r.getAttribute('height') || ''), box.h);
+
+  if (bg) {
+    bg.setAttribute('fill', v);
+    return;
+  }
+  const surface = rects.find((r) => {
+    const f = r.getAttribute('fill');
+    return f && f !== 'none' && spansFrame(r);
+  });
+  if (surface) surface.setAttribute('fill', v);
+  else el.setAttribute('fill', v);
+}
+
 /** Rewrite one layer's `clip` flag in the tree (structural copy along the path). */
 function setClipInTree(layers: Layer[], id: string, clip: boolean): Layer[] {
   return layers.map((l) =>
@@ -257,11 +288,37 @@ export function EditorCore() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   // The primary selection (last picked) drives the single-layer side panels.
   const selectedId = selectedIds.length ? selectedIds[selectedIds.length - 1] : null;
-  // Select a layer. `additive` (Shift) toggles it within the current set;
-  // otherwise it replaces the selection. null clears.
-  const select = useCallback((id: string | null, additive = false) => {
+  // Flat depth-first order of every layer id — the visual row order in the panel.
+  // Kept in a ref so `select` (a stable callback) can read it without re-binding.
+  const flatOrderRef = useRef<string[]>([]);
+  // The last plain-clicked row — the anchor a Shift-range selection extends from.
+  const anchorRef = useRef<string | null>(null);
+  // Select a layer. `range` (Shift) selects every row between the anchor and this
+  // one; `additive` (Cmd/Ctrl) toggles it within the current set; otherwise it
+  // replaces the selection. null clears.
+  const select = useCallback((id: string | null, additive = false, range = false) => {
+    if (id == null) {
+      anchorRef.current = null;
+      setSelectedIds([]);
+      return;
+    }
+    if (range) {
+      const order = flatOrderRef.current;
+      const anchor = anchorRef.current;
+      const a = anchor ? order.indexOf(anchor) : -1;
+      const b = order.indexOf(id);
+      if (a !== -1 && b !== -1) {
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        setSelectedIds(order.slice(lo, hi + 1));
+        return; // keep the existing anchor so the range can be re-dragged
+      }
+      // No usable anchor — fall through to a plain pick.
+      anchorRef.current = id;
+      setSelectedIds([id]);
+      return;
+    }
+    anchorRef.current = id;
     setSelectedIds((cur) => {
-      if (id == null) return [];
       if (!additive) return [id];
       return cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
     });
@@ -436,6 +493,19 @@ export function EditorCore() {
 
   // Mirror the committed authoring state so undo can snapshot the pre-change value.
   latest.current = result ? { svg: result.svg, layers: result.screen.layers, draft } : null;
+
+  // Keep the flat row order in sync so Shift-range selection maps ids → positions.
+  flatOrderRef.current = (() => {
+    const order: string[] = [];
+    const walk = (ls: Layer[]) => {
+      for (const l of ls) {
+        order.push(l.id);
+        if (l.children.length) walk(l.children);
+      }
+    };
+    if (result) walk(result.screen.layers);
+    return order;
+  })();
 
   // Cmd/Ctrl+Z undo, Cmd/Ctrl+Shift+Z redo — but let native undo win inside inputs.
   useEffect(() => {
@@ -994,9 +1064,9 @@ export function EditorCore() {
   // the selected nodes) and the layer tree, then selects the new frame. Only
   // works when the selection is a set of siblings — otherwise it no-ops.
   const groupLayers = useCallback(
-    (ids: string[], layout: 'row' | 'column' | 'none') => {
+    (ids: string[], layout: 'row' | 'column' | 'none'): string | null => {
       const cur = latest.current;
-      if (!cur || ids.length < 1) return;
+      if (!cur || ids.length < 1) return null;
       const idSet = new Set(ids);
       const gid = rid('L');
       const name = layout === 'none' ? 'Группа' : 'Авто-макет';
@@ -1009,7 +1079,7 @@ export function EditorCore() {
         props: layout === 'none' ? {} : { layout, frame: true },
         children: hits,
       }));
-      if (!grouped) return; // selection spans different parents — can't group
+      if (!grouped) return null; // selection spans different parents — can't group
 
       pushUndo();
       setResult((r) => {
@@ -1039,9 +1109,33 @@ export function EditorCore() {
         return { ...r, svg: new XMLSerializer().serializeToString(doc.documentElement), screen: { ...r.screen, layers: grouped } };
       });
       setSelectedIds([gid]);
+      anchorRef.current = gid;
+      return gid;
     },
     [pushUndo],
   );
+
+  // Wrap a selection into a real frame in one step (right-click → "Преобразовать
+  // во фрейм"). Groups the layers, then framifies the new group once it's in the
+  // DOM (framify measures the live bbox). Falls back to a straight framify when
+  // the target is already a plain group.
+  const pendingFramifyRef = useRef<string | null>(null);
+  const frameSelection = useCallback(
+    (ids: string[]) => {
+      const gid = groupLayers(ids, 'none');
+      if (gid) pendingFramifyRef.current = gid;
+    },
+    [groupLayers],
+  );
+  useEffect(() => {
+    const gid = pendingFramifyRef.current;
+    if (!gid) return;
+    pendingFramifyRef.current = null;
+    // Wait for the freshly grouped <g> to render so getBBox can measure it.
+    const raf = requestAnimationFrame(() => framifyGroup(gid));
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
 
   // Dissolve a group/frame: unwrap its <g> in the markup (move children out to
   // where the group sat, then drop the empty <g>) and splice the frame's children
@@ -1699,7 +1793,11 @@ export function EditorCore() {
                 layer={selected}
                 screen={result.screen}
                 onRadius={(v) => mutate(selected.id, (el) => (el.setAttribute('rx', String(v)), el.setAttribute('ry', String(v))))}
-                onFill={(v) => mutate(selected.id, (el) => el.setAttribute('fill', v))}
+                onFill={(v) =>
+                  selected.type === 'frame'
+                    ? mutate(selected.id, (el) => setFrameFill(el, v, selected.props.box))
+                    : mutate(selected.id, (el) => el.setAttribute('fill', v))
+                }
                 onText={(v) => mutate(selected.id, (el) => (el.textContent = v))}
                 onResize={
                   selected.type === 'frame' &&
@@ -1749,12 +1847,25 @@ export function EditorCore() {
           })()}
           canFramify={(() => {
             const l = findLayer(result.screen.layers, menu.layerId);
-            // Only a plain group (not already a frame) can be framified — once it
-            // is a real frame the option drops away, confirming the conversion.
-            return !!l && l.type === 'frame' && l.children.length > 0 && !l.props.frame;
+            if (!l) return false;
+            // A plain group converts in place; any other target (a leaf, or a
+            // multi-selection) gets wrapped into a new frame — Figma's "Frame
+            // selection". A layer that's already a real frame has nothing to do.
+            const isPlainGroup = l.type === 'frame' && l.children.length > 0 && !l.props.frame;
+            const isRealFrame = l.type === 'frame' && !!l.props.frame;
+            return isPlainGroup || !isRealFrame;
           })()}
           onFramify={() => {
-            framifyGroup(menu.layerId!);
+            const l = findLayer(result.screen.layers, menu.layerId!);
+            const isPlainGroup =
+              !!l && l.type === 'frame' && l.children.length > 0 && !l.props.frame;
+            if (isPlainGroup) {
+              framifyGroup(menu.layerId!); // existing group → frame, in place
+            } else {
+              // Frame the current selection (or just the clicked row).
+              const target = menu.layerId!;
+              frameSelection(selectedIds.includes(target) ? selectedIds : [target]);
+            }
             setMenu(null);
           }}
           onGroup={(layout) => {

@@ -632,3 +632,20 @@ a:hover > .brand-logo .bl4 { animation: bl4 6s cubic-bezier(.65,0,.35,1) infinit
 /* Figma card: frames sit offset (--tx/--ty) at rest, snap to an aligned stack. */
 .pf-frame { transform: translate(var(--tx, 0), var(--ty, 0)); }
 .group:hover .pf-frame { transform: translate(0, 0); }
+
+/* PlatformFeatures — extra detail motions. */
+@keyframes pf-typing {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30%           { opacity: 1; transform: translateY(-2px); }
+}
+.group:hover .pf-typing { animation: pf-typing 1.1s ease-in-out infinite; }
+
+@keyframes pf-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+  50%      { opacity: 1; transform: scale(1) rotate(45deg); }
+}
+.group:hover .pf-twinkle { animation: pf-twinkle 1.6s ease-in-out infinite; }
+
+/* Editor canvas: let <text> layers be picked anywhere in their box, not only
+   on the painted glyphs — so users don't have to aim at individual letters. */
+.editor-svg-host text { pointer-events: bounding-box; }

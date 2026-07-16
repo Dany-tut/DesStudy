@@ -124,6 +124,14 @@ model Learner {
   phone    String?
   telegram String?
 
+  // Two-way curator↔applicant chat over the Telegram bot. `tgLinkToken` is a
+  // random code embedded in the `t.me/<bot>?start=<token>` deep link we hand the
+  // applicant after their заявка; when they press Start the webhook resolves it
+  // and stores their private `tgChatId`. Once `tgChatId` is set the curator can
+  // reply from the admin «Заявки» tab and the applicant's messages flow back in.
+  tgChatId    String? @unique
+  tgLinkToken String? @unique
+
   // Credentials — null until the learner claims a LOGIN invite. `email` is
   // unique so it can't collide across learner cards; staff Users live in a
   // separate table, so a person could in theory reuse an address there.
@@ -163,6 +171,22 @@ model Learner {
   lessonAccess     LessonLearnerAccess[]
   invites          LearnerInvite[]
   applications     Application[]
+  chatMessages     ChatMessage[]
+}
+
+/// One message in the curator↔applicant Telegram chat, surfaced in the admin
+/// «Заявки» tab. `direction` is 'out' (curator → applicant, sent from the admin)
+/// or 'in' (applicant → curator, delivered by the Telegram webhook). Both sides
+/// go through the same bot; the conversation is scoped to the learner.
+model ChatMessage {
+  id        String   @id @default(cuid())
+  learner   Learner  @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  learnerId String
+  direction String // 'in' | 'out'
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([learnerId, createdAt])
 }
 
 /// A guest learner's "оставить заявку" from the pricing screen — the tariff they

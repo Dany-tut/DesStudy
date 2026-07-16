@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, ArrowRight, Loader2, CheckCircle2, X } from 'lucide-react';
+import { Check, ArrowRight, Loader2, CheckCircle2, MessageCircle, X } from 'lucide-react';
 
 /**
  * Guest-facing tariff cards shown to a learner who finished the grading test but
@@ -67,6 +67,8 @@ export function PricingPlans() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [telegram, setTelegram] = useState('');
+  // Deep link to open the curator chat over the bot, returned on submit.
+  const [chatLink, setChatLink] = useState<string | null>(null);
   const canSubmit = name.trim() !== '' && telegram.trim() !== '';
 
   const selectedPlan = selected ? PLANS.find((p) => p.id === selected) ?? null : null;
@@ -93,6 +95,8 @@ export function PricingPlans() {
         }),
       });
       if (!res.ok) throw new Error('failed');
+      const data = (await res.json().catch(() => ({}))) as { chatLink?: string | null };
+      setChatLink(data.chatLink ?? null);
       setStatus('sent');
       setContactOpen(false);
     } catch {
@@ -198,10 +202,23 @@ export function PricingPlans() {
       </div>
 
       {sentPlan ? (
-        <p className="mt-6 flex items-center justify-center gap-2 text-center text-footnote text-brand">
-          <CheckCircle2 size={16} />
-          Заявка на «{sentPlan.name}» отправлена — куратор скоро свяжется с вами.
-        </p>
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <p className="flex items-center gap-2 text-center text-footnote text-brand">
+            <CheckCircle2 size={16} />
+            Заявка на «{sentPlan.name}» отправлена — куратор скоро свяжется с вами.
+          </p>
+          {chatLink && (
+            <a
+              href={chatLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand transition-base hover:bg-brand-hover"
+            >
+              <MessageCircle size={15} />
+              Открыть чат с куратором
+            </a>
+          )}
+        </div>
       ) : error ? (
         <p className="mt-6 text-center text-footnote text-danger">
           Не удалось отправить заявку. Попробуйте ещё раз.

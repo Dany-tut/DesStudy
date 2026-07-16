@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentLearner } from '@/lib/learner';
 import { prisma } from '@/lib/db';
-import { sendTelegramMessage, escapeHtml } from '@/lib/notify/telegram';
+import { sendTelegramMessage, botChatLink, escapeHtml } from '@/lib/notify/telegram';
+import { randomBytes } from 'node:crypto';
 
 export const runtime = 'nodejs';
 
@@ -66,12 +67,22 @@ export async function POST(req: NextRequest) {
   const learner = await getCurrentLearner();
   const plan = body.plan;
 
+  // Deep-link token so the applicant can open a chat with the curator over the
+  // bot. Generated once per learner and reused across re-submits.
+  const chatToken = learner.tgLinkToken ?? randomBytes(12).toString('base64url');
+
   await prisma.$transaction(async (tx) => {
-    const learnerData: { name?: string; phone: string | null; telegram: string } = {
+    const learnerData: {
+      name?: string;
+      phone: string | null;
+      telegram: string;
+      tgLinkToken?: string;
+    } = {
       phone: phone || null,
       telegram,
     };
     if (name !== learner.name) learnerData.name = name;
+    if (!learner.tgLinkToken) learnerData.tgLinkToken = chatToken;
     await tx.learner.update({ where: { id: learner.id }, data: learnerData });
 
     const existing = await tx.application.findFirst({
@@ -107,5 +118,7 @@ export async function POST(req: NextRequest) {
   if (phone) lines.push(`Телефон: ${escapeHtml(phone)}`);
   await sendTelegramMessage(lines.join('\n'));
 
-  return NextResponse.json({ ok: true });
+  // Hand the applicant a deep link so they can open the curator chat right from
+  // Telegram; pressing Start there wires up two-way messaging (see the webhook).
+  return NextResponse.json({ ok: true, chatLink: botChatLink(chatToken) });
 }
