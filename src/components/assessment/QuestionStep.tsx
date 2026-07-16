@@ -39,13 +39,15 @@ export function QuestionStep({
           {question.interactive === 'component-states' && (
             <ComponentStatesTask onLevel={onChange} />
           )}
-          <button
-            type="button"
-            onClick={() => setSelfMode(true)}
-            className="mt-5 text-footnote text-tertiary underline-offset-2 hover:text-secondary hover:underline"
-          >
-            Пропустить задание — оценю себя сам
-          </button>
+          {question.interactive !== 'color-contrast' && (
+            <button
+              type="button"
+              onClick={() => setSelfMode(true)}
+              className="mt-5 text-footnote text-tertiary underline-offset-2 hover:text-secondary hover:underline"
+            >
+              Пропустить задание — оценю себя сам
+            </button>
+          )}
         </>
       ) : (
         <SelfAssessment question={question} value={value} onChange={onChange} />

@@ -33,7 +33,7 @@ function str(v: unknown): string {
 
 /**
  * A guest "оставить заявку" from the pricing screen. Records which tariff the
- * current learner picked — plus their contact (phone required, telegram
+ * current learner picked — plus their contact (ФИ + telegram required, phone
  * optional) — so it surfaces as a lead in the teacher/boss results view. One
  * learner keeps a single application: re-submitting updates the plan and
  * re-opens it (status back to 'new') rather than piling up duplicate leads.
@@ -53,22 +53,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_plan' }, { status: 400 });
   }
 
-  const phone = str(body.phone);
-  if (!phone) {
-    return NextResponse.json({ error: 'phone_required' }, { status: 400 });
-  }
   const telegram = str(body.telegram);
+  if (!telegram) {
+    return NextResponse.json({ error: 'telegram_required' }, { status: 400 });
+  }
+  const name = str(body.name);
+  if (!name) {
+    return NextResponse.json({ error: 'name_required' }, { status: 400 });
+  }
+  const phone = str(body.phone); // optional now
 
   const learner = await getCurrentLearner();
-  const name = str(body.name);
   const plan = body.plan;
 
   await prisma.$transaction(async (tx) => {
-    const learnerData: { name?: string; phone: string; telegram: string | null } = {
-      phone,
-      telegram: telegram || null,
+    const learnerData: { name?: string; phone: string | null; telegram: string } = {
+      phone: phone || null,
+      telegram,
     };
-    if (name && name !== learner.name) learnerData.name = name;
+    if (name !== learner.name) learnerData.name = name;
     await tx.learner.update({ where: { id: learner.id }, data: learnerData });
 
     const existing = await tx.application.findFirst({
@@ -94,15 +97,14 @@ export async function POST(req: NextRequest) {
     orderBy: { createdAt: 'desc' },
     select: { grade: true },
   });
-  const displayName = name || learner.name || 'Без имени';
   const lines = [
     '🎯 <b>Новая заявка на грейд-платформу</b>',
     `Тариф: <b>${escapeHtml(PLAN_LABEL[plan])}</b>`,
-    `ФИ: ${escapeHtml(displayName)}`,
+    `ФИ: ${escapeHtml(name)}`,
     `Грейд: ${latest ? escapeHtml(GRADE_LABEL[latest.grade] ?? latest.grade) : 'тест не пройден'}`,
-    `Телефон: ${escapeHtml(phone)}`,
+    `Telegram: ${escapeHtml(telegram)}`,
   ];
-  if (telegram) lines.push(`Telegram: ${escapeHtml(telegram)}`);
+  if (phone) lines.push(`Телефон: ${escapeHtml(phone)}`);
   await sendTelegramMessage(lines.join('\n'));
 
   return NextResponse.json({ ok: true });

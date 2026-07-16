@@ -60,11 +60,14 @@ export function PricingPlans() {
   const [selected, setSelected] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState(false);
-  // The contact modal collects phone (required) + telegram (optional) before the
-  // заявка goes out — that contact is how the curator reaches the lead.
+  // The contact modal collects ФИ + telegram (both required) and phone
+  // (optional) before the заявка goes out — that contact is how the curator
+  // reaches the lead.
   const [contactOpen, setContactOpen] = useState(false);
+  const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [telegram, setTelegram] = useState('');
+  const canSubmit = name.trim() !== '' && telegram.trim() !== '';
 
   const selectedPlan = selected ? PLANS.find((p) => p.id === selected) ?? null : null;
 
@@ -75,14 +78,19 @@ export function PricingPlans() {
   }
 
   async function submit() {
-    if (!selected || status === 'sending' || !phone.trim()) return;
+    if (!selected || status === 'sending' || !canSubmit) return;
     setStatus('sending');
     setError(false);
     try {
       const res = await fetch('/api/application', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: selected, phone: phone.trim(), telegram: telegram.trim() || undefined }),
+        body: JSON.stringify({
+          plan: selected,
+          name: name.trim(),
+          telegram: telegram.trim(),
+          phone: phone.trim() || undefined,
+        }),
       });
       if (!res.ok) throw new Error('failed');
       setStatus('sent');
@@ -241,30 +249,56 @@ export function PricingPlans() {
                 submit();
               }}
             >
-              <label className="block">
-                <span className="text-footnote font-medium text-primary">Телефон</span>
-                <input
-                  type="tel"
-                  autoFocus
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+7 999 123-45-67"
-                  className="mt-1.5 w-full rounded-lg border border-border bg-canvas px-3 py-2.5 text-footnote text-primary outline-none transition-base placeholder:text-tertiary focus:border-brand"
-                />
-              </label>
-              <label className="block">
-                <span className="text-footnote font-medium text-primary">
-                  Telegram <span className="text-tertiary">— по желанию</span>
-                </span>
-                <input
-                  type="text"
-                  value={telegram}
-                  onChange={(e) => setTelegram(e.target.value)}
-                  placeholder="@username"
-                  className="mt-1.5 w-full rounded-lg border border-border bg-canvas px-3 py-2.5 text-footnote text-primary outline-none transition-base placeholder:text-tertiary focus:border-brand"
-                />
-              </label>
+              <input
+                type="text"
+                autoFocus
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="ФИ"
+                className="w-full rounded-lg border border-border bg-canvas px-3 py-2.5 text-footnote text-primary outline-none transition-base placeholder:text-tertiary focus:border-brand"
+              />
+              <input
+                type="text"
+                required
+                value={telegram}
+                onChange={(e) => setTelegram(e.target.value)}
+                placeholder="Telegram (@username)"
+                className="w-full rounded-lg border border-border bg-canvas px-3 py-2.5 text-footnote text-primary outline-none transition-base placeholder:text-tertiary focus:border-brand"
+              />
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Телефон — по желанию"
+                className="w-full rounded-lg border border-border bg-canvas px-3 py-2.5 text-footnote text-primary outline-none transition-base placeholder:text-tertiary focus:border-brand"
+              />
+
+              {/* Reach the curator directly — link + scannable QR to the bot. */}
+              <div className="flex items-center gap-3 rounded-lg border border-border bg-canvas p-3">
+                <a
+                  href="https://t.me/DesStudy_bot"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 rounded-md bg-white p-1.5"
+                  aria-label="Открыть Telegram DesStudy"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/telegram-qr.svg" alt="QR на Telegram @DesStudy_bot" width={72} height={72} />
+                </a>
+                <div className="text-footnote text-secondary">
+                  Можно написать нам напрямую в Telegram:{' '}
+                  <a
+                    href="https://t.me/DesStudy_bot"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-brand hover:underline"
+                  >
+                    @DesStudy_bot
+                  </a>
+                  <span className="mt-0.5 block text-tertiary">Наведите камеру на QR-код</span>
+                </div>
+              </div>
 
               {error && (
                 <p className="text-footnote text-danger">Не удалось отправить. Попробуйте ещё раз.</p>
@@ -272,7 +306,7 @@ export function PricingPlans() {
 
               <button
                 type="submit"
-                disabled={status === 'sending' || !phone.trim()}
+                disabled={status === 'sending' || !canSubmit}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-footnote font-medium text-on-brand transition-base hover:bg-brand-hover disabled:opacity-50"
               >
                 {status === 'sending' ? (

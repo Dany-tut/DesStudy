@@ -175,7 +175,7 @@ model Application {
   learner   Learner  @relation(fields: [learnerId], references: [id], onDelete: Cascade)
   learnerId String
   plan      String // 'self' | 'mentor' | 'job'
-  status    String   @default("new") // 'new' | 'contacted' | 'closed'
+  status    String   @default("new") // 'new' | 'contacted' | 'closed' | 'spam'
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

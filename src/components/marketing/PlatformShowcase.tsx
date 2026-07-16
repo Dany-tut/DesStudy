@@ -24,6 +24,10 @@ import {
   ListChecks,
   Waypoints,
   ArrowUpDown,
+  Contrast,
+  ScanSearch,
+  PaintBucket,
+  Move,
 } from 'lucide-react';
 import BlurEffect from 'react-progressive-blur';
 import { Confetti } from './Confetti';
@@ -46,7 +50,19 @@ const SUCCESS_RGB = '47 181 124';
  * fake mock.
  */
 
-type ModeId = 'tune' | 'fix' | 'build' | 'quiz' | 'match' | 'order' | 'mentor' | 'validate';
+type ModeId =
+  | 'tune'
+  | 'fix'
+  | 'contrast'
+  | 'paint'
+  | 'build'
+  | 'spot'
+  | 'move'
+  | 'quiz'
+  | 'match'
+  | 'order'
+  | 'mentor'
+  | 'validate';
 
 interface Mode {
   id: ModeId;
@@ -58,7 +74,11 @@ interface Mode {
 const MODES: Mode[] = [
   { id: 'tune', name: 'Отступы · 8pt', icon: Ruler, kind: 'Тренажёр' },
   { id: 'fix', name: 'Почини экран', icon: Wrench, kind: 'Практика' },
+  { id: 'contrast', name: 'Контраст текста', icon: Contrast, kind: 'Тренажёр' },
+  { id: 'paint', name: 'Заливка', icon: PaintBucket, kind: 'Тренажёр' },
   { id: 'build', name: 'Собери с нуля', icon: Blocks, kind: 'Практика' },
+  { id: 'spot', name: 'Найди ошибку', icon: ScanSearch, kind: 'Практика' },
+  { id: 'move', name: 'Перемести', icon: Move, kind: 'Практика' },
   { id: 'quiz', name: 'Квиз по теории', icon: ListChecks, kind: 'Квиз' },
   { id: 'match', name: 'Сопоставление', icon: Waypoints, kind: 'Практика' },
   { id: 'order', name: 'Порядок шагов', icon: ArrowUpDown, kind: 'Практика' },
@@ -175,7 +195,13 @@ export function PlatformShowcase() {
           >
             {active === 'tune' && <TuneMode solved={solved.tune} onSolve={() => activate('tune')} />}
             {active === 'fix' && <FixMode solved={solved.fix} onSolve={() => activate('fix')} />}
+            {active === 'contrast' && (
+              <ContrastMode solved={solved.contrast} onSolve={() => activate('contrast')} />
+            )}
+            {active === 'paint' && <PaintMode solved={solved.paint} onSolve={() => activate('paint')} />}
             {active === 'build' && <BuildMode solved={solved.build} onSolve={() => activate('build')} />}
+            {active === 'spot' && <SpotMode solved={solved.spot} onSolve={() => activate('spot')} />}
+            {active === 'move' && <MoveMode solved={solved.move} onSolve={() => activate('move')} />}
             {active === 'quiz' && <QuizMode solved={solved.quiz} onSolve={() => activate('quiz')} />}
             {active === 'match' && <MatchMode solved={solved.match} onSolve={() => activate('match')} />}
             {active === 'order' && <OrderMode solved={solved.order} onSolve={() => activate('order')} />}
@@ -408,7 +434,7 @@ function TuneMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
           value={gap}
           min={0}
           max={24}
-          step={4}
+          step={2}
           unit="px"
           accent={gapOk ? SUCCESS_RGB : undefined}
           celebrate={allOk}
@@ -416,30 +442,27 @@ function TuneMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
         />
       </div>
 
-      {/* padding stepper */}
-      <div className="mt-4 flex items-center gap-3">
-        <span className="w-16 text-caption text-tertiary">padding</span>
-        <div className="flex flex-1 items-center gap-2">
-          <StepBtn label="убавить padding" onClick={() => bump('pad', Math.max(0, padding - 4))}>
-            <Minus size={14} />
-          </StepBtn>
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-            <div
-              className={`h-full rounded-full transition-base ${padOk ? 'bg-success' : 'bg-brand'}`}
-              style={{ width: `${(padding / 24) * 100}%` }}
-            />
-          </div>
-          <StepBtn label="прибавить padding" onClick={() => bump('pad', Math.min(24, padding + 4))}>
-            <Plus size={14} />
-          </StepBtn>
+      {/* padding slider — same control as gap so the two identical-type tasks
+          read identically (was a +/- stepper, which looked inconsistent). */}
+      <div className="mt-6">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-caption text-tertiary">padding</span>
+          <span
+            className={`min-w-[46px] text-right text-footnote font-semibold tabular-nums ${padOk ? 'text-success' : 'text-primary'}`}
+          >
+            {padding}px
+          </span>
         </div>
-        <span
-          className={`min-w-[46px] text-right text-footnote font-semibold tabular-nums ${
-            padOk ? 'text-success' : 'text-primary'
-          }`}
-        >
-          {padding}px
-        </span>
+        <Slider
+          value={padding}
+          min={0}
+          max={24}
+          step={2}
+          unit="px"
+          accent={padOk ? SUCCESS_RGB : undefined}
+          celebrate={allOk}
+          onChange={(v) => bump('pad', v)}
+        />
       </div>
 
       {/* two validation lines */}
@@ -717,6 +740,359 @@ function BuildMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }
       <div className="mt-4 space-y-1.5">
         <ValLine ok={sizeOk} label="Заголовок доминирует (размер L)" />
         <ValLine ok={alignOk} label="Контент выровнен по левому краю" />
+      </div>
+    </div>
+  );
+}
+
+/* ── mode: contrast — drag text lightness to a passing WCAG ratio ────── */
+
+// Relative luminance of a neutral gray channel (0–255), per WCAG 2.1.
+function grayLuminance(c: number) {
+  const s = c / 255;
+  const lin = s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  return lin;
+}
+// Contrast ratio of a gray on a white background.
+function contrastOnWhite(gray: number) {
+  return (1 + 0.05) / (grayLuminance(gray) + 0.05);
+}
+
+function ContrastMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }) {
+  // `dark` = how dark the text is (0 = near-white, 100 = black). Start light so
+  // the sample fails, and the visitor drags until it passes AA.
+  const [dark, setDark] = useState(solved ? 80 : 20);
+
+  const gray = Math.round(255 - (dark / 100) * 255);
+  const ratio = contrastOnWhite(gray);
+  const aaOk = ratio >= 4.5; // WCAG AA for normal text
+  const wasOk = useRef(solved);
+
+  function setLevel(v: number) {
+    setDark(v);
+    const nowOk = contrastOnWhite(Math.round(255 - (v / 100) * 255)) >= 4.5;
+    if (nowOk && !wasOk.current) onSolve();
+    wasOk.current = nowOk;
+  }
+
+  const textColor = `rgb(${gray} ${gray} ${gray})`;
+
+  return (
+    <div className="flex min-h-[340px] flex-col">
+      <ModeHeader title="Контраст текста" hint="Затемняй текст, пока контраст не пройдёт AA (≥ 4.5:1)" done={solved} />
+
+      {/* live preview on a white card */}
+      <div className="rounded-xl border border-border bg-white p-5">
+        <p className="text-footnote font-semibold transition-base" style={{ color: textColor }}>
+          Заголовок курса
+        </p>
+        <p className="mt-1 text-caption leading-snug transition-base" style={{ color: textColor }}>
+          Этот абзац должен читаться без напряжения на белом фоне.
+        </p>
+      </div>
+
+      {/* live ratio read-out */}
+      <div className="mt-4 flex items-center justify-between">
+        <span className="text-caption text-tertiary">контраст с фоном</span>
+        <span
+          className={`rounded-md px-2 py-0.5 text-footnote font-semibold tabular-nums transition-base ${
+            aaOk ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'
+          }`}
+        >
+          {ratio.toFixed(1)}:1
+        </span>
+      </div>
+
+      {/* darkness slider — recolors green + celebrates on pass */}
+      <div className="mt-auto pt-6">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-caption text-tertiary">насыщенность текста</span>
+        </div>
+        <Slider
+          value={dark}
+          min={0}
+          max={100}
+          step={5}
+          accent={aaOk ? SUCCESS_RGB : undefined}
+          celebrate={aaOk}
+          onChange={setLevel}
+        />
+      </div>
+
+      {/* validation */}
+      <div className="mt-4 space-y-1.5">
+        <ValLine ok={aaOk} label="Контраст ≥ 4.5:1 (WCAG AA)" />
+      </div>
+    </div>
+  );
+}
+
+/* ── mode: spot — find the block that breaks the grid (click-to-fix) ──── */
+
+const SPOT_TILES = [0, 1, 2, 3];
+const SPOT_ODD = 2; // this tile sits off the baseline
+
+function SpotMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }) {
+  const [fixedOdd, setFixedOdd] = useState(solved);
+  const [miss, setMiss] = useState<number | null>(null);
+
+  function tap(i: number) {
+    if (fixedOdd) return;
+    if (i === SPOT_ODD) {
+      setFixedOdd(true);
+      setMiss(null);
+      onSolve();
+    } else {
+      setMiss(i);
+      setTimeout(() => setMiss((m) => (m === i ? null : m)), 450);
+    }
+  }
+
+  return (
+    <div className="flex min-h-[340px] flex-col">
+      <ModeHeader
+        title="Найди ошибку"
+        hint="Один блок выбивается из сетки — кликни по нему, чтобы выровнять"
+        done={solved}
+      />
+
+      {/* live board — four tiles on a shared baseline; one is nudged up */}
+      <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="flex items-end gap-3">
+          {SPOT_TILES.map((i) => {
+            const odd = i === SPOT_ODD && !fixedOdd;
+            const shake = miss === i;
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => tap(i)}
+                aria-label={`Блок ${i + 1}`}
+                style={{ transform: odd ? 'translateY(-14px)' : 'translateY(0)' }}
+                className={[
+                  'flex flex-1 flex-col gap-2 rounded-lg border p-3 text-left transition-base',
+                  fixedOdd
+                    ? 'cursor-default border-border bg-canvas'
+                    : 'cursor-pointer hover:border-brand',
+                  odd
+                    ? 'border-brand/60 bg-brand/5'
+                    : 'border-border bg-canvas',
+                  shake ? 'border-danger bg-danger/10' : '',
+                ].join(' ')}
+              >
+                <span className="h-8 w-8 rounded-lg bg-brand/15" />
+                <span className="h-2 w-full rounded-full bg-border-strong" />
+                <span className="h-2 w-2/3 rounded-full bg-border" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <p className={`mt-auto pt-4 text-caption ${fixedOdd ? 'text-success' : 'text-tertiary'}`}>
+        {fixedOdd
+          ? '✓ Ровная базовая линия — глаз считывает ряд как единое целое'
+          : miss !== null
+            ? 'Этот блок на месте. Ищи тот, что приподнят над линией'
+            : 'Три блока стоят на одной линии, один — нет. Кликни по нарушителю'}
+      </p>
+
+      <div className="mt-4 space-y-1.5">
+        <ValLine ok={fixedOdd} label="Все блоки на одной базовой линии" />
+      </div>
+    </div>
+  );
+}
+
+/* ── mode: paint — fill the shape with the right design token ────────── */
+
+const SWATCHES = [
+  { id: 'brand', token: 'brand-500', css: 'var(--bg-brand)', ok: true },
+  { id: 'red', token: 'red-500', css: '#e5484d', ok: false },
+  { id: 'green', token: 'green-500', css: '#2fb57c', ok: false },
+  { id: 'gray', token: 'gray-400', css: '#9ca3af', ok: false },
+  { id: 'amber', token: 'amber-500', css: '#f5a623', ok: false },
+] as const;
+
+function PaintMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }) {
+  const [fill, setFill] = useState<string | null>(solved ? 'brand' : null);
+  const picked = SWATCHES.find((s) => s.id === fill) ?? null;
+  const ok = picked?.ok ?? false;
+
+  function paint(id: string) {
+    if (ok) return; // lock once correct
+    setFill(id);
+    if (SWATCHES.find((s) => s.id === id)?.ok) onSolve();
+  }
+
+  return (
+    <div className="flex min-h-[340px] flex-col">
+      <ModeHeader
+        title="Заливка"
+        hint="Покрась кнопку в акцентный токен бренда — как заливкой в Figma"
+        done={solved}
+      />
+
+      {/* live preview — the shape whose fill you're painting */}
+      <div className="flex items-center justify-center rounded-xl border border-border bg-surface p-6">
+        <div
+          className="flex h-11 items-center justify-center rounded-xl px-6 text-footnote font-medium transition-base"
+          style={{
+            background: picked ? picked.css : 'var(--bg-muted)',
+            color: picked ? '#ffffff' : 'var(--text-tertiary)',
+          }}
+        >
+          Начать курс
+        </div>
+      </div>
+
+      {/* fill token row — the Figma-style swatch picker */}
+      <div className="mt-auto pt-5">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-caption text-tertiary">Fill</span>
+          <span className="font-mono text-caption text-secondary">
+            {picked ? picked.token : '—'}
+          </span>
+        </div>
+        <div className="flex gap-2.5">
+          {SWATCHES.map((s) => {
+            const isPicked = fill === s.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                aria-label={s.token}
+                onClick={() => paint(s.id)}
+                className={[
+                  'h-9 w-9 shrink-0 rounded-lg border transition-fast',
+                  isPicked ? 'ring-2 ring-brand ring-offset-2 ring-offset-canvas' : 'hover:scale-105',
+                  isPicked ? 'border-transparent' : 'border-black/10',
+                ].join(' ')}
+                style={{ background: s.css }}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* validation */}
+      <div className="mt-5 space-y-1.5">
+        <ValLine ok={ok} label="Заливка = акцентный токен (brand-500)" />
+      </div>
+    </div>
+  );
+}
+
+/* ── mode: move — drag the block into the frame, snaps on release ─────── */
+
+function MoveMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }) {
+  const boardRef = useRef<HTMLDivElement>(null);
+  // Position of the draggable block's top-left, in board px.
+  const START = { x: 12, y: 44 };
+  const TARGET = { x: 176, y: 30 };
+  const BLOCK = { w: 84, h: 60 };
+  const SNAP = 26; // px tolerance between block+target centres
+
+  const [pos, setPos] = useState(solved ? TARGET : START);
+  const [dragging, setDragging] = useState(false);
+  const [snapped, setSnapped] = useState(solved);
+  const grab = useRef({ dx: 0, dy: 0 });
+
+  function centreDist(p: { x: number; y: number }) {
+    return Math.hypot(p.x - TARGET.x, p.y - TARGET.y);
+  }
+  const near = !snapped && dragging && centreDist(pos) < SNAP;
+
+  function onDown(e: React.PointerEvent) {
+    if (snapped) return;
+    const board = boardRef.current;
+    if (!board) return;
+    const b = board.getBoundingClientRect();
+    grab.current = { dx: e.clientX - b.left - pos.x, dy: e.clientY - b.top - pos.y };
+    setDragging(true);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }
+  function onMove(e: React.PointerEvent) {
+    if (!dragging) return;
+    const board = boardRef.current;
+    if (!board) return;
+    const b = board.getBoundingClientRect();
+    const x = Math.max(0, Math.min(b.width - BLOCK.w, e.clientX - b.left - grab.current.dx));
+    const y = Math.max(0, Math.min(b.height - BLOCK.h, e.clientY - b.top - grab.current.dy));
+    setPos({ x, y });
+  }
+  function onUp(e: React.PointerEvent) {
+    if (!dragging) return;
+    setDragging(false);
+    (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+    if (centreDist(pos) < SNAP) {
+      setPos(TARGET);
+      setSnapped(true);
+      onSolve();
+    }
+  }
+
+  return (
+    <div className="flex min-h-[340px] flex-col">
+      <ModeHeader
+        title="Перемести"
+        hint="Перетащи блок в пунктирную рамку — он примагнитится, как в Figma"
+        done={solved}
+      />
+
+      <div
+        ref={boardRef}
+        className="relative h-[150px] w-full overflow-hidden rounded-xl border border-border bg-surface"
+        style={{
+          backgroundImage:
+            'linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+      >
+        {/* drop frame */}
+        <div
+          className={`absolute rounded-lg border-2 border-dashed transition-base ${
+            snapped ? 'border-success/60 bg-success/5' : near ? 'border-brand bg-brand/10' : 'border-border-strong'
+          }`}
+          style={{ left: TARGET.x, top: TARGET.y, width: BLOCK.w, height: BLOCK.h }}
+        />
+
+        {/* draggable block */}
+        <div
+          onPointerDown={onDown}
+          onPointerMove={onMove}
+          onPointerUp={onUp}
+          role="button"
+          aria-label="Перетаскиваемый блок"
+          className={[
+            'absolute flex flex-col justify-center gap-1.5 rounded-lg border px-3 shadow-sm transition-shadow select-none touch-none',
+            snapped
+              ? 'cursor-default border-success bg-success/10'
+              : dragging
+                ? 'cursor-grabbing border-brand bg-elevated shadow-md'
+                : 'cursor-grab border-border bg-elevated',
+          ].join(' ')}
+          style={{
+            left: pos.x,
+            top: pos.y,
+            width: BLOCK.w,
+            height: BLOCK.h,
+            transition: dragging ? 'none' : 'left 0.28s cubic-bezier(0.32,1.12,0.5,1), top 0.28s cubic-bezier(0.32,1.12,0.5,1)',
+          }}
+        >
+          <span className="h-6 w-6 rounded-md bg-brand/20" />
+          <span className="h-1.5 w-full rounded-full bg-border-strong" />
+        </div>
+      </div>
+
+      <p className={`mt-auto pt-4 text-caption ${snapped ? 'text-success' : 'text-tertiary'}`}>
+        {snapped
+          ? '✓ Блок на месте — привязка к рамке сработала'
+          : 'Тащи карточку к пунктирному контуру, пока он не подсветится, и отпусти'}
+      </p>
+
+      <div className="mt-4 space-y-1.5">
+        <ValLine ok={snapped} label="Блок привязан к целевой рамке" />
       </div>
     </div>
   );
