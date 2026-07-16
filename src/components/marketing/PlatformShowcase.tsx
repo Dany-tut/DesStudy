@@ -702,10 +702,10 @@ function BuildMode({ solved, onSolve }: { solved: boolean; onSolve: () => void }
         >
           {/* fixed 18px slot so the taller heading (size L) never grows the card */}
           <div className="flex h-[18px] items-center" style={{ width: '70%' }}>
-            <div className="w-full rounded bg-border-strong transition-base" style={{ height: headH }} />
+            <div className="w-full rounded-full bg-border-strong transition-base" style={{ height: headH }} />
           </div>
-          <div className="h-2 w-full rounded bg-border" />
-          <div className="h-2 w-2/3 rounded bg-border" />
+          <div className="h-2 w-full rounded-full bg-border" />
+          <div className="h-2 w-2/3 rounded-full bg-border" />
         </div>
       </div>
 
@@ -907,7 +907,7 @@ function SpotMode({ solved, onSolve }: { solved: boolean; onSolve: () => void })
 /* ── mode: paint — fill the shape with the right design token ────────── */
 
 const SWATCHES = [
-  { id: 'brand', token: 'brand-500', css: 'var(--bg-brand)', ok: true },
+  { id: 'brand', token: 'brand-500', css: 'var(--brand)', ok: true },
   { id: 'red', token: 'red-500', css: '#e5484d', ok: false },
   { id: 'green', token: 'green-500', css: '#2fb57c', ok: false },
   { id: 'gray', token: 'gray-400', css: '#9ca3af', ok: false },
