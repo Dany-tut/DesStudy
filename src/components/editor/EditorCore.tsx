@@ -589,7 +589,7 @@ export function EditorCore() {
   // Cmd/Ctrl+Z undo, Cmd/Ctrl+Shift+Z redo — but let native undo win inside inputs.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
+      if (!(e.metaKey || e.ctrlKey) || e.code !== 'KeyZ') return;
       const ae = document.activeElement;
       if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
       e.preventDefault();
@@ -1760,15 +1760,17 @@ export function EditorCore() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
-      const k = e.key.toLowerCase();
-      if (k !== 'c' && k !== 'v' && k !== 'd') return;
+      // Keyed on `e.code` (physical key), so it works on any layout — on a
+      // Cyrillic layout `e.key` for the C key is 'с', which would never match.
+      const code = e.code;
+      if (code !== 'KeyC' && code !== 'KeyV' && code !== 'KeyD') return;
       const ae = document.activeElement;
       if (ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae as HTMLElement).isContentEditable)) return;
-      if (k === 'c') {
+      if (code === 'KeyC') {
         if (!selectedIds.length) return;
         e.preventDefault();
         copySelection();
-      } else if (k === 'v') {
+      } else if (code === 'KeyV') {
         if (!clipboard.current.length) return;
         e.preventDefault();
         pasteClipboard();
@@ -1786,7 +1788,7 @@ export function EditorCore() {
   // Shift makes a plain group. Skip while typing in a field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'g') return;
+      if (!(e.metaKey || e.ctrlKey) || e.code !== 'KeyG') return;
       const ae = document.activeElement;
       if (ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae as HTMLElement).isContentEditable)) return;
       if (!selectedIds.length) return;
@@ -2048,10 +2050,10 @@ export function EditorCore() {
     const onKey = (e: KeyboardEvent) => {
       const ae = document.activeElement;
       if (ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae as HTMLElement).isContentEditable)) return;
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+      if ((e.metaKey || e.ctrlKey) && e.code === 'KeyA') {
         e.preventDefault();
         selectAll();
-      } else if (e.shiftKey && e.key === '1') {
+      } else if (e.shiftKey && e.code === 'Digit1') {
         e.preventDefault();
         fitView();
       }

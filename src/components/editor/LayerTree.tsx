@@ -516,14 +516,15 @@ function LayerRow({
         draggable={draggable && !editing}
         onDragStart={(e) => {
           e.stopPropagation();
-          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.effectAllowed = 'copyMove';
           e.dataTransfer.setData('text/plain', layer.id);
           onBeginDrag?.(layer.id);
         }}
         onDragOver={(e) => {
           if (!dragId || dragId === layer.id) return;
           e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
+          // Alt/Option → show the copy badge; a plain drag shows the move cursor.
+          e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
           const el = rowRef.current;
           if (!el) return;
           const r = el.getBoundingClientRect();
@@ -587,12 +588,14 @@ function LayerRow({
         ].join(' ')}
         style={{ paddingLeft: 8 + depth * 14 }}
       >
-        {/* Reorder drop line — before / after this row. */}
+        {/* Reorder drop line — before / after this row. Its left edge follows the
+            row's own indentation so the line reads at the depth it'll land at,
+            instead of a full-width bar that looks skewed over nested rows. */}
         {drop && drop.id === layer.id && drop.pos === 'before' && (
-          <span aria-hidden className="pointer-events-none absolute -top-px left-1 right-1 h-0.5 rounded-full bg-brand" />
+          <span aria-hidden className="pointer-events-none absolute top-0 right-1 h-0.5 -translate-y-1/2 rounded-full bg-brand" style={{ left: 8 + depth * 14 }} />
         )}
         {drop && drop.id === layer.id && drop.pos === 'after' && (
-          <span aria-hidden className="pointer-events-none absolute -bottom-px left-1 right-1 h-0.5 rounded-full bg-brand" />
+          <span aria-hidden className="pointer-events-none absolute bottom-0 right-1 h-0.5 translate-y-1/2 rounded-full bg-brand" style={{ left: 8 + depth * 14 }} />
         )}
         {/* Indent guides — one hairline per ancestor level, like Figma. */}
         {Array.from({ length: depth }).map((_, i) => (
