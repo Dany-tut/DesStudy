@@ -34,7 +34,7 @@ export default async function TeacherPage() {
       where: { teacherId: user.id },
       orderBy: { createdAt: 'desc' },
       include: {
-        members: { include: { learner: { select: { id: true, name: true, email: true } } } },
+        members: { include: { learner: { select: { id: true, name: true, email: true, passwordPlain: true } } } },
       },
     }),
     // The teacher's own students (BOSS sees all). teacherId is set when a card
@@ -42,7 +42,7 @@ export default async function TeacherPage() {
     prisma.learner.findMany({
       where: user.role === 'BOSS' ? {} : { teacherId: user.id },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, email: true, passwordPlain: true },
       take: 500,
     }),
   ]);
@@ -54,6 +54,8 @@ export default async function TeacherPage() {
       id: m.learner.id,
       name: m.learner.name,
       hasAccount: !!m.learner.email,
+      email: m.learner.email,
+      password: m.learner.passwordPlain,
     })),
   }));
 
@@ -61,6 +63,8 @@ export default async function TeacherPage() {
     id: l.id,
     name: l.name,
     hasAccount: !!l.email,
+    email: l.email,
+    password: l.passwordPlain,
   }));
 
   const lessonViews: LessonView[] = lessons.map((l) => ({

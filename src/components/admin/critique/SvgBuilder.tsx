@@ -182,8 +182,8 @@ export function SvgBuilder({
         </div>
         <LayerTree
           layers={screen.layers}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
+          selectedIds={selectedId ? [selectedId] : []}
+          onSelect={(id) => setSelectedId(id)}
           onHover={setHoveredId}
           zoneIds={zoneIds}
         />

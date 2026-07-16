@@ -104,6 +104,15 @@ body {
 }
 
 /*
+ * Always reserve room for the vertical scrollbar so switching between views
+ * (short page → tall page) never shifts the layout horizontally. The gutter is
+ * held on <html> even when there's nothing to scroll.
+ */
+html {
+  scrollbar-gutter: stable;
+}
+
+/*
  * Focus rings — kill the browser's default black outline everywhere and show a
  * soft brand ring only for keyboard users (:focus-visible). Mouse/touch clicks
  * leave no ring, so selecting a segment or answer never draws a hard border.

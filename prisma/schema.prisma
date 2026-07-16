@@ -122,6 +122,11 @@ model Learner {
   // separate table, so a person could in theory reuse an address there.
   email        String? @unique
   passwordHash String?
+  // Plaintext copy of the learner's password, shown to the teacher in the admin
+  // so they can hand credentials back to a student who forgot them. Deliberate
+  // product choice for this teacher-provisioned platform — NOT a security best
+  // practice (passwords should normally only ever be hashed).
+  passwordPlain String?
 
   // The teacher who tested/created this learner. Scopes the testing view +
   // results per teacher (BOSS sees all). SetNull keeps orphaned cards visible

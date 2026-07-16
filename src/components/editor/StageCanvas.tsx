@@ -33,6 +33,8 @@ interface Box {
 
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 8;
+/** Snap distance for Shift-drag alignment, in screen px. */
+const SNAP_PX = 6;
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
 /** Modifier that means "go deep / zoom" — Cmd (Mac) · Ctrl · Alt, any of them.
@@ -53,15 +55,28 @@ function layerIdAt(target: EventTarget | null, deep: boolean): string | null {
   return top.getAttribute('data-layer-id');
 }
 
+/** A layer's content-space bounds plus its centre, for alignment snapping. */
+type SnapBox = { left: number; top: number; right: number; bottom: number; cx: number; cy: number };
+
+/** Content-space box of an element, given the content rect origin and scale. */
+function snapBoxOf(el: Element, crLeft: number, crTop: number, scale: number): SnapBox {
+  const r = el.getBoundingClientRect();
+  const left = (r.left - crLeft) / scale;
+  const top = (r.top - crTop) / scale;
+  const right = (r.right - crLeft) / scale;
+  const bottom = (r.bottom - crTop) / scale;
+  return { left, top, right, bottom, cx: (left + right) / 2, cy: (top + bottom) / 2 };
+}
+
 export function StageCanvas({
   svg,
   width,
   height,
-  selectedId,
+  selectedIds,
   hoveredId,
   onSelect,
   onHover,
-  onMoveLayer,
+  onMoveLayers,
   zoneIds,
   svgHostRef,
 }: {
@@ -69,12 +84,15 @@ export function StageCanvas({
   /** viewBox size in user units — one unit renders as one content-space px. */
   width: number;
   height: number;
-  selectedId: string | null;
+  /** Selected layer ids. The last entry is the "primary" (drives side panels). */
+  selectedIds: string[];
   hoveredId: string | null;
-  onSelect: (id: string | null) => void;
+  /** Select a layer. `additive` (Shift) toggles it in/out of the current set;
+   *  otherwise it replaces the selection. Pass null to clear. */
+  onSelect: (id: string | null, additive?: boolean) => void;
   onHover: (id: string | null) => void;
-  /** Commit a finished drag: shift the layer by (dx,dy) user units. */
-  onMoveLayer: (id: string, dx: number, dy: number) => void;
+  /** Commit a finished drag: shift every given layer by (dx,dy) user units. */
+  onMoveLayers: (ids: string[], dx: number, dy: number) => void;
   /** Layer ids promoted to critique zones — outlined in green. */
   zoneIds?: Set<string>;
   /** Ref to the div wrapping the injected `<svg>`, so callers can measure nodes. */
@@ -84,7 +102,7 @@ export function StageCanvas({
   const contentRef = useRef<HTMLDivElement>(null);
   const selHiRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View | null>(null);
-  const [selBox, setSelBox] = useState<Box | null>(null);
+  const [selBoxes, setSelBoxes] = useState<Box[]>([]);
   const [hovBox, setHovBox] = useState<Box | null>(null);
   const [zoneBoxes, setZoneBoxes] = useState<Box[]>([]);
 
@@ -101,13 +119,23 @@ export function StageCanvas({
   const drag = useRef<
     | null
     | { kind: 'pan'; startX: number; startY: number; ox: number; oy: number; scale: number }
-    | { kind: 'move'; id: string; node: SVGGraphicsElement; base: string; startX: number; startY: number; scale: number; dx: number; dy: number }
+    | { kind: 'move'; ids: string[]; nodes: { node: SVGGraphicsElement; base: string }[]; startX: number; startY: number; scale: number; dx: number; dy: number; baseBox: SnapBox; targets: SnapBox[] }
   >(null);
+
+  // Imperative alignment guides drawn during a Shift-drag — positioned in
+  // content space (so 1px = 1 user unit) and toggled without a re-render.
+  const vGuideRef = useRef<HTMLDivElement>(null);
+  const hGuideRef = useRef<HTMLDivElement>(null);
 
   // Latest pointer event awaiting a frame — coalesces the burst of pointermove
   // events the OS fires between two paints into a single visual update.
-  const pending = useRef<{ x: number; y: number } | null>(null);
+  const pending = useRef<{ x: number; y: number; shift: boolean } | null>(null);
   const raf = useRef<number | null>(null);
+
+  // Last known cursor position over the stage, so pressing/releasing the deep
+  // modifier (Alt/Cmd/Ctrl) can re-resolve the hover target without waiting for
+  // the mouse to move — the highlight dives to the leaf the instant Alt goes down.
+  const lastPointer = useRef<{ x: number; y: number } | null>(null);
 
   // Fit-and-centre the scene the first time we know both sizes.
   useLayoutEffect(() => {
@@ -139,9 +167,10 @@ export function StageCanvas({
     [view],
   );
 
+  const selKey = selectedIds.join(',');
   useLayoutEffect(() => {
-    setSelBox(measure(selectedId));
-    setHovBox(hoveredId && hoveredId !== selectedId ? measure(hoveredId) : null);
+    setSelBoxes(selectedIds.map((id) => measure(id)).filter((b): b is Box => b != null));
+    setHovBox(hoveredId && !selectedIds.includes(hoveredId) ? measure(hoveredId) : null);
     if (zoneIds && zoneIds.size) {
       const boxes: Box[] = [];
       for (const id of zoneIds) {
@@ -152,7 +181,8 @@ export function StageCanvas({
     } else {
       setZoneBoxes([]);
     }
-  }, [selectedId, hoveredId, svg, view, measure, zoneIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selKey, hoveredId, svg, view, measure, zoneIds]);
 
   // Wheel: pan by default, zoom-to-cursor with Alt. Bound natively so we can
   // preventDefault (the page must not scroll behind the fixed stage).
@@ -193,18 +223,52 @@ export function StageCanvas({
         const content = contentRef.current;
         if (content) content.style.transform = `translate(${x}px, ${y}px) scale(${g.scale})`;
       } else {
-        g.dx = (p.x - g.startX) / g.scale;
-        g.dy = (p.y - g.startY) / g.scale;
-        // Move the layer and its selection outline together — both by the same
-        // content-space delta, so no re-measure (getBoundingClientRect) is needed.
-        g.node.setAttribute('transform', `translate(${g.dx} ${g.dy}) ${g.base}`.trim());
+        let dx = (p.x - g.startX) / g.scale;
+        let dy = (p.y - g.startY) / g.scale;
+        let guideX: number | null = null;
+        let guideY: number | null = null;
+        // Shift-drag: snap the dragged box's edges/centre to any neighbour's
+        // edges/centre within a small threshold, and remember the matched line.
+        if (p.shift && g.targets.length) {
+          const T = SNAP_PX / g.scale;
+          const b = g.baseBox;
+          let bestX = T;
+          let bestY = T;
+          for (const t of g.targets) {
+            const tXs = [t.left, t.cx, t.right];
+            const tYs = [t.top, t.cy, t.bottom];
+            for (const dv of [b.left + dx, b.cx + dx, b.right + dx]) {
+              for (const tv of tXs) {
+                const d = tv - dv;
+                if (Math.abs(d) < bestX) { bestX = Math.abs(d); dx += d; guideX = tv; }
+              }
+            }
+            for (const dv of [b.top + dy, b.cy + dy, b.bottom + dy]) {
+              for (const tv of tYs) {
+                const d = tv - dv;
+                if (Math.abs(d) < bestY) { bestY = Math.abs(d); dy += d; guideY = tv; }
+              }
+            }
+          }
+        }
+        g.dx = dx;
+        g.dy = dy;
+        // Move every selected layer and the selection outlines together — all by
+        // the same content-space delta, so no re-measure is needed.
+        for (const { node, base } of g.nodes) {
+          node.setAttribute('transform', `translate(${dx} ${dy}) ${base}`.trim());
+        }
         const hi = selHiRef.current;
-        if (hi) hi.style.transform = `translate(${g.dx}px, ${g.dy}px)`;
+        if (hi) hi.style.transform = `translate(${dx}px, ${dy}px)`;
+        const vg = vGuideRef.current;
+        if (vg) { vg.style.display = guideX == null ? 'none' : 'block'; if (guideX != null) vg.style.left = `${guideX}px`; }
+        const hg = hGuideRef.current;
+        if (hg) { hg.style.display = guideY == null ? 'none' : 'block'; if (guideY != null) hg.style.top = `${guideY}px`; }
       }
     };
     const onMove = (e: PointerEvent) => {
       if (!drag.current) return;
-      pending.current = { x: e.clientX, y: e.clientY };
+      pending.current = { x: e.clientX, y: e.clientY, shift: e.shiftKey };
       if (raf.current == null) raf.current = requestAnimationFrame(flush);
     };
     const onUp = () => {
@@ -227,7 +291,9 @@ export function StageCanvas({
       } else {
         const hi = selHiRef.current;
         if (hi) hi.style.transform = '';
-        if (Math.abs(g.dx) > 0.5 || Math.abs(g.dy) > 0.5) onMoveLayer(g.id, g.dx, g.dy);
+        if (vGuideRef.current) vGuideRef.current.style.display = 'none';
+        if (hGuideRef.current) hGuideRef.current.style.display = 'none';
+        if (Math.abs(g.dx) > 0.5 || Math.abs(g.dy) > 0.5) onMoveLayers(g.ids, g.dx, g.dy);
       }
     };
     window.addEventListener('pointermove', onMove);
@@ -237,37 +303,118 @@ export function StageCanvas({
       window.removeEventListener('pointerup', onUp);
       if (raf.current != null) cancelAnimationFrame(raf.current);
     };
-  }, [onMoveLayer]);
+  }, [onMoveLayers]);
 
   function onPointerDown(e: React.PointerEvent) {
-    if (e.button !== 0 || !view) return;
-    const id = layerIdAt(e.target, wantsDeep(e));
-    if (id && !e.shiftKey) {
-      const node = contentRef.current?.querySelector<SVGGraphicsElement>(`[data-layer-id="${id}"]`);
-      onSelect(id);
-      if (node) {
-        drag.current = {
-          kind: 'move',
-          id,
-          node,
-          base: node.getAttribute('transform') ?? '',
-          startX: e.clientX,
-          startY: e.clientY,
-          scale: view.scale,
-          dx: 0,
-          dy: 0,
-        };
-      }
-    } else {
+    if (!view) return;
+    // Middle mouse button (wheel press): always pan. preventDefault kills the
+    // browser's middle-click autoscroll, which otherwise fights the stage.
+    if (e.button === 1) {
+      e.preventDefault();
       onSelect(null);
       drag.current = { kind: 'pan', startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y, scale: view.scale };
+      return;
+    }
+    if (e.button !== 0) return;
+    const deep = wantsDeep(e);
+    const additive = e.shiftKey;
+    const content = contentRef.current;
+
+    // Arm a move gesture over `ids`: snapshot each node's transform, the union
+    // bounding box of the whole selection, and the neighbours to snap against —
+    // all read once here, never per frame.
+    const armMove = (ids: string[]) => {
+      if (!content || !view) return;
+      const cr = content.getBoundingClientRect();
+      const nodes: { node: SVGGraphicsElement; base: string }[] = [];
+      const selected = new Set(ids);
+      let L = Infinity, T = Infinity, R = -Infinity, B = -Infinity;
+      const targets: SnapBox[] = [];
+      for (const sid of ids) {
+        const node = content.querySelector<SVGGraphicsElement>(`[data-layer-id="${sid}"]`);
+        if (!node) continue;
+        nodes.push({ node, base: node.getAttribute('transform') ?? '' });
+        const b = snapBoxOf(node, cr.left, cr.top, view.scale);
+        L = Math.min(L, b.left); T = Math.min(T, b.top);
+        R = Math.max(R, b.right); B = Math.max(B, b.bottom);
+        for (const sib of node.parentElement?.querySelectorAll(':scope > [data-layer-id]') ?? []) {
+          if (!selected.has(sib.getAttribute('data-layer-id') ?? '')) {
+            targets.push(snapBoxOf(sib, cr.left, cr.top, view.scale));
+          }
+        }
+      }
+      if (!nodes.length) return;
+      const baseBox: SnapBox = { left: L, top: T, right: R, bottom: B, cx: (L + R) / 2, cy: (T + B) / 2 };
+      drag.current = {
+        kind: 'move', ids, nodes, startX: e.clientX, startY: e.clientY,
+        scale: view.scale, dx: 0, dy: 0, baseBox, targets,
+      };
+    };
+
+    // Resolve the layer under the cursor. A plain press inside any already-
+    // selected layer grabs the whole selection (Figma: drag within selection
+    // moves it) — even if the hit resolves to a child or a different group.
+    let id = layerIdAt(e.target, deep);
+    if (!additive && !deep && selectedIds.length) {
+      const hitEl = e.target instanceof Element ? e.target : null;
+      for (const sid of selectedIds) {
+        const selNode = content?.querySelector<Element>(`[data-layer-id="${sid}"]`);
+        if (selNode && hitEl && selNode.contains(hitEl)) { id = sid; break; }
+      }
+    }
+
+    if (!id) {
+      // Empty grid: clear selection and pan. Shift keeps the current selection.
+      if (!additive) onSelect(null);
+      drag.current = { kind: 'pan', startX: e.clientX, startY: e.clientY, ox: view.x, oy: view.y, scale: view.scale };
+      return;
+    }
+
+    if (additive) {
+      const wasSelected = selectedIds.includes(id);
+      onSelect(id, true); // toggle membership
+      // Removing a layer just updates the selection — no drag. Adding one arms a
+      // move over the whole (now larger) selection, so a Shift-drag moves all.
+      if (!wasSelected) armMove([...selectedIds, id]);
+      return;
+    }
+
+    if (selectedIds.includes(id)) {
+      armMove(selectedIds); // press within the current selection: move all of it
+    } else {
+      onSelect(id, false);  // fresh single selection
+      armMove([id]);
     }
   }
 
   function onPointerMoveHover(e: React.PointerEvent) {
+    lastPointer.current = { x: e.clientX, y: e.clientY };
     if (drag.current) return;
     onHover(layerIdAt(e.target, wantsDeep(e)));
   }
+
+  // Pressing (or releasing) the deep modifier re-resolves the hover target at the
+  // current cursor position — so just holding Alt dives to the leaf under the
+  // cursor without needing to nudge the mouse first.
+  useEffect(() => {
+    const isModifier = (k: string) => k === 'Alt' || k === 'Meta' || k === 'Control';
+    const rehover = (deep: boolean) => {
+      if (drag.current) return;
+      const p = lastPointer.current;
+      if (!p) return;
+      const el = document.elementFromPoint(p.x, p.y);
+      if (!el || !hostRef.current?.contains(el)) return;
+      onHover(layerIdAt(el, deep));
+    };
+    const onKeyDown = (e: KeyboardEvent) => { if (isModifier(e.key)) rehover(true); };
+    const onKeyUp = (e: KeyboardEvent) => { if (isModifier(e.key)) rehover(wantsDeep(e)); };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [onHover]);
 
   return (
     <div
@@ -294,7 +441,24 @@ export function StageCanvas({
             <Highlight key={`z-${i}`} box={b} kind="zone" scale={view.scale} />
           ))}
           {hovBox && <Highlight box={hovBox} kind="hover" scale={view.scale} />}
-          {selBox && <Highlight ref={selHiRef} box={selBox} kind="select" scale={view.scale} />}
+          {selBoxes.length > 0 && (
+            <div ref={selHiRef} className="pointer-events-none absolute left-0 top-0 will-change-transform" style={{ width, height }}>
+              {selBoxes.map((b, i) => (
+                <Highlight key={`s-${i}`} box={b} kind="select" scale={view.scale} />
+              ))}
+            </div>
+          )}
+          {/* Alignment guides for Shift-drag — full-span lines, positioned imperatively. */}
+          <div
+            ref={vGuideRef}
+            className="pointer-events-none absolute top-0 hidden bg-[#f24822]"
+            style={{ height, width: `${1 / view.scale}px` }}
+          />
+          <div
+            ref={hGuideRef}
+            className="pointer-events-none absolute left-0 hidden bg-[#f24822]"
+            style={{ width, height: `${1 / view.scale}px` }}
+          />
         </div>
       )}
 

@@ -1,13 +1,17 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Users, Plus, Trash2, X, UserPlus, Loader2, Link2, Copy, Check, KeyRound } from 'lucide-react';
+import { Users, Plus, Trash2, X, UserPlus, Loader2, Link2, Copy, Check, KeyRound, Eye, EyeOff } from 'lucide-react';
 
 export interface LearnerOption {
   id: string;
   name: string | null;
   /** True once the learner has set email + password (LOGIN invite claimed). */
   hasAccount?: boolean;
+  /** Login the learner set for themselves (visible to the teacher). */
+  email?: string | null;
+  /** Plaintext password the learner set — shown so the teacher can recover it. */
+  password?: string | null;
 }
 export interface GroupView {
   id: string;
@@ -27,6 +31,72 @@ export function GroupsManager({
   const [groups, setGroups] = useState<GroupView[]>(initialGroups);
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
+
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteName, setInviteName] = useState('');
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviting, setInviting] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+
+  /**
+   * Invite a learner WITHOUT the entry test: create a blank card by name, then
+   * issue a LOGIN link so they set up their own email + password. Test invites
+   * live only in the Тестирование tab.
+   */
+  async function invite() {
+    const name = inviteName.trim();
+    if (!name) return;
+    setInviting(true);
+    try {
+      const cardRes = await fetch('/api/teacher/learners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const card = await cardRes.json();
+      if (!cardRes.ok) return;
+      const res = await fetch('/api/teacher/learner-invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'LOGIN', learnerId: card.id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setInviteName('');
+        await setLinkAndCopy(data.url);
+      }
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  // Publish the fresh link and copy it to the clipboard in one go — the teacher
+  // just clicks "Получить ссылку" and it's ready to paste. If the clipboard is
+  // blocked (permissions / non-secure origin), fall back to showing the field.
+  async function setLinkAndCopy(url: string) {
+    setInviteUrl(url);
+    setCopyFailed(false);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopyFailed(true);
+    }
+  }
+
+  async function copyInvite() {
+    if (!inviteUrl) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+      setCopyFailed(false);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopyFailed(true);
+    }
+  }
 
   async function createGroup() {
     const trimmed = name.trim();
@@ -76,11 +146,74 @@ export function GroupsManager({
 
   return (
     <section>
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-callout font-semibold text-primary">
           <Users size={16} className="text-brand" /> Группы
         </h2>
+        <button
+          type="button"
+          onClick={() => setInviteOpen((v) => !v)}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-caption font-medium text-secondary transition-fast hover:text-primary"
+        >
+          <Link2 size={13} />
+          Пригласить ученика
+        </button>
       </div>
+
+      {inviteOpen && (
+        <div className="mb-4 flex flex-wrap items-end gap-2 rounded-lg border border-border bg-surface p-3">
+          <label className="flex flex-1 flex-col gap-1.5" style={{ minWidth: 220 }}>
+            <span className="text-caption text-tertiary">Имя ученика — без вступительного теста</span>
+            <input
+              value={inviteName}
+              onChange={(e) => setInviteName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && invite()}
+              placeholder="Например: Иван Петров"
+              className="rounded-lg border border-border bg-canvas px-3 py-2 text-footnote text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={invite}
+            disabled={inviting || !inviteName.trim()}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-footnote font-medium text-on-brand transition-fast hover:opacity-90 disabled:opacity-50"
+          >
+            {inviting ? <Loader2 size={15} className="animate-spin" /> : copied ? <Check size={15} /> : <Link2 size={15} />}
+            {copied ? 'Ссылка скопирована' : 'Получить ссылку'}
+          </button>
+          {copied && (
+            <p className="w-full text-caption text-tertiary">
+              Одноразовая ссылка скопирована — вставь её ученику. Он задаст email и пароль и сразу попадёт в кабинет.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Fallback only when the clipboard was blocked — otherwise the link is
+          already copied and there's nothing to show. */}
+      {inviteUrl && copyFailed && (
+        <div className="mb-4 rounded-lg border border-border bg-surface p-3">
+          <p className="mb-1.5 text-caption text-tertiary">
+            Не удалось скопировать автоматически — скопируй ссылку вручную и отправь ученику.
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={inviteUrl}
+              onFocus={(e) => e.currentTarget.select()}
+              className="min-w-0 flex-1 rounded-md border border-border bg-canvas px-2 py-1.5 text-caption text-primary outline-none"
+            />
+            <button
+              type="button"
+              onClick={copyInvite}
+              className="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand px-2.5 py-1.5 text-caption font-medium text-on-brand transition-fast hover:opacity-90"
+            >
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? 'Ок' : 'Копировать'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Create group */}
       <div className="mb-4 flex flex-wrap items-end gap-2">
@@ -141,27 +274,61 @@ function GroupCard({
   onRemove: (l: LearnerOption) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteName, setInviteName] = useState('');
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const memberIds = useMemo(() => new Set(group.members.map((m) => m.id)), [group.members]);
   const available = useMemo(
     () => learners.filter((l) => !memberIds.has(l.id)),
     [learners, memberIds],
   );
 
+  /**
+   * Invite a NEW learner straight into this group — no entry test. Create the
+   * card, drop it into the group, then hand back a LOGIN link. Test invites are
+   * issued only from the Тестирование tab.
+   */
   async function invite() {
+    const name = inviteName.trim();
+    if (!name) return;
     setInviting(true);
     try {
+      const cardRes = await fetch('/api/teacher/learners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const card = await cardRes.json();
+      if (!cardRes.ok) return;
+      await onAdd({ id: card.id, name: card.name, hasAccount: false });
       const res = await fetch('/api/teacher/learner-invites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'TEST', groupId: group.id }),
+        body: JSON.stringify({ kind: 'LOGIN', learnerId: card.id }),
       });
       const data = await res.json();
-      if (res.ok) setInviteUrl(data.url);
+      if (res.ok) {
+        setInviteName('');
+        setInviteOpen(false);
+        await setLinkAndCopy(data.url);
+      }
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function setLinkAndCopy(url: string) {
+    setInviteUrl(url);
+    setCopyFailed(false);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopyFailed(true);
     }
   }
 
@@ -170,9 +337,10 @@ function GroupCard({
     try {
       await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      setCopyFailed(false);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* selectable fallback */
+      setCopyFailed(true);
     }
   }
 
@@ -194,23 +362,9 @@ function GroupCard({
       </div>
 
       {group.members.length > 0 && (
-        <ul className="mb-3 flex flex-wrap gap-1.5">
+        <ul className="mb-3 space-y-1.5">
           {group.members.map((m) => (
-            <li
-              key={m.id}
-              className="flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-caption text-secondary"
-            >
-              {m.hasAccount && <KeyRound size={11} className="text-brand" aria-label="есть аккаунт" />}
-              {learnerLabel(m)}
-              <button
-                type="button"
-                onClick={() => onRemove(m)}
-                title="Убрать из группы"
-                className="text-tertiary transition-fast hover:text-[#F85149]"
-              >
-                <X size={12} />
-              </button>
-            </li>
+            <MemberRow key={m.id} member={m} onRemove={() => onRemove(m)} />
           ))}
         </ul>
       )}
@@ -252,20 +406,49 @@ function GroupCard({
           </button>
           <button
             type="button"
-            onClick={invite}
-            disabled={inviting}
-            className="inline-flex items-center gap-1.5 text-caption font-medium text-secondary transition-fast hover:text-primary disabled:opacity-50"
+            onClick={() => setInviteOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 text-caption font-medium text-secondary transition-fast hover:text-primary"
           >
-            {inviting ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={13} />}
+            <Link2 size={13} />
             Пригласить по ссылке
           </button>
         </div>
       )}
 
-      {inviteUrl && (
+      {inviteOpen && (
+        <div className="mt-2 flex items-end gap-2 rounded-lg border border-border bg-surface p-2">
+          <label className="flex flex-1 flex-col gap-1" style={{ minWidth: 0 }}>
+            <span className="text-caption text-tertiary">Имя ученика — без теста, сразу в группу</span>
+            <input
+              value={inviteName}
+              onChange={(e) => setInviteName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && invite()}
+              placeholder="Например: Иван Петров"
+              className="rounded-md border border-border bg-canvas px-2 py-1.5 text-caption text-primary outline-none transition-fast placeholder:text-tertiary focus:border-brand"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={invite}
+            disabled={inviting || !inviteName.trim()}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand px-2.5 py-1.5 text-caption font-medium text-on-brand transition-fast hover:opacity-90 disabled:opacity-50"
+          >
+            {inviting ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={13} />}
+            Ссылка
+          </button>
+        </div>
+      )}
+
+      {copied && !copyFailed && (
+        <p className="mt-2 inline-flex items-center gap-1 text-caption text-brand">
+          <Check size={13} /> Ссылка скопирована — отправь ученику
+        </p>
+      )}
+
+      {inviteUrl && copyFailed && (
         <div className="mt-3 rounded-lg border border-border bg-surface p-2">
           <p className="mb-1.5 text-caption text-tertiary">
-            Ссылка на тест для этой группы — одноразовая, отправьте ученику.
+            Не удалось скопировать автоматически — скопируй ссылку вручную.
           </p>
           <div className="flex items-center gap-2">
             <input
@@ -286,5 +469,72 @@ function GroupCard({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * One learner in a group. Shows the name and, once they've claimed a LOGIN
+ * invite, their login (email) plus a reveal-on-click password so the teacher can
+ * hand the credentials back if the student forgets them.
+ */
+function MemberRow({ member, onRemove }: { member: LearnerOption; onRemove: () => void }) {
+  const [show, setShow] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const hasCreds = !!member.email;
+
+  async function copyCreds() {
+    const text = `${member.email ?? ''}${member.password ? ` / ${member.password}` : ''}`.trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <li className="rounded-lg border border-border bg-surface px-2.5 py-1.5">
+      <div className="flex items-center gap-1.5">
+        {member.hasAccount && <KeyRound size={11} className="shrink-0 text-brand" aria-label="есть аккаунт" />}
+        <span className="min-w-0 flex-1 truncate text-caption text-secondary">{learnerLabel(member)}</span>
+        {hasCreds && (
+          <button
+            type="button"
+            onClick={() => setShow((v) => !v)}
+            title={show ? 'Скрыть данные для входа' : 'Показать данные для входа'}
+            className="shrink-0 text-tertiary transition-fast hover:text-primary"
+          >
+            {show ? <EyeOff size={13} /> : <Eye size={13} />}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onRemove}
+          title="Убрать из группы"
+          className="shrink-0 text-tertiary transition-fast hover:text-[#F85149]"
+        >
+          <X size={13} />
+        </button>
+      </div>
+      {hasCreds && show && (
+        <div className="mt-1.5 flex items-center gap-2 border-t border-border pt-1.5">
+          <div className="min-w-0 flex-1 font-mono text-caption text-primary">
+            <div className="truncate">{member.email}</div>
+            <div className="truncate text-secondary">{member.password ?? '— пароль не сохранён —'}</div>
+          </div>
+          <button
+            type="button"
+            onClick={copyCreds}
+            title="Скопировать логин и пароль"
+            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-2 py-1 text-caption text-secondary transition-fast hover:text-primary"
+          >
+            {copied ? <Check size={12} /> : <Copy size={12} />}
+            {copied ? 'Ок' : 'Копировать'}
+          </button>
+        </div>
+      )}
+    </li>
   );
 }

@@ -61,7 +61,9 @@ export async function POST(req: NextRequest) {
       if (claim.count === 0) throw new Error('invite_race');
       await tx.learner.update({
         where: { id: learnerId },
-        data: { email, passwordHash },
+        // passwordPlain is stored so the teacher can recover credentials for a
+        // student in the admin — see the field comment in schema.prisma.
+        data: { email, passwordHash, passwordPlain: password },
       });
     });
   } catch (e) {

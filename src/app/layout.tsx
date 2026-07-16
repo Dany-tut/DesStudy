@@ -26,7 +26,7 @@ export default async function RootLayout({
   // sitting a test or a visitor claiming an invite should see only that screen,
   // never the staff/learner navigation (which also wrongly leaked in when a
   // signed-in curator opened a public test link).
-  const BARE_PREFIXES = ['/signin', '/test', '/join', '/invite', '/assessment'];
+  const BARE_PREFIXES = ['/signin', '/test', '/join', '/invite', '/assessment', '/landing'];
   const isBare = BARE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   const [locale, staffUser, learner] = await Promise.all([
@@ -43,9 +43,17 @@ export default async function RootLayout({
       }
     : null;
 
+  // Learner-only areas — the paid course (kept in sync with middleware.ts).
+  // On these routes the learner shell wins even if a staff session also exists
+  // in the same browser; otherwise an admin who is also enrolled as a student
+  // would see the staff nav bleed onto their /student pages.
+  const LEARNER_PREFIXES = ['/student', '/learn', '/dashboard', '/achievements', '/library', '/mentor'];
+  const onLearnerRoute = LEARNER_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
   // A signed-in student (learner session) gets the full app Sidebar; staff and
-  // anonymous visitors get the header shell instead.
-  const isStudent = !staff && !!learner;
+  // anonymous visitors get the header shell instead. Route context breaks the
+  // tie when both a staff and a learner session are present at once.
+  const isStudent = !!learner && (onLearnerRoute || !staff);
 
   // Identity shown in the sidebar's user menu.
   const learnerUser = {
