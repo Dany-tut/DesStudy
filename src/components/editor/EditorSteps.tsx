@@ -1,9 +1,16 @@
 'use client';
 
 import { useRef } from 'react';
-import { UploadCloud, Trash2, Target, Check, Lock, Globe, FileText, Send, GitCompare, Crop, Wrench, Plus, GitCompareArrows } from 'lucide-react';
+import { UploadCloud, Trash2, Target, Check, Lock, Globe, FileText, Send, GitCompare, Crop, Wrench, Plus, GitCompareArrows, Sparkles } from 'lucide-react';
 import { CRITIQUE_ROLES, CRITIQUE_DEFECTS, DEFECT_PROPS } from '@/lib/curriculum/screenCritique';
-import type { CritiqueZone, CritiqueRoleId, CritiqueDefectId, DefectDelta, DefectProp } from '@/lib/curriculum/types';
+import type {
+  CritiqueZone,
+  CritiqueRoleId,
+  CritiqueDefectId,
+  CritiqueFixOption,
+  DefectDelta,
+  DefectProp,
+} from '@/lib/curriculum/types';
 import type { Layer } from '@/lib/editor/types';
 import { useT } from '@/lib/i18n/client';
 
@@ -67,7 +74,9 @@ export function ExerciseSetupPanel({
             >
               <Icon size={15} className={active ? 'mt-0.5 text-brand' : 'mt-0.5 text-tertiary'} />
               <span className="flex min-w-0 flex-col">
-                <span className="text-caption font-semibold text-primary">{t(k.labelKey)}</span>
+                <span className="truncate text-caption font-semibold text-primary" title={t(k.labelKey)}>
+                  {t(k.labelKey)}
+                </span>
                 <span className="text-caption leading-tight text-tertiary">{t(k.hintKey)}</span>
               </span>
             </button>
@@ -128,6 +137,8 @@ export function ZoneEditor({
   onAdd,
   onRemove,
   onPatch,
+  onAskAI,
+  aiBusy,
 }: {
   layer: Layer;
   zone?: CritiqueZone;
@@ -140,13 +151,31 @@ export function ZoneEditor({
   onAdd: () => void;
   onRemove: () => void;
   onPatch: (patch: Partial<CritiqueZone>) => void;
+  /** Ask the vision model to fill this zone's prose fields. Omitted when the
+   *  zone's frame has no эталон twin to compare against. */
+  onAskAI?: () => void;
+  aiBusy?: boolean;
 }) {
   const { t } = useT();
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <p className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.zone.title')}</p>
-        <p className="mt-0.5 truncate text-footnote font-semibold text-primary">{layer.name}</p>
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.zone.title')}</p>
+          <p className="mt-0.5 truncate text-footnote font-semibold text-primary">{layer.name}</p>
+        </div>
+        {zone && onAskAI && (
+          <button
+            type="button"
+            onClick={onAskAI}
+            disabled={aiBusy}
+            title={t('editor.zone.askAIHint')}
+            className="flex shrink-0 items-center gap-1 rounded-lg bg-brand/10 px-2 py-1 text-caption font-medium text-brand transition-fast hover:bg-brand/15 disabled:opacity-50"
+          >
+            <Sparkles size={12} className={aiBusy ? 'animate-pulse' : ''} />
+            {aiBusy ? t('editor.zone.askAIBusy') : t('editor.zone.askAI')}
+          </button>
+        )}
       </div>
 
       {!zone ? (
@@ -184,7 +213,40 @@ export function ZoneEditor({
             </select>
           </label>
 
+          {/* Debatable picks grade as yellow «спорно» rather than wrong — design
+              is subjective, and the strongest reading is rarely the only one. */}
+          <ChipPicker
+            title={t('editor.zone.debatableRoles')}
+            options={CRITIQUE_ROLES.filter((r) => r.id !== zone.role)}
+            selected={zone.debatableRoles ?? []}
+            onChange={(ids) => onPatch({ debatableRoles: ids.length ? (ids as CritiqueRoleId[]) : undefined })}
+          />
+
           <label className="flex flex-col gap-1">
+            <span className="text-caption text-tertiary">{t('editor.zone.mentorNote')}</span>
+            <textarea
+              rows={3}
+              defaultValue={zone.roleNote}
+              key={`note-${zone.id}`}
+              onChange={(e) => onPatch({ roleNote: e.target.value })}
+              placeholder={t('editor.zone.mentorNotePlaceholder')}
+              className="resize-none rounded-lg border border-border bg-canvas px-2 py-1.5 text-caption text-primary"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-caption text-tertiary">{t('editor.zone.intent')}</span>
+            <textarea
+              rows={2}
+              defaultValue={zone.intent}
+              key={`intent-${zone.id}`}
+              onChange={(e) => onPatch({ intent: e.target.value })}
+              placeholder={t('editor.zone.intentPlaceholder')}
+              className="resize-none rounded-lg border border-border bg-canvas px-2 py-1.5 text-caption text-primary"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 border-t border-border pt-3">
             <span className="text-caption text-tertiary">{t('editor.zone.defect')}</span>
             <select
               value={zone.defect}
@@ -199,17 +261,29 @@ export function ZoneEditor({
             </select>
           </label>
 
+          <ChipPicker
+            title={t('editor.zone.debatableDefects')}
+            options={CRITIQUE_DEFECTS.filter((d) => d.id !== zone.defect && d.id !== 'none')}
+            selected={zone.debatableDefects ?? []}
+            onChange={(ids) => onPatch({ debatableDefects: ids.length ? (ids as CritiqueDefectId[]) : undefined })}
+          />
+
           <label className="flex flex-col gap-1">
-            <span className="text-caption text-tertiary">{t('editor.zone.mentorNote')}</span>
+            <span className="text-caption text-tertiary">{t('editor.zone.defectNote')}</span>
             <textarea
-              rows={3}
-              defaultValue={zone.roleNote}
-              key={`note-${zone.id}`}
-              onChange={(e) => onPatch({ roleNote: e.target.value })}
-              placeholder={t('editor.zone.mentorNotePlaceholder')}
+              rows={2}
+              defaultValue={zone.defectNote}
+              key={`dnote-${zone.id}`}
+              onChange={(e) => onPatch({ defectNote: e.target.value })}
+              placeholder={t('editor.zone.defectNotePlaceholder')}
               className="resize-none rounded-lg border border-border bg-canvas px-2 py-1.5 text-caption text-primary"
             />
           </label>
+
+          {/* A clean zone has nothing to repair, so the fix options don't apply. */}
+          {zone.defect !== 'none' && (
+            <FixEditor fixes={zone.fixes ?? []} onChange={(fixes) => onPatch({ fixes: fixes.length ? fixes : undefined })} />
+          )}
 
           <DeltaEditor
             deltas={zone.deltas ?? []}
@@ -226,6 +300,110 @@ export function ZoneEditor({
           </button>
         </>
       )}
+    </div>
+  );
+}
+
+/* ───────────── Multi-select chips (спорные роли / дефекты) ───────────── */
+
+/** Toggleable chips over a role/defect catalog. `hint` rides along as a title so
+ *  the teacher gets the same coaching text the learner's palette shows. */
+function ChipPicker({
+  title,
+  options,
+  selected,
+  onChange,
+}: {
+  title: string;
+  options: { id: string; label: string; hint: string }[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  if (!options.length) return null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-caption text-tertiary">{title}</span>
+      <div className="flex flex-wrap gap-1">
+        {options.map((o) => {
+          const on = selected.includes(o.id);
+          return (
+            <button
+              key={o.id}
+              type="button"
+              title={o.hint}
+              onClick={() => onChange(on ? selected.filter((i) => i !== o.id) : [...selected, o.id])}
+              className={[
+                'rounded-md border px-1.5 py-0.5 text-caption transition-fast',
+                on
+                  ? 'border-warning/50 bg-warning/10 text-warning'
+                  : 'border-border text-tertiary hover:border-warning/40 hover:text-secondary',
+              ].join(' ')}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ───────────── Candidate fixes (ровно один правильный) ───────────── */
+
+/**
+ * The reconstruction step's answer options. Exactly one fix is `correct` —
+ * picking a new one clears the previous, so the list can never grade two ways.
+ */
+function FixEditor({
+  fixes,
+  onChange,
+}: {
+  fixes: CritiqueFixOption[];
+  onChange: (fixes: CritiqueFixOption[]) => void;
+}) {
+  const { t } = useT();
+  return (
+    <div className="flex flex-col gap-2 border-t border-border pt-3">
+      <span className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.zone.fixes')}</span>
+      {fixes.length === 0 && <p className="text-caption leading-tight text-tertiary">{t('editor.zone.fixesEmpty')}</p>}
+
+      {fixes.map((f, i) => (
+        <div key={f.id} className="flex items-center gap-1.5">
+          <button
+            type="button"
+            title={t('editor.zone.markCorrect')}
+            onClick={() => onChange(fixes.map((x, j) => ({ ...x, correct: j === i })))}
+            className={[
+              'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-fast',
+              f.correct ? 'border-success bg-success/15 text-success' : 'border-border text-tertiary hover:border-success/50',
+            ].join(' ')}
+          >
+            <Check size={11} />
+          </button>
+          <input
+            value={f.label}
+            onChange={(e) => onChange(fixes.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
+            placeholder={t('editor.zone.fixPlaceholder')}
+            className="min-w-0 flex-1 rounded-md border border-border bg-canvas px-2 py-1 text-caption text-primary"
+          />
+          <button
+            type="button"
+            onClick={() => onChange(fixes.filter((_, j) => j !== i))}
+            className="shrink-0 rounded p-1 text-tertiary transition-fast hover:text-danger"
+            title={t('editor.zone.removeFix')}
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        onClick={() => onChange([...fixes, { id: `fix_${Math.random().toString(36).slice(2, 9)}`, label: '' }])}
+        className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-1.5 text-caption font-medium text-secondary transition-fast hover:border-brand/40 hover:text-primary"
+      >
+        <Plus size={13} /> {t('editor.zone.addFix')}
+      </button>
     </div>
   );
 }

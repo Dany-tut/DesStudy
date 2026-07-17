@@ -9,6 +9,7 @@ import {
   Users,
   BarChart3,
   ClipboardCheck,
+  Palette,
   type LucideIcon,
 } from 'lucide-react';
 import { useT } from '@/lib/i18n/client';
@@ -47,6 +48,7 @@ const NAV: NavItem[] = [
   { href: '/teacher/testing', labelKey: 'nav.testing', icon: ClipboardCheck },
   { href: '/admin/editor', labelKey: 'nav.lessons', icon: BookOpen },
   { href: '/admin', labelKey: 'nav.admin', icon: ShieldCheck, exact: true, only: 'BOSS' },
+  { href: '/design-system', labelKey: 'nav.designSystem', icon: Palette, only: 'BOSS' },
 ];
 
 /** On the sign-in page the "Войти" CTA is redundant — hide just the button. */

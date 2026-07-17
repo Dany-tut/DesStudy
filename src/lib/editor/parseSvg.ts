@@ -17,7 +17,9 @@ const SKIP_TAGS = new Set(['defs', 'clippath', 'lineargradient', 'radialgradient
 
 const VECTOR_TAGS = new Set(['path', 'circle', 'ellipse', 'polygon', 'polyline', 'line']);
 
-function localName(el: Element): string {
+/** Tag name without any namespace prefix. Exported so the live diff reads a
+ *  node exactly the way the importer did. */
+export function localName(el: Element): string {
   // xmldom exposes tagName with namespace prefix sometimes; normalize.
   return (el.localName || el.tagName || '').toLowerCase().replace(/^.*:/, '');
 }
@@ -79,7 +81,10 @@ function textContent(el: Element): string {
   return (el.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
-function extractProps(el: Element, tag: string): LayerProps {
+/** Read a node's editable props straight from the SVG. The importer snapshots
+ *  these into `Layer.props`; the diff calls it again against the CURRENT markup,
+ *  so an edit that only touched the SVG can't hide from it. */
+export function extractProps(el: Element, tag: string): LayerProps {
   const props: LayerProps = {};
   const fill = attrOrStyle(el, 'fill');
 

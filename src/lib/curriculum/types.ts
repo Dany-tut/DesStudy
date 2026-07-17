@@ -524,7 +524,10 @@ export type DefectProp =
   | 'gap'
   | 'size'
   | 'position'
-  | 'opacity';
+  | 'opacity'
+  /** The layer exists on one side only — deleted from (or added to) the
+   *  сломанный twin. Values are «есть»/«нет» rather than a measured quantity. */
+  | 'presence';
 
 export interface DefectDelta {
   prop: DefectProp;

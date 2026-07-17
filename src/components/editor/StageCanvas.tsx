@@ -59,9 +59,44 @@ const wantsDeep = (e: { altKey: boolean; metaKey: boolean; ctrlKey: boolean }) =
  *  vertically, matching a mouse-wheel scroll. */
 const wantsZoom = (e: { metaKey: boolean; ctrlKey: boolean }) => e.metaKey || e.ctrlKey;
 
+/**
+ * The topmost *leaf* layer whose bounding box contains the point, if any.
+ *
+ * Native SVG hit-testing only fires where an element actually paints, so a
+ * glyph's counters, the gaps between letters, and the hollow of an unfilled
+ * path all fall through to whatever is behind them. Figma hit-tests a text or
+ * vector layer by its box, so we do the same: scan the leaves (anything with no
+ * nested [data-layer-id] — i.e. not a frame or group, whose boxes are large
+ * enough that a box test would swallow every click inside them) back-to-front
+ * and take the last one that covers the point.
+ */
+function bboxLeafIdAt(root: Element | null, clientX: number, clientY: number): string | null {
+  if (!root) return null;
+  let hit: string | null = null;
+  for (const el of root.querySelectorAll('[data-layer-id]')) {
+    if (el.querySelector('[data-layer-id]')) continue;
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) continue;
+    if (clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) continue;
+    // Document order paints back-to-front, so the last match is the topmost.
+    hit = el.getAttribute('data-layer-id');
+  }
+  return hit;
+}
+
 /** The layer id under a hit target — deepest leaf, or the outermost group. */
-function layerIdAt(target: EventTarget | null, deep: boolean): string | null {
-  const el = target instanceof Element ? target.closest('[data-layer-id]') : null;
+function layerIdAt(target: EventTarget | null, deep: boolean, root?: Element | null, clientX?: number, clientY?: number): string | null {
+  let el = target instanceof Element ? target.closest('[data-layer-id]') : null;
+  // A box hit on a leaf beats whatever painted under it (see bboxLeafIdAt), but
+  // never beats a leaf the browser resolved directly — that one is a real hit
+  // on the geometry and is at least as specific.
+  if (root != null && clientX != null && clientY != null && (!el || el.querySelector('[data-layer-id]'))) {
+    const boxId = bboxLeafIdAt(root, clientX, clientY);
+    const boxEl = boxId ? root.querySelector(`[data-layer-id="${boxId}"]`) : null;
+    // Only trust it when it sits inside the DOM hit — otherwise a leaf whose box
+    // overhangs a neighbouring frame would steal that frame's clicks.
+    if (boxEl && (!el || el.contains(boxEl))) el = boxEl;
+  }
   if (!el) return null;
   if (deep) return el.getAttribute('data-layer-id');
   let top = el;
@@ -918,7 +953,7 @@ export function StageCanvas({
         if (tool === 'text') {
           onCreateText?.({ x: ux, y: uy });
         } else {
-          drag.current = { kind: 'draw', crLeft: cr.left, crTop: cr.top, scale: view.scale, sx: ux, sy: uy, box: { x: ux, y: uy, w: 0, h: 0 }, hitId: layerIdAt(e.target, wantsDeep(e)), frame: tool === 'frame' };
+          drag.current = { kind: 'draw', crLeft: cr.left, crTop: cr.top, scale: view.scale, sx: ux, sy: uy, box: { x: ux, y: uy, w: 0, h: 0 }, hitId: layerIdAt(e.target, wantsDeep(e), contentRef.current, e.clientX, e.clientY), frame: tool === 'frame' };
         }
         return;
       }
@@ -1002,7 +1037,7 @@ export function StageCanvas({
     // wrapper instead. (The role-icon button stops pointerdown itself, so it never
     // reaches here and still just cycles the role.)
     const chromeEl = e.target instanceof Element ? e.target.closest('[data-frame-chrome-id]') : null;
-    let id = chromeEl ? chromeEl.getAttribute('data-frame-chrome-id') : layerIdAt(e.target, deep);
+    let id = chromeEl ? chromeEl.getAttribute('data-frame-chrome-id') : layerIdAt(e.target, deep, contentRef.current, e.clientX, e.clientY);
     if (!chromeEl && !additive && (!deep || dup) && selectedIds.length) {
       const hitEl = e.target instanceof Element ? e.target : null;
       for (const sid of selectedIds) {
@@ -1218,7 +1253,7 @@ export function StageCanvas({
   function onPointerMoveHover(e: React.PointerEvent) {
     lastPointer.current = { x: e.clientX, y: e.clientY };
     if (drag.current) return;
-    onHover(layerIdAt(e.target, wantsDeep(e)));
+    onHover(layerIdAt(e.target, wantsDeep(e), contentRef.current, e.clientX, e.clientY));
   }
 
   // Pressing (or releasing) the deep modifier re-resolves the hover target at the
@@ -1263,7 +1298,7 @@ export function StageCanvas({
       onPointerMove={onPointerMoveHover}
       onContextMenu={(e) => {
         // Layer under the cursor → layer menu; empty grid → canvas menu.
-        onContextMenu(e, layerIdAt(e.target, wantsDeep(e)));
+        onContextMenu(e, layerIdAt(e.target, wantsDeep(e), contentRef.current, e.clientX, e.clientY));
       }}
       onPointerLeave={() => onHover(null)}
       className="canvas-grid relative h-full w-full touch-none select-none overflow-hidden bg-canvas"
@@ -1295,7 +1330,7 @@ export function StageCanvas({
         >
           <div
             ref={svgHostRef}
-            className="editor-svg-host relative [&>svg]:block [&>svg]:h-full [&>svg]:w-full [&>svg]:overflow-visible"
+            className="editor-svg-host relative [&_text]:[pointer-events:bounding-box] [&>svg]:block [&>svg]:h-full [&>svg]:w-full [&>svg]:overflow-visible"
             style={{ width, height }}
             dangerouslySetInnerHTML={{ __html: svg }}
           />

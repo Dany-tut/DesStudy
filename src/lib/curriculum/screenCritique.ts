@@ -75,6 +75,7 @@ export const DEFECT_PROPS: DefectPropDef[] = [
   { id: 'size', label: 'Размер', unit: 'px' },
   { id: 'position', label: 'Положение', unit: 'px' },
   { id: 'opacity', label: 'Прозрачность' },
+  { id: 'presence', label: 'Наличие слоя' },
 ];
 
 export const defectPropById = (id?: DefectProp) => DEFECT_PROPS.find((p) => p.id === id);

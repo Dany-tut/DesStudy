@@ -12,7 +12,7 @@ import {
   LayoutGrid,
   MousePointer2,
   Plus,
-  Scissors,
+  Check,
   Blend,
   Scan,
 } from 'lucide-react';
@@ -45,6 +45,8 @@ export function PropertiesPanel({
   onMove,
   onAlign,
   onText,
+  onFontSize,
+  onFontWeight,
   onResize,
   onToggleClip,
   footer,
@@ -62,6 +64,8 @@ export function PropertiesPanel({
   onMove?: (x: number, y: number) => void;
   onAlign?: (edge: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom') => void;
   onText?: (v: string) => void;
+  onFontSize?: (v: number) => void;
+  onFontWeight?: (v: number) => void;
   onResize?: (w: number, h: number) => void;
   onToggleClip?: (on: boolean) => void;
   footer?: React.ReactNode;
@@ -82,9 +86,12 @@ export function PropertiesPanel({
       {/* Header */}
       <div className="pb-2">
         <p className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.props.properties')}</p>
-        <p className="mt-0.5 flex items-center gap-1.5 truncate text-footnote font-semibold text-primary">
-          {layer.name}
-          <span className="rounded bg-hover px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-tertiary">
+        {/* `truncate` on the flex row itself does nothing — ellipsis needs a
+            block box, and a bare text node can't be styled. The name gets its
+            own min-w-0 span; the badge never gives up width. */}
+        <p className="mt-0.5 flex items-center gap-1.5 text-footnote font-semibold text-primary">
+          <span className="min-w-0 truncate" title={layer.name}>{layer.name}</span>
+          <span className="shrink-0 rounded bg-hover px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-tertiary">
             {t(typeLabelKey(layer))}
           </span>
         </p>
@@ -226,11 +233,32 @@ export function PropertiesPanel({
           ) : (
             <p className="line-clamp-3 text-caption text-secondary">«{props.text}»</p>
           )}
-          {(props.fontSize != null || props.fontWeight) && (
-            <p className="mt-1.5 text-caption tabular-nums text-tertiary">
-              {props.fontSize != null ? `${props.fontSize}px` : ''}
-              {props.fontWeight ? ` · ${props.fontWeight}` : ''}
-            </p>
+          {onFontSize || onFontWeight ? (
+            <div className="mt-1.5 grid grid-cols-2 gap-1">
+              <ScrubField
+                label={t('editor.props.fontSize')}
+                value={Math.round(props.fontSize ?? 16)}
+                min={1}
+                max={400}
+                onCommit={(v) => onFontSize?.(v)}
+              />
+              <ScrubField
+                label={t('editor.props.fontWeight')}
+                value={Number(props.fontWeight) || 400}
+                min={100}
+                max={900}
+                // Weights are a 100-step scale; scrubbing lands on every integer,
+                // so snap before it reaches the SVG.
+                onCommit={(v) => onFontWeight?.(Math.round(v / 100) * 100)}
+              />
+            </div>
+          ) : (
+            (props.fontSize != null || props.fontWeight) && (
+              <p className="mt-1.5 text-caption tabular-nums text-tertiary">
+                {props.fontSize != null ? `${props.fontSize}px` : ''}
+                {props.fontWeight ? ` · ${props.fontWeight}` : ''}
+              </p>
+            )
           )}
         </Section>
       )}
@@ -327,7 +355,7 @@ export const FIELD_INTERACTIVE =
  * an opaque swatch here reads as a hole punched in the panel.
  */
 export const ICON_BTN =
-  'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-tertiary transition-fast ' +
+  'flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md text-tertiary transition-fast ' +
   'hover:bg-hover hover:text-primary active:bg-pressed ' +
   'focus-visible:!outline-none focus-visible:bg-hover focus-visible:text-primary';
 
@@ -461,7 +489,9 @@ export function Section({
   return (
     <div className={['py-2', last ? '' : 'border-b border-border'].join(' ')}>
       <div className="mb-1.5 flex items-center justify-between">
-        <p className={['text-caption font-medium', muted ? 'text-tertiary' : 'text-secondary'].join(' ')}>{title}</p>
+        <p className={['min-w-0 truncate text-caption font-medium', muted ? 'text-tertiary' : 'text-secondary'].join(' ')} title={title}>
+          {title}
+        </p>
         {action}
       </div>
       {children}
@@ -515,7 +545,7 @@ export function ColorRow({
 export function GhostBtn({ Icon, onClick }: { Icon: typeof MousePointer2; onClick?: () => void }) {
   if (!onClick) {
     return (
-      <span className="flex h-5 w-5 items-center justify-center rounded-sm text-tertiary">
+      <span className="flex h-[26px] w-[26px] items-center justify-center rounded-md text-tertiary">
         <Icon size={13} />
       </span>
     );
@@ -574,20 +604,18 @@ export function ClipToggle({ checked, onChange }: { checked: boolean; onChange: 
       onClick={() => onChange(!checked)}
       className="mt-1.5 flex w-full items-center gap-1.5 rounded-sm px-1 py-0.5 text-left text-footnote text-secondary transition-fast hover:text-primary"
     >
-      <Scissors size={13} className="text-tertiary" />
-      <span className="flex-1">{t('editor.props.clipContent')}</span>
       <span
         className={[
-          'relative h-4 w-7 shrink-0 rounded-full transition-fast',
-          checked ? 'bg-brand' : 'bg-border',
+          'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[3px] border transition-fast',
+          checked ? 'border-brand bg-brand text-white' : 'border-border',
         ].join(' ')}
       >
-        <span
-          className={[
-            'absolute top-0.5 h-3 w-3 rounded-full bg-white transition-fast',
-            checked ? 'left-3.5' : 'left-0.5',
-          ].join(' ')}
-        />
+        {checked && <Check size={10} strokeWidth={3} />}
+      </span>
+      {/* min-w-0 or the flex item refuses to shrink below its text and truncate
+          never fires — the row just overflows instead. */}
+      <span className="min-w-0 flex-1 truncate" title={t('editor.props.clipContent')}>
+        {t('editor.props.clipContent')}
       </span>
     </button>
   );
@@ -596,7 +624,7 @@ export function ClipToggle({ checked, onChange }: { checked: boolean; onChange: 
 export function PlusBtn({ onClick, title }: { onClick?: () => void; title?: string } = {}) {
   if (!onClick) {
     return (
-      <span className="flex h-5 w-5 items-center justify-center text-tertiary">
+      <span className="flex h-[26px] w-[26px] items-center justify-center text-tertiary">
         <Plus size={13} />
       </span>
     );

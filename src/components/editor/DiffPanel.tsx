@@ -128,12 +128,35 @@ export function DiffPanel({
                                 className="flex shrink-0 cursor-pointer items-center gap-1 text-caption text-tertiary"
                                 title={isCriterion ? t('editor.diff.criterionOn') : t('editor.diff.criterionOff')}
                               >
-                                <input
-                                  type="checkbox"
-                                  checked={isCriterion}
-                                  onChange={() => onToggleCriterion(e)}
-                                  className="h-3.5 w-3.5 accent-[var(--brand)]"
-                                />
+                                <span className="relative inline-flex h-4 w-4 shrink-0 items-center justify-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={isCriterion}
+                                    onChange={() => onToggleCriterion(e)}
+                                    className="peer absolute inset-0 z-10 m-0 cursor-pointer opacity-0"
+                                  />
+                                  <span
+                                    className={[
+                                      'inline-flex h-4 w-4 items-center justify-center rounded-[5px] border transition-fast',
+                                      isCriterion
+                                        ? 'border-brand bg-brand'
+                                        : 'border-border bg-transparent peer-hover:border-tertiary',
+                                    ].join(' ')}
+                                  >
+                                    {isCriterion && (
+                                      <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden>
+                                        <path
+                                          d="M2.5 6.2 4.8 8.5 9.5 3.8"
+                                          fill="none"
+                                          stroke="white"
+                                          strokeWidth="1.75"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      </svg>
+                                    )}
+                                  </span>
+                                </span>
                                 {t('editor.diff.criterion')}
                               </label>
                             </div>

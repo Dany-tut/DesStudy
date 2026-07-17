@@ -23,6 +23,7 @@ import {
   Bug,
 } from 'lucide-react';
 import type { Layer, LayerType } from '@/lib/editor/types';
+import type { LayerDropPos as DropPos } from '@/lib/editor/tree';
 import { useT } from '@/lib/i18n/client';
 import { RENAME_FIELD } from './renameField';
 
@@ -145,9 +146,6 @@ function LayerName({ name, naming, order }: { name: string; naming: boolean; ord
   return <span className="min-w-0 flex-1 truncate">{name}</span>;
 }
 
-/** Drop position of a layer-panel drag — kept in sync with EditorCore's LayerDropPos. */
-type DropPos = 'before' | 'after' | 'inside';
-
 /** Find a layer by id anywhere in the forest. */
 function findInForest(list: Layer[], id: string): Layer | null {
   for (const l of list) {
@@ -255,7 +253,9 @@ export function LayerTree({
     setDrop((d) => (d && d.id === id && d.pos === pos ? d : { id, pos }));
   };
   const commitDrop = (copy: boolean) => {
+    console.log('[DBG commitDrop] dragId=', dragId, 'drop=', drop, 'hasHandler=', !!onReparent, 'copy=', copy);
     if (dragId && drop && onReparent) onReparent(dragId, drop.id, drop.pos, copy);
+    else console.log('[DBG commitDrop] BAIL: no dragId / no drop target / no handler');
     endDrag();
   };
 
@@ -391,7 +391,9 @@ export function LayerContextMenu({
   onGroup,
   onUngroup,
   onFramify,
-  onDuplicateFlawed,
+  frameRole,
+  onDuplicateAs,
+  onSetRole,
   onRename,
   onDelete,
 }: {
@@ -404,21 +406,22 @@ export function LayerContextMenu({
   onGroup: (layout: 'row' | 'column' | 'none') => void;
   onUngroup?: () => void;
   onFramify?: () => void;
-  /** Show "Дублировать как сломанный" — true for a top-level frame. */
-  onDuplicateFlawed?: () => void;
+  /** Critique role of a top-level frame — 'none' for one without a role yet;
+   *  undefined when the row isn't a top-level frame (role actions hidden). */
+  frameRole?: 'none' | 'reference' | 'flawed';
+  onDuplicateAs?: (role: 'reference' | 'flawed') => void;
+  onSetRole?: (role: 'reference' | 'flawed') => void;
   onRename?: () => void;
   onDelete?: () => void;
 }) {
   const { t } = useT();
   return (
     <ContextMenuShell x={x} y={y} onClose={onClose}>
+      {/* Direction (ряд/колонка) is set in the properties panel — the menu just
+          wraps the selection in an auto-layout frame, vertical by default. */}
       <button type="button" className={MENU_ITEM} onClick={() => onGroup('column')}>
         <Rows3 size={14} className="text-tertiary" />
-        {t('editor.menu.autoLayoutVertical')}
-      </button>
-      <button type="button" className={MENU_ITEM} onClick={() => onGroup('row')}>
-        <Columns3 size={14} className="text-tertiary" />
-        {t('editor.menu.autoLayoutHorizontal')}
+        {t('editor.menu.autoLayout')}
       </button>
       {isGroup ? (
         <button type="button" className={MENU_ITEM} onClick={() => onUngroup?.()}>
@@ -438,13 +441,33 @@ export function LayerContextMenu({
           {t('editor.menu.convertToFrame')}
         </button>
       )}
-      {onDuplicateFlawed && (
+      {frameRole && (
         <>
           <div className="my-1 h-px bg-border" />
-          <button type="button" className={MENU_ITEM} onClick={onDuplicateFlawed}>
-            <Copy size={14} className="text-tertiary" />
-            {t('editor.menu.duplicateFlawed')}
-          </button>
+          {frameRole !== 'flawed' && (
+            <button type="button" className={MENU_ITEM} onClick={() => onDuplicateAs?.('flawed')}>
+              <Copy size={14} className="text-tertiary" />
+              {t('editor.menu.duplicateFlawed')}
+            </button>
+          )}
+          {frameRole === 'flawed' && (
+            <button type="button" className={MENU_ITEM} onClick={() => onDuplicateAs?.('reference')}>
+              <Copy size={14} className="text-tertiary" />
+              {t('editor.menu.duplicateReference')}
+            </button>
+          )}
+          {frameRole !== 'reference' && (
+            <button type="button" className={MENU_ITEM} onClick={() => onSetRole?.('reference')}>
+              <BadgeCheck size={14} className="text-tertiary" />
+              {t('editor.menu.markReference')}
+            </button>
+          )}
+          {frameRole === 'reference' && (
+            <button type="button" className={MENU_ITEM} onClick={() => onSetRole?.('flawed')}>
+              <BadgeCheck size={14} className="text-tertiary" />
+              {t('editor.menu.markFlawed')}
+            </button>
+          )}
         </>
       )}
       {(onRename || onDelete) && <div className="my-1 h-px bg-border" />}

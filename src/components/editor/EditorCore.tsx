@@ -5,11 +5,20 @@ import { useRouter } from 'next/navigation';
 import { useT } from '@/lib/i18n/client';
 import { UploadCloud, AlertCircle, X, GraduationCap, Link2, Image as ImageIcon, ChevronDown, ChevronsDownUp, Sparkles, Loader2, Shapes } from 'lucide-react';
 import { parseSvgToLayers } from '@/lib/editor/parseSvg';
-import type { Layer, ParseResult, EditorTool } from '@/lib/editor/types';
+import type { Layer, LayerProps, ParseResult, EditorTool } from '@/lib/editor/types';
+import {
+  findLayer,
+  removeFromTree,
+  insertRelative,
+  moveLayerInTree,
+  type LayerDropPos,
+} from '@/lib/editor/tree';
 // Digest only — importing @/lib/ai/nameFrames here would pull the Anthropic SDK
 // into the client bundle. The naming itself runs server-side, behind the route.
 import { digestFrame } from '@/lib/editor/frameDigest';
-import { rasterizeFrame } from '@/lib/editor/rasterizeFrame';
+import { rasterizeFrame, type FrameBox } from '@/lib/editor/rasterizeFrame';
+import type { AnalyzeReply } from '@/lib/ai/critiqueAnalyze';
+import { extractProps, localName } from '@/lib/editor/parseSvg';
 import { listDrafts, saveDraft, deleteDraft, coverPageOf, gzipJson, type EditorDraftEntry } from '@/lib/editor/drafts';
 import { blankResult, type PageItem, type PageMeta } from '@/lib/editor/pages';
 import { emptyDraft, draftToPayload } from '@/lib/admin/exerciseDraft';
@@ -73,59 +82,22 @@ function cycleFrameRoleInTree(layers: Layer[], id: string): Layer[] {
   );
 }
 
-/** Drop one layer (and its subtree) from the tree. */
-function removeFromTree(layers: Layer[], id: string): Layer[] {
-  const out: Layer[] = [];
-  for (const l of layers) {
-    if (l.id === id) continue;
-    out.push(l.children.length ? { ...l, children: removeFromTree(l.children, id) } : l);
-  }
-  return out;
-}
-
-/** Drop position of a layer-panel drag: reorder as a sibling before / after the
- *  target, or nest as the target's last child. */
-export type LayerDropPos = 'before' | 'after' | 'inside';
-
-/** True when `id` is `layer` itself or anywhere in its subtree. */
-function inSubtree(layer: Layer, id: string): boolean {
-  return layer.id === id || layer.children.some((c) => inSubtree(c, id));
-}
-
-/** Insert `node` relative to `targetId`: as its previous / next sibling, or (for
- *  `inside`) appended as its last child. Returns null when the target is absent. */
-function insertRelative(layers: Layer[], targetId: string, node: Layer, pos: LayerDropPos): Layer[] | null {
-  let found = false;
-  const walk = (list: Layer[]): Layer[] => {
-    const out: Layer[] = [];
-    for (const l of list) {
-      if (l.id === targetId) {
-        found = true;
-        if (pos === 'inside') {
-          out.push({ ...l, children: [...l.children, node] });
-        } else if (pos === 'before') {
-          out.push(node, l);
-        } else {
-          out.push(l, node);
-        }
-        continue;
+/** The given ids in document order. A selected node takes its whole subtree with
+ *  it, so ids nested under another selected id are dropped (Figma moves the
+ *  ancestor, not the ancestor *and* its child). */
+function orderIdsInTree(layers: Layer[], ids: string[]): string[] {
+  const set = new Set(ids);
+  const out: string[] = [];
+  (function walk(ls: Layer[]) {
+    for (const l of ls) {
+      if (set.has(l.id)) {
+        out.push(l.id);
+        continue; // don't descend — the subtree travels with it
       }
-      out.push(l.children.length ? { ...l, children: walk(l.children) } : l);
+      if (l.children.length) walk(l.children);
     }
-    return out;
-  };
-  const out = walk(layers);
-  return found ? out : null;
-}
-
-/** Move `dragId` next to / inside `targetId`. Guards against dropping a node onto
- *  itself or into its own subtree; returns null when the move is invalid. */
-function moveLayerInTree(layers: Layer[], dragId: string, targetId: string, pos: LayerDropPos): Layer[] | null {
-  if (dragId === targetId) return null;
-  const dragged = findLayer(layers, dragId);
-  if (!dragged) return null;
-  if (inSubtree(dragged, targetId)) return null; // can't nest a node inside itself
-  return insertRelative(removeFromTree(layers, dragId), targetId, dragged, pos);
+  })(layers);
+  return out;
 }
 
 /**
@@ -311,15 +283,6 @@ function setFrameInTree(layers: Layer[], id: string): Layer[] {
   );
 }
 
-function findLayer(layers: Layer[], id: string): Layer | null {
-  for (const l of layers) {
-    if (l.id === id) return l;
-    const hit = findLayer(l.children, id);
-    if (hit) return hit;
-  }
-  return null;
-}
-
 function collectIds(layer: Layer, acc: Set<string>): void {
   acc.add(layer.id);
   for (const c of layer.children) collectIds(c, acc);
@@ -414,11 +377,29 @@ const strDelta = (
 ): DefectDelta | null => ((was ?? '') === (now ?? '') ? null : { prop, was: was ?? '', now: now ?? '' });
 
 /**
+ * A layer as it exists RIGHT NOW: props re-read from the current markup and
+ * geometry measured from the rendered DOM, rebased into its frame's local space.
+ *
+ * `Layer.props` is only an import-time snapshot — several editing paths (colour
+ * via `mutate`, moves via `transformLayers`) write the SVG and leave the
+ * snapshot behind, so a diff over `props` silently reports nothing. Reading
+ * live is what makes the diff impossible to fool, whatever edited the layer.
+ */
+interface LiveLayer {
+  props: LayerProps;
+  /** Frame-local box — absolute coords differ by the frames' own offset, which
+   *  would otherwise read as «сдвинут» on every single layer. */
+  box: FrameBox | null;
+}
+
+type ReadLive = (id: string, frameBox: FrameBox | null) => LiveLayer | null;
+
+/**
  * Diff a сломанный layer against its эталон twin, property by property. `was`
  * is the correct (reference) value, `now` the broken one. Only surfaces props
  * the parser actually captures — the teacher can add anything else by hand.
  */
-function diffLayerProps(ref: Layer, bad: Layer): DefectDelta[] {
+function diffLayerProps(ref: LiveLayer, bad: LiveLayer): DefectDelta[] {
   const r = ref.props;
   const b = bad.props;
   const out: (DefectDelta | null)[] = [
@@ -429,21 +410,70 @@ function diffLayerProps(ref: Layer, bad: Layer): DefectDelta[] {
     numDelta('radius', r.radius, b.radius, 'px'),
     numDelta('opacity', r.opacity != null ? r.opacity : undefined, b.opacity != null ? b.opacity : undefined),
   ];
-  if (r.box && b.box) {
-    out.push(
-      strDelta(
-        'size',
-        `${Math.round(r.box.w)}×${Math.round(r.box.h)}`,
-        `${Math.round(b.box.w)}×${Math.round(b.box.h)}`,
-      ),
-      strDelta(
-        'position',
-        `${Math.round(r.box.x)}, ${Math.round(r.box.y)}`,
-        `${Math.round(b.box.x)}, ${Math.round(b.box.y)}`,
-      ),
-    );
+  // Geometry comes from the live measurement, not props.box: a move writes a
+  // `transform`, which never touches x/y, so props.box can't see it.
+  const rb = ref.box;
+  const bb = bad.box;
+  if (rb && bb) {
+    // Sub-pixel noise from getBBox shouldn't read as a defect.
+    const moved = Math.abs(rb.x - bb.x) >= 1 || Math.abs(rb.y - bb.y) >= 1;
+    const resized = Math.abs(rb.w - bb.w) >= 1 || Math.abs(rb.h - bb.h) >= 1;
+    if (resized)
+      out.push(
+        strDelta('size', `${Math.round(rb.w)}×${Math.round(rb.h)}`, `${Math.round(bb.w)}×${Math.round(bb.h)}`),
+      );
+    if (moved)
+      out.push(
+        strDelta(
+          'position',
+          `${Math.round(rb.x)}, ${Math.round(rb.y)}`,
+          `${Math.round(bb.x)}, ${Math.round(bb.y)}`,
+        ),
+      );
   }
   return out.filter((d): d is DefectDelta => d != null);
+}
+
+/** The layer exists on one side only. Authored as a delta so «убрал ценник» can
+ *  become a grading criterion like any property change. */
+const presenceDelta = (kind: 'removed' | 'added'): DefectDelta => ({
+  prop: 'presence',
+  was: kind === 'removed' ? 'есть' : 'нет',
+  now: kind === 'removed' ? 'удалён' : 'добавлен',
+});
+
+type Rect = { x0: number; y0: number; x1: number; y1: number };
+
+/** Re-express a screen-relative % rect as a frame-relative % rect. Zone rects are
+ *  measured against the whole screen, but the AI sees a render cropped to one
+ *  frame and answers in that frame's coordinates — this puts them on one scale. */
+function rebaseRect(rect: Rect, box: FrameBox, screen: { width: number; height: number }): Rect {
+  const toLocal = (v: number, origin: number, extent: number, span: number) =>
+    ((((v / 100) * span) - origin) / extent) * 100;
+  return {
+    x0: toLocal(rect.x0, box.x, box.w, screen.width),
+    x1: toLocal(rect.x1, box.x, box.w, screen.width),
+    y0: toLocal(rect.y0, box.y, box.h, screen.height),
+    y1: toLocal(rect.y1, box.y, box.h, screen.height),
+  };
+}
+
+/** The suggestion overlapping `target` most, by intersection area. Null when the
+ *  model proposed nothing that touches the zone at all — better to leave the
+ *  zone alone than to paste a note about some other part of the screen. */
+function pickByOverlap<T extends { rect: Rect }>(zones: T[], target: Rect): T | undefined {
+  let best: T | undefined;
+  let bestArea = 0;
+  for (const z of zones) {
+    const w = Math.min(z.rect.x1, target.x1) - Math.max(z.rect.x0, target.x0);
+    const h = Math.min(z.rect.y1, target.y1) - Math.max(z.rect.y0, target.y0);
+    const area = w > 0 && h > 0 ? w * h : 0;
+    if (area > bestArea) {
+      bestArea = area;
+      best = z;
+    }
+  }
+  return best;
 }
 
 /** One layer inside a «сломанный» frame that differs from its эталон twin —
@@ -456,20 +486,60 @@ export interface DefectEntry {
   deltas: DefectDelta[];
 }
 
+/** Every descendant of `root`, excluding `root` itself. */
+function descendants(root: Layer): Layer[] {
+  const out: Layer[] = [];
+  const walk = (n: Layer) => {
+    for (const c of n.children) {
+      out.push(c);
+      walk(c);
+    }
+  };
+  walk(root);
+  return out;
+}
+
 /**
  * Scan every «сломанный» top-level frame and pair each of its descendant layers
  * to the эталон twin — by the explicit `twinId` link first (robust to
- * reordering), falling back to the mirrored index path against the first
- * reference frame for hand-built pairs. Returns only the layers that actually
- * differ, with their per-property deltas. This is the whole-frame counterpart to
- * `autoDeltas` (which diffs a single selected layer).
+ * reordering), falling back to the mirrored index path for hand-built pairs.
+ *
+ * Returns the layers that differ AND `pairedIds` (everything that found a twin,
+ * differing or not) — the panel needs the first, the «Из эталона» affordance
+ * needs to tell «identical» from «unpaired».
+ *
+ * Layers present on one side only become a `presence` delta: a walk of the
+ * сломанный frame alone can't see a deletion, since the deleted layer simply
+ * isn't there to visit. Deletions are matched by `twinId` only — index paths
+ * shift when a layer is removed, so a path match would pair the wrong nodes.
  */
-function collectDefects(tops: Layer[]): DefectEntry[] {
+function collectDefects(
+  tops: Layer[],
+  read: ReadLive,
+): { entries: DefectEntry[]; pairedIds: Set<string> } {
   const refFrames = tops.filter((t) => t.props.frameRole === 'reference');
-  if (!refFrames.length) return [];
-  const out: DefectEntry[] = [];
-  const walk = (frame: Layer, node: Layer) => {
-    if (node !== frame) {
+  const entries: DefectEntry[] = [];
+  const pairedIds = new Set<string>();
+  if (!refFrames.length) return { entries, pairedIds };
+
+  for (const frame of tops) {
+    if (frame.props.frameRole !== 'flawed') continue;
+    const refFrame = refFrames.find((r) => r.id !== frame.id) ?? refFrames[0];
+    const frameBox = read(frame.id, null)?.box ?? null;
+    const refBox = read(refFrame.id, null)?.box ?? null;
+    const matchedTwins = new Set<string>();
+    const add = (layer: Layer, deltas: DefectDelta[]) => {
+      if (deltas.length)
+        entries.push({
+          frameId: frame.id,
+          frameName: frame.name,
+          layerId: layer.id,
+          layerName: layer.name,
+          deltas,
+        });
+    };
+
+    for (const node of descendants(frame)) {
       let twin: Layer | null = null;
       if (node.props.twinId) {
         for (const rf of refFrames) {
@@ -479,18 +549,33 @@ function collectDefects(tops: Layer[]): DefectEntry[] {
       }
       if (!twin) {
         const path = pathTo(frame, node.id);
-        if (path) twin = atPath(refFrames[0], path);
+        if (path) twin = atPath(refFrame, path);
       }
-      if (twin) {
-        const deltas = diffLayerProps(twin, node);
-        if (deltas.length)
-          out.push({ frameId: frame.id, frameName: frame.name, layerId: node.id, layerName: node.name, deltas });
+      if (!twin) {
+        // Only a linked tree can tell «added» from «this pairing is just
+        // unknown» — an unlinked import has no twins at all, and calling every
+        // layer added would bury the real defects.
+        if (node.props.twinId) add(node, [presenceDelta('added')]);
+        continue;
+      }
+      matchedTwins.add(twin.id);
+      pairedIds.add(node.id);
+      const a = read(twin.id, refBox);
+      const b = read(node.id, frameBox);
+      if (a && b) add(node, diffLayerProps(a, b));
+    }
+
+    // Anything in the эталон that nothing in the сломанный claims as its twin
+    // was deleted. Reported against the reference layer's id — the сломанный
+    // node is gone, and this one is still selectable on canvas.
+    const linked = descendants(frame).some((n) => n.props.twinId);
+    if (linked) {
+      for (const refNode of descendants(refFrame)) {
+        if (!matchedTwins.has(refNode.id)) add(refNode, [presenceDelta('removed')]);
       }
     }
-    for (const c of node.children) walk(frame, c);
-  };
-  for (const f of tops) if (f.props.frameRole === 'flawed') walk(f, f);
-  return out;
+  }
+  return { entries, pairedIds };
 }
 
 const EMPTY_DRAFT: EditorDraft = {
@@ -845,35 +930,6 @@ export function EditorCore() {
     return s;
   }, [result]);
 
-  // Auto-diff the selected layer against its эталон twin: locate the top-level
-  // frame it lives in, confirm that frame is «сломанный», find the sibling
-  // reference frame, then pair the layer to its counterpart. Preference order:
-  // (1) the explicit `twinId` link stamped when the сломанный twin was spawned —
-  // robust to reordering/insert/delete; (2) fall back to mirroring the index
-  // path for layers with no link (hand-built pairs, older drafts). Undefined
-  // when there's no pairing (plain frame / no reference), so the editor hides the
-  // «Из эталона» affordance; [] means «paired, identical». Declared with the
-  // other hooks (before any early return) so hook order stays stable.
-  const autoDeltas = useMemo<DefectDelta[] | undefined>(() => {
-    if (!selected || !result) return undefined;
-    const tops = result.screen.layers;
-    const host = tops.find((t) => pathTo(t, selected.id));
-    if (!host || host.props.frameRole !== 'flawed') return undefined;
-    const ref = tops.find((t) => t.id !== host.id && t.props.frameRole === 'reference');
-    if (!ref) return undefined;
-    const twin =
-      (selected.props.twinId ? findLayer(ref.children, selected.props.twinId) : null) ??
-      atPath(ref, pathTo(host, selected.id)!);
-    if (!twin) return [];
-    return diffLayerProps(twin, selected);
-  }, [selected, result]);
-
-  // Every layer across all «сломанный» frames that differs from its эталон twin —
-  // the data behind the bottom «Отличия» panel.
-  const defects = useMemo<DefectEntry[]>(
-    () => (result ? collectDefects(result.screen.layers) : []),
-    [result],
-  );
   // A reference↔flawed pair exists at all — so the panel is worth showing even
   // before any layer is broken (it prompts «сломай слой»).
   const hasFramePair = useMemo(
@@ -1329,11 +1385,7 @@ export function EditorCore() {
           /* un-rendered node — bail */
         }
       }
-      console.log('[DBG framify] id=', id, 'liveNodeFound?', !!live, 'bbox=', bbox);
-      if (!bbox || bbox.w <= 0 || bbox.h <= 0) {
-        console.log('[DBG framify] BAIL: bbox unmeasurable/degenerate');
-        return;
-      }
+      if (!bbox || bbox.w <= 0 || bbox.h <= 0) return;
       pushUndo();
       setResult((r) => {
         if (!r) return r;
@@ -1384,9 +1436,11 @@ export function EditorCore() {
   // Shift one or more layers by (dx,dy) in a single markup pass, so a multi-
   // selection move is one undo step and one re-serialize — not one per layer.
   const moveLayers = useCallback(
-    (ids: string[], dx: number, dy: number) => {
+    (ids: string[], dx: number, dy: number, coalesce = false) => {
       if (!ids.length) return;
-      pushUndo();
+      // Held arrow keys fire one keydown per repeat; coalesce them into the
+      // undo entry the first press opened instead of one entry per pixel.
+      if (!coalesce) pushUndo();
       setResult((r) => {
         if (!r) return r;
         const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
@@ -1574,6 +1628,51 @@ export function EditorCore() {
     }
   }, []);
 
+  // Every layer across all «сломанный» frames that differs from its эталон twin —
+  // the data behind the bottom «Отличия» panel.
+  //
+  // An effect, not a memo: the scan measures geometry from the rendered DOM, and
+  // during render the DOM still shows the PREVIOUS svg — a memo would diff the
+  // edit before last. Running after commit means we always read what's on screen.
+  const [scan, setScan] = useState<{ entries: DefectEntry[]; pairedIds: Set<string> }>({
+    entries: [],
+    pairedIds: new Set(),
+  });
+  useEffect(() => {
+    if (!result) {
+      setScan({ entries: [], pairedIds: new Set() });
+      return;
+    }
+    // Parse the current markup once, then read each node from it — the props on
+    // the layer tree are an import-time snapshot and go stale on every SVG-only
+    // edit (colour, transform), which is exactly what the diff must catch.
+    const doc = new DOMParser().parseFromString(result.svg, 'image/svg+xml');
+    const read: ReadLive = (id, frameBox) => {
+      const el = doc.querySelector(`[data-layer-id="${id}"]`);
+      if (!el) return null;
+      const abs = measureLayerBox(id);
+      return {
+        props: extractProps(el, localName(el)),
+        box: abs
+          ? frameBox
+            ? { x: abs.x - frameBox.x, y: abs.y - frameBox.y, w: abs.w, h: abs.h }
+            : abs
+          : null,
+      };
+    };
+    setScan(collectDefects(result.screen.layers, read));
+  }, [result, measureLayerBox]);
+  const defects = scan.entries;
+
+  // The selected layer's own diff, pulled from the same scan so the panel and
+  // the inspector can never disagree. Undefined = no эталон twin (hides the «Из
+  // эталона» affordance); [] = paired and identical.
+  const autoDeltas = useMemo<DefectDelta[] | undefined>(() => {
+    if (!selected) return undefined;
+    if (!scan.pairedIds.has(selected.id)) return undefined;
+    return scan.entries.find((e) => e.layerId === selected.id)?.deltas ?? [];
+  }, [selected, scan]);
+
   const parentCTM = useCallback((id: string): DOMMatrix | null => {
     const host = svgHostRef.current;
     const node = host?.querySelector(`[data-layer-id="${id}"]`);
@@ -1689,6 +1788,8 @@ export function EditorCore() {
   // frame's rows clear as its answer lands, so the tree fills in progressively
   // instead of freezing until the slowest frame returns.
   const [namingIds, setNamingIds] = useState<Set<string>>(new Set());
+  /** Zone currently awaiting a critique-analyze reply — drives its ИИ spinner. */
+  const [aiZoneId, setAiZoneId] = useState<string | null>(null);
   const renamingFrames = namingIds.size > 0;
 
   /** Commit one frame's names into both the markup and the tree, and release its
@@ -1842,11 +1943,7 @@ export function EditorCore() {
   const groupLayers = useCallback(
     (ids: string[], layout: 'row' | 'column' | 'none', nameOverride?: string): string | null => {
       const cur = latest.current;
-      console.log('[DBG groupLayers] ids=', ids, 'layout=', layout, 'cur?', !!cur);
-      if (!cur || ids.length < 1) {
-        console.log('[DBG groupLayers] BAIL: no snapshot or empty ids');
-        return null;
-      }
+      if (!cur || ids.length < 1) return null;
       const idSet = new Set(ids);
       const gid = rid('L');
       const name = nameOverride ?? (layout === 'none' ? 'Группа' : 'Авто-макет');
@@ -1859,10 +1956,7 @@ export function EditorCore() {
         props: layout === 'none' ? {} : { layout, frame: true },
         children: hits,
       }));
-      if (!grouped) {
-        console.log('[DBG groupLayers] BAIL: groupSiblings=null (selection not siblings under one parent)');
-        return null; // selection spans different parents — can't group
-      }
+      if (!grouped) return null; // selection spans different parents — can't group
 
       pushUndo();
       setResult((r) => {
@@ -1871,11 +1965,7 @@ export function EditorCore() {
         const els = ids
           .map((id) => doc.querySelector(`[data-layer-id="${id}"]`))
           .filter((e): e is Element => !!e);
-        console.log('[DBG groupLayers] markup nodes found:', els.length, 'of', ids.length);
-        if (!els.length) {
-          console.log('[DBG groupLayers] BAIL: no data-layer-id nodes in markup');
-          return r;
-        }
+        if (!els.length) return r;
         // Order the nodes as they sit in the document so the wrapped markup keeps
         // its paint order (earlier = behind), matching the tree order.
         els.sort((a, b) =>
@@ -2011,29 +2101,65 @@ export function EditorCore() {
       // and look for its own vanished target.
       if (dragId === targetId) return;
 
-      const moved = moveLayerInTree(cur.layers, dragId, targetId, pos);
-      if (!moved) return;
+      // Grabbing a row that's part of the current multi-selection drags the WHOLE
+      // selection (Figma behaviour). Without this only the grabbed row travels and
+      // the rest sit still, which reads as "the layers refuse to move".
+      const batch =
+        selectedIds.includes(dragId) && selectedIds.length > 1
+          ? orderIdsInTree(cur.layers, selectedIds)
+          : [dragId];
+      console.log('[DBG reparent] dragId=', dragId, 'target=', targetId, 'pos=', pos,
+        'selectedIds=', selectedIds, '-> batch=', batch);
+      // `before`/`inside` keep document order when applied front-to-back, but each
+      // `after` insert lands directly behind the target — so that one runs in
+      // reverse to come out in the original order.
+      const order = pos === 'after' ? [...batch].reverse() : batch;
+
+      // Apply to the tree one at a time on the evolving result, skipping the ones
+      // that can't legally move (the target itself, or an ancestor of the target —
+      // that would nest the target inside its own subtree).
+      let layers = cur.layers;
+      const movable: string[] = [];
+      for (const id of order) {
+        if (id === targetId) continue;
+        const next = moveLayerInTree(layers, id, targetId, pos);
+        if (!next) {
+          console.log('[DBG reparent] tree-move REJECTED for', id, '(target is inside it, or id not found)');
+          continue;
+        }
+        layers = next;
+        movable.push(id);
+      }
+      console.log('[DBG reparent] movable=', movable);
+      if (!movable.length) {
+        console.log('[DBG reparent] BAIL: nothing movable');
+        return;
+      }
 
       pushUndo();
       setResult((r) => {
         if (!r) return r;
         const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
-        const dragEl = doc.querySelector(`[data-layer-id="${dragId}"]`);
         const targetEl = doc.querySelector(`[data-layer-id="${targetId}"]`);
-        if (!dragEl || !targetEl) return r;
-        if (pos === 'inside') {
-          targetEl.appendChild(dragEl);
-        } else {
-          const parent = targetEl.parentNode;
-          if (!parent) return r;
-          parent.insertBefore(dragEl, pos === 'before' ? targetEl : targetEl.nextSibling);
+        console.log('[DBG reparent] markup targetEl found?', !!targetEl);
+        if (!targetEl) return r;
+        const parent = pos === 'inside' ? null : targetEl.parentNode;
+        if (pos !== 'inside' && !parent) return r;
+        for (const id of movable) {
+          const el = doc.querySelector(`[data-layer-id="${id}"]`);
+          if (!el) {
+            console.log('[DBG reparent] markup node MISSING for', id);
+            continue;
+          }
+          if (pos === 'inside') targetEl.appendChild(el);
+          else parent!.insertBefore(el, pos === 'before' ? targetEl : targetEl.nextSibling);
         }
-        return { ...r, svg: new XMLSerializer().serializeToString(doc.documentElement), screen: { ...r.screen, layers: moved } };
+        return { ...r, svg: new XMLSerializer().serializeToString(doc.documentElement), screen: { ...r.screen, layers } };
       });
-      setSelectedIds([dragId]);
-      anchorRef.current = dragId;
+      setSelectedIds(movable);
+      anchorRef.current = movable[movable.length - 1];
     },
-    [pushUndo],
+    [pushUndo, selectedIds],
   );
 
   // Duplicate a top-level frame as its «сломанный» twin: clone the subtree with
@@ -2041,8 +2167,32 @@ export function EditorCore() {
   // path), relabel the cloned SVG node, shift it to the right, mark the original
   // as эталон and the copy as сломанный. This is the «копирую рядом» step the
   // whole per-property diff flow hangs on.
-  const duplicateAsFlawed = useCallback(
-    (id: string) => {
+  // Set a top-level frame's critique role outright («Выбрать как эталон» /
+  // «как сломанный»). Role is pure metadata — no SVG mutation.
+  const setFrameRole = useCallback(
+    (id: string, role: 'reference' | 'flawed') => {
+      pushUndo();
+      setResult((r) =>
+        r
+          ? {
+              ...r,
+              screen: {
+                ...r.screen,
+                layers: r.screen.layers.map((l) =>
+                  l.id === id ? { ...l, props: { ...l.props, frameRole: role } } : l,
+                ),
+              },
+            }
+          : r,
+      );
+    },
+    [pushUndo],
+  );
+
+  // Duplicate a top-level frame as the other half of an эталон/сломанный pair:
+  // the clone takes `role`, the original takes its counterpart.
+  const duplicateAsRole = useCallback(
+    (id: string, role: 'reference' | 'flawed') => {
       const cur = latest.current;
       if (!cur) return;
       const idx = cur.layers.findIndex((l) => l.id === id);
@@ -2055,8 +2205,8 @@ export function EditorCore() {
       // The frame itself pairs to the эталон by role, not by twinId — clear the
       // link the clone helper stamped on the root so only inner layers carry it.
       delete clone.props.twinId;
-      clone.name = `${frame.name} · сломанный`;
-      clone.props = { ...clone.props, frameRole: 'flawed' };
+      clone.name = `${frame.name} · ${role === 'flawed' ? 'сломанный' : 'эталон'}`;
+      clone.props = { ...clone.props, frameRole: role };
 
       pushUndo();
       setResult((r) => {
@@ -2077,8 +2227,11 @@ export function EditorCore() {
         el.setAttribute('transform', `translate(${dx},0) ${prev}`.trim());
         orig.parentNode?.insertBefore(el, orig.nextSibling);
         const layers = [...r.screen.layers];
-        // Mark the original as the эталон so the pair is complete out of the box.
-        layers[idx] = { ...frame, props: { ...frame.props, frameRole: 'reference' } };
+        // Mark the original as the counterpart so the pair is complete out of the box.
+        layers[idx] = {
+          ...frame,
+          props: { ...frame.props, frameRole: role === 'flawed' ? 'reference' : 'flawed' },
+        };
         layers.splice(idx + 1, 0, clone);
         return {
           ...r,
@@ -2261,6 +2414,30 @@ export function EditorCore() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [selectedIds, copySelection, pasteClipboard, duplicateSelection]);
+
+  // Arrow keys nudge the selection: 1px, or 10px with Shift. Skip while typing
+  // in a field, and let the browser keep arrows for scrolling when nothing is
+  // selected.
+  useEffect(() => {
+    const STEP: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+    };
+    const onKey = (e: KeyboardEvent) => {
+      const step = STEP[e.key];
+      if (!step || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!selectedIds.length) return;
+      const ae = document.activeElement;
+      if (ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae as HTMLElement).isContentEditable)) return;
+      e.preventDefault();
+      const k = e.shiftKey ? 10 : 1;
+      moveLayers(selectedIds, step[0] * k, step[1] * k, e.repeat);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedIds, moveLayers]);
 
   // Cmd/Ctrl+G groups the current selection into an auto-layout frame; adding
   // Shift makes a plain group. Skip while typing in a field.
@@ -2647,6 +2824,70 @@ export function EditorCore() {
     [pushUndo],
   );
 
+  /**
+   * Fill the selected zone's prose fields from the vision model. Renders the
+   * сломанный frame the zone lives in plus its эталон twin, sends both, then
+   * keeps the suggestion whose rect overlaps this zone most — the model returns
+   * zones for the whole frame, and only the one under this layer is ours.
+   *
+   * Prose only, on purpose: `deltas` come from the deterministic auto-diff and
+   * the model must not get a vote on what the grader measures.
+   */
+  const askZoneAI = useCallback(async () => {
+    const cur = result;
+    const zone = selected ? zoneByLayer.get(selected.id) : undefined;
+    if (!zone || !selected || !cur || aiZoneId) return;
+    const tops = cur.screen.layers;
+    const host = tops.find((t) => pathTo(t, selected.id));
+    if (!host || host.props.frameRole !== 'flawed') return;
+    const ref = tops.find((t) => t.id !== host.id && t.props.frameRole === 'reference');
+    if (!ref) return;
+    const hostBox = measureLayerBox(host.id);
+    const refBox = measureLayerBox(ref.id);
+    if (!hostBox || !refBox) return;
+
+    setAiZoneId(zone.id);
+    try {
+      const [imageBase64, goodBase64] = await Promise.all([
+        rasterizeFrame(cur.svg, hostBox),
+        rasterizeFrame(cur.svg, refBox),
+      ]);
+      if (!imageBase64) return;
+      const res = await fetch('/api/admin/critique-analyze', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64,
+          mediaType: 'image/png',
+          screenTitle: draft.title || host.name,
+          goodBase64: goodBase64 ?? undefined,
+          goodMediaType: goodBase64 ? 'image/png' : undefined,
+        }),
+      });
+      if (!res.ok) return;
+      const reply = (await res.json()) as AnalyzeReply;
+      // The zone's rect is measured against the whole screen, the render against
+      // the frame — rebase it onto frame-local % so the two are comparable.
+      const local = zone.rect ? rebaseRect(zone.rect, hostBox, cur.screen) : null;
+      const best = local ? pickByOverlap(reply.zones ?? [], local) : (reply.zones ?? [])[0];
+      if (!best) return;
+      patchZone(zone.id, {
+        role: best.role,
+        roleNote: best.roleNote,
+        intent: best.intent,
+        defect: best.defect,
+        defectNote: best.defectNote,
+        fixes: best.fixes?.length
+          ? best.fixes.map((f, i) => ({ id: rid(`fix${i}`), label: f.label, correct: f.correct }))
+          : undefined,
+      });
+    } catch {
+      // Leave the zone as authored — the teacher can retry or fill it by hand.
+    } finally {
+      setAiZoneId(null);
+    }
+  }, [zoneByLayer, selected, result, aiZoneId, draft.title, measureLayerBox, patchZone]);
+
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -2887,6 +3128,26 @@ export function EditorCore() {
                 onMove={(x, y) => moveLayerTo(selected.id, x, y)}
                 onAlign={alignLayer}
                 onText={(v) => mutate(selected.id, (el) => (el.textContent = v))}
+                onFontSize={
+                  selected.type === 'text'
+                    ? (v) =>
+                        editLayer(
+                          selected.id,
+                          (el) => el.setAttribute('font-size', String(v)),
+                          () => ({ fontSize: v }),
+                        )
+                    : undefined
+                }
+                onFontWeight={
+                  selected.type === 'text'
+                    ? (v) =>
+                        editLayer(
+                          selected.id,
+                          (el) => el.setAttribute('font-weight', String(v)),
+                          () => ({ fontWeight: String(v) }),
+                        )
+                    : undefined
+                }
                 onResize={
                   selected.type === 'frame' &&
                   selected.props.box &&
@@ -2911,6 +3172,10 @@ export function EditorCore() {
                   onAdd={() => addZone(selected)}
                   onRemove={() => selZone && removeZone(selZone.id)}
                   onPatch={(patch) => selZone && patchZone(selZone.id, patch)}
+                  // Only offer the AI where there's a pair to compare — the
+                  // auto-diff existing is exactly that condition.
+                  onAskAI={autoDeltas ? () => void askZoneAI() : undefined}
+                  aiBusy={!!selZone && aiZoneId === selZone.id}
                 />
               </div>
             </>
@@ -2947,7 +3212,6 @@ export function EditorCore() {
             // expected, and an in-place convert leaves the tree looking
             // unchanged, which reads as "the command did nothing".
             const target = menu.layerId!;
-            console.log('[DBG onFramify] CLICKED target=', target, 'selectedIds=', selectedIds);
             frameSelection(selectedIds.includes(target) ? selectedIds : [target]);
             setMenu(null);
           }}
@@ -2960,14 +3224,18 @@ export function EditorCore() {
             ungroupLayers(menu.layerId!);
             setMenu(null);
           }}
-          onDuplicateFlawed={
-            result.screen.layers.some((l) => l.id === menu.layerId && l.type === 'frame')
-              ? () => {
-                  duplicateAsFlawed(menu.layerId!);
-                  setMenu(null);
-                }
-              : undefined
+          frameRole={
+            result.screen.layers.find((l) => l.id === menu.layerId && l.type === 'frame')?.props
+              .frameRole ?? (result.screen.layers.some((l) => l.id === menu.layerId && l.type === 'frame') ? 'none' : undefined)
           }
+          onDuplicateAs={(role) => {
+            duplicateAsRole(menu.layerId!, role);
+            setMenu(null);
+          }}
+          onSetRole={(role) => {
+            setFrameRole(menu.layerId!, role);
+            setMenu(null);
+          }}
           onRename={() => {
             setRenameId(menu.layerId);
             setMenu(null);
