@@ -278,6 +278,16 @@ export const editor = {
       publicShort: 'публичный',
       toDrafts: 'В черновики',
       publish: 'Опубликовать',
+      saving: 'Сохраняю…',
+      publishing: 'Публикую…',
+    },
+    publish: {
+      needFlawed: 'Нужен «сломанный» фрейм. Продублируй эталон как сломанный и внеси в копию правки.',
+      needZone: 'Добавь хотя бы одну зону критики — отметь отличие критерием или создай зону вручную.',
+      defaultPrompt: 'Найди проблемы на экране: определи роль каждого блока и что в нём не так.',
+      done: 'Урок опубликован — ученики уже видят его.',
+      incomplete: 'Урок не прошёл проверку и не опубликован.',
+      failed: 'Не удалось опубликовать:',
     },
   },
   en: {
@@ -545,6 +555,16 @@ export const editor = {
       publicShort: 'public',
       toDrafts: 'To drafts',
       publish: 'Publish',
+      saving: 'Saving…',
+      publishing: 'Publishing…',
+    },
+    publish: {
+      needFlawed: 'A «flawed» frame is required. Duplicate the reference as flawed and edit the copy.',
+      needZone: 'Add at least one critique zone — mark a difference as a criterion or create a zone by hand.',
+      defaultPrompt: 'Find the problems on the screen: identify each block’s role and what’s wrong with it.',
+      done: 'Lesson published — learners can see it now.',
+      incomplete: 'The lesson failed validation and was not published.',
+      failed: 'Could not publish:',
     },
   },
 } as const;

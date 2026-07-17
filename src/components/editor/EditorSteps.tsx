@@ -510,12 +510,14 @@ export function Step4Access({
   onPatch,
   onSave,
   onPublish,
+  busy = 'idle',
 }: {
   draft: EditorDraft;
   zoneCount: number;
   onPatch: (patch: Partial<EditorDraft>) => void;
   onSave: () => void;
   onPublish: () => void;
+  busy?: 'idle' | 'saving' | 'publishing';
 }) {
   const { t } = useT();
   const restricted = draft.access === 'RESTRICTED';
@@ -578,16 +580,18 @@ export function Step4Access({
         <button
           type="button"
           onClick={onSave}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 text-footnote font-medium text-secondary transition-fast hover:text-primary"
+          disabled={busy !== 'idle'}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 text-footnote font-medium text-secondary transition-fast hover:text-primary disabled:opacity-50"
         >
-          <FileText size={15} /> {t('editor.access.toDrafts')}
+          <FileText size={15} /> {busy === 'saving' ? t('editor.access.saving') : t('editor.access.toDrafts')}
         </button>
         <button
           type="button"
           onClick={onPublish}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-footnote font-semibold text-on-brand transition-fast hover:bg-brand-hover"
+          disabled={busy !== 'idle'}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand py-2.5 text-footnote font-semibold text-on-brand transition-fast hover:bg-brand-hover disabled:opacity-50"
         >
-          <Send size={15} /> {t('editor.access.publish')}
+          <Send size={15} /> {busy === 'publishing' ? t('editor.access.publishing') : t('editor.access.publish')}
         </button>
       </div>
     </div>

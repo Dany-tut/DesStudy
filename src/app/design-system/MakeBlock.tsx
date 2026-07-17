@@ -22,8 +22,6 @@ import {
   LayoutGrid,
   Blend,
   Scan,
-  Minus,
-  Plus,
   Eye,
   Droplet,
   Grid2x2,
@@ -49,7 +47,7 @@ import {
   FIELD_STATIC,
   FIELD_INTERACTIVE,
 } from '@/components/editor/PropertiesPanel';
-import { SectionHeader, FieldLabel } from '@/components/editor/SectionHeader';
+import { SectionHeader } from '@/components/editor/SectionHeader';
 import { MenuSurface, MenuItem, MenuSeparator } from '@/components/editor/Menu';
 import { LayerTree } from '@/components/editor/LayerTree';
 import { moveLayerInTree } from '@/lib/editor/tree';
@@ -286,7 +284,7 @@ export function MakeBlock() {
           </div>
         </Spec>
         <Spec name="Размер" note="min=1 — ширина и высота не уходят в ноль и минус.">
-          <div className="flex items-center gap-1.5">
+          <div className="grid grid-cols-2 gap-1">
             <ScrubField label="Ш" value={w} onCommit={setW} min={1} />
             <ScrubField label="В" value={h} onCommit={setH} min={1} />
           </div>
@@ -295,7 +293,7 @@ export function MakeBlock() {
           name="С иконкой и единицей"
           note="Глиф вместо слова, когда ярлык шире значения. Прозрачность клампится 0–100 и несёт суффикс «%»."
         >
-          <div className="flex items-center gap-1.5">
+          <div className="grid grid-cols-2 gap-1">
             <ScrubField
               label="Прозрачность"
               Icon={Blend}
@@ -309,7 +307,7 @@ export function MakeBlock() {
           </div>
         </Spec>
         <Spec name="Смешанное значение" note="Разные значения в мультивыборе — «Mixed» вместо числа.">
-          <div className="flex items-center gap-1.5">
+          <div className="grid grid-cols-2 gap-1">
             <Field label="X" value="Mixed" />
             <Field label="Y" value="Mixed" />
           </div>
@@ -388,11 +386,9 @@ export function MakeBlock() {
           />
           <div className="flex items-start gap-1.5">
             <div className="min-w-0 flex-1">
-              <FieldLabel>Прозрачность</FieldLabel>
               <ScrubField label="Прозрачность" Icon={Blend} value={opacity} onCommit={setOpacity} min={0} max={100} suffix="%" />
             </div>
             <div className="min-w-0 flex-1">
-              <FieldLabel>Скругление</FieldLabel>
               <ScrubField label="Скругление" Icon={Scan} value={radius} onCommit={setRadius} min={0} />
             </div>
           </div>
@@ -439,22 +435,6 @@ export function MakeBlock() {
         </Spec>
         <Spec name="Обрезка содержимого" note="Только у настоящего фрейма — у простой группы clip нет, как в Figma.">
           <ClipToggle checked={clip} onChange={setClip} />
-        </Spec>
-      </Group>
-
-      <Group title="Иконочные кнопки">
-        <Spec
-          name="Ghost / Plus"
-          note="Никогда не сплошная заливка: непрозрачный квадрат тут читается как дырка в панели. Только полупрозрачный bg-hover под глифом."
-        >
-          <div className="flex items-center gap-2">
-            <GhostBtn Icon={Minus} onClick={() => {}} />
-            <GhostBtn Icon={Plus} onClick={() => {}} />
-            <PlusBtn onClick={() => {}} title="Добавить" />
-            <span className="ml-2 text-caption text-tertiary">инертные:</span>
-            <GhostBtn Icon={Minus} />
-            <PlusBtn />
-          </div>
         </Spec>
       </Group>
 
@@ -683,6 +663,37 @@ export function MakeBlock() {
           note="Тот же слой без stroke: приглушённый заголовок и «+», как у пустых Effects."
         >
           <PropertiesPanel layer={PLAIN_LAYER} onStroke={() => {}} onRadius={() => {}} />
+        </Spec>
+      </Group>
+
+      <Group title="Панель свойств — разделение секций">
+        <Spec
+          name="Разделители"
+          note="Секции разделены хайрлайном снизу, последняя — без него. Как в Figma: границы блоков читаются, но панель остаётся единым полотном."
+        >
+          <PropertiesPanel
+            layer={STROKE_LAYER}
+            chrome="divider"
+            onStroke={() => {}}
+            onStrokeWidth={() => {}}
+            onRadius={() => {}}
+            onFill={() => {}}
+            onOpacity={() => {}}
+          />
+        </Spec>
+        <Spec
+          name="Рамка вокруг секции"
+          note="Каждый блок — своя скруглённая рамка на чуть более светлой подложке, между ними зазор. Границы явные, блоки читаются как карточки — ценой лишней обводки и отступов."
+        >
+          <PropertiesPanel
+            layer={STROKE_LAYER}
+            chrome="card"
+            onStroke={() => {}}
+            onStrokeWidth={() => {}}
+            onRadius={() => {}}
+            onFill={() => {}}
+            onOpacity={() => {}}
+          />
         </Spec>
       </Group>
 

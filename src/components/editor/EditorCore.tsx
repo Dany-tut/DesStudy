@@ -434,6 +434,23 @@ function diffLayerProps(ref: LiveLayer, bad: LiveLayer): DefectDelta[] {
   return out.filter((d): d is DefectDelta => d != null);
 }
 
+/**
+ * Crop the whole-screen SVG down to one frame by retargeting the root viewBox —
+ * the same box `rasterizeFrame` draws, expressed declaratively. Everything
+ * outside the frame (crucially the эталон twin, parked to the right) falls
+ * outside the viewBox and doesn't render, while `<defs>` gradients/clips it
+ * references still resolve. This is the markup the player's `svg` scene shows.
+ */
+function cropSvgToFrame(svg: string, box: FrameBox): string {
+  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  const root = doc.documentElement;
+  root.setAttribute('viewBox', `${box.x} ${box.y} ${box.w} ${box.h}`);
+  root.setAttribute('width', String(Math.round(box.w)));
+  root.setAttribute('height', String(Math.round(box.h)));
+  root.removeAttribute('style'); // a fixed width/height in style would override the attrs
+  return new XMLSerializer().serializeToString(root);
+}
+
 /** The layer exists on one side only. Authored as a delta so «убрал ценник» can
  *  become a grading criterion like any property change. */
 const presenceDelta = (kind: 'removed' | 'added'): DefectDelta => ({
@@ -776,57 +793,69 @@ export function EditorCore() {
   const [autosaveError, setAutosaveError] = useState<string | null>(null);
   const [lessonSaved, setLessonSaved] = useState(false);
 
+  // Ensure the lesson exists and its screen block holds `entry`, returning the
+  // lesson id. Shared by the debounced autosave and by publish (which can't wait
+  // on a debounce). Serialised through `savingRef` so concurrent callers can't
+  // race two lesson-creates; each awaits the same in-flight chain.
+  const persistEntry = useCallback((entry: EditorDraftEntry): Promise<string> => {
+    savingRef.current = savingRef.current.then(async () => {
+      if (!lessonIdRef.current) {
+        const res = await fetch('/api/admin/lessons', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: entry.fileName.replace(/\.svg$/i, '') || 'Новый экран',
+            slug: `ekran-${Math.random().toString(36).slice(2, 8)}`,
+            pathTitle: 'От преподавателя',
+            skill: 'custom',
+            difficulty: 'easy',
+            estimatedMinutes: 10,
+            objectives: [],
+            prerequisites: [],
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message ?? `create failed (${res.status})`);
+        lessonIdRef.current = data.id as string;
+        setDrafts(saveDraft({ ...entry, lessonId: data.id as string }));
+      }
+      const res = await fetch(`/api/admin/lessons/${lessonIdRef.current}/screen`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/octet-stream', 'X-Payload-Encoding': 'gzip' },
+        body: await gzipJson({
+          payload: {
+            fileName: entry.fileName,
+            items: entry.items,
+            activePageId: entry.activePageId,
+            coverPageId: entry.coverPageId,
+          },
+        }),
+      });
+      if (!res.ok) {
+        const msg = await res.json().catch(() => null);
+        throw new Error(msg?.message ?? `save failed (${res.status})`);
+      }
+    });
+    // Report both the outcome and the id: `savingRef` is typed void so the chain
+    // stays uniform, but callers need the lesson id the save just settled.
+    return savingRef.current.then(() => {
+      setAutosaveError(null);
+      setLessonSaved(true);
+      if (!lessonIdRef.current) throw new Error('lesson id missing after save');
+      return lessonIdRef.current;
+    });
+  }, []);
+
   const autosaveToLesson = useCallback((entry: EditorDraftEntry) => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(() => {
-      savingRef.current = savingRef.current.then(async () => {
-        try {
-          if (!lessonIdRef.current) {
-            const res = await fetch('/api/admin/lessons', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                title: entry.fileName.replace(/\.svg$/i, '') || 'Новый экран',
-                slug: `ekran-${Math.random().toString(36).slice(2, 8)}`,
-                pathTitle: 'От преподавателя',
-                skill: 'custom',
-                difficulty: 'easy',
-                estimatedMinutes: 10,
-                objectives: [],
-                prerequisites: [],
-              }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.message ?? `create failed (${res.status})`);
-            lessonIdRef.current = data.id as string;
-            setDrafts(saveDraft({ ...entry, lessonId: data.id as string }));
-          }
-          const res = await fetch(`/api/admin/lessons/${lessonIdRef.current}/screen`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/octet-stream', 'X-Payload-Encoding': 'gzip' },
-            body: await gzipJson({
-              payload: {
-                fileName: entry.fileName,
-                items: entry.items,
-                activePageId: entry.activePageId,
-                coverPageId: entry.coverPageId,
-              },
-            }),
-          });
-          if (!res.ok) {
-            const msg = await res.json().catch(() => null);
-            throw new Error(msg?.message ?? `save failed (${res.status})`);
-          }
-          setAutosaveError(null);
-          setLessonSaved(true);
-        } catch (e) {
-          // Show the real reason — a bare "не удалось" hides whether it's auth,
-          // validation or size, which is exactly what you need to act on.
-          setAutosaveError(`${t('editor.autosaveFailed')} ${(e as Error).message}`);
-        }
+      persistEntry(entry).catch((e) => {
+        // Show the real reason — a bare "не удалось" hides whether it's auth,
+        // validation or size, which is exactly what you need to act on.
+        setAutosaveError(`${t('editor.autosaveFailed')} ${(e as Error).message}`);
       });
     }, 1500);
-  }, [t]);
+  }, [persistEntry, t]);
 
   // ── Undo / redo ──────────────────────────────────────────────────────────
   // Snapshots capture the two mutable pieces of authoring state (the SVG markup
@@ -2824,6 +2853,140 @@ export function EditorCore() {
     [pushUndo],
   );
 
+  // Snapshot the current authoring state as a draft entry — the same shape the
+  // autosave effect builds, but callable on demand (publish / save-now can't
+  // wait for the debounce to fire).
+  const buildEntry = useCallback((): EditorDraftEntry | null => {
+    if (!activeDraftId || activePageId == null || !result) return null;
+    pageDataRef.current.set(activePageId, { result, draft });
+    const built: PageItem[] = items.map((m) =>
+      m.kind === 'divider'
+        ? { id: m.id, kind: 'divider', name: m.name }
+        : {
+            id: m.id,
+            kind: 'page',
+            name: m.name,
+            ...(pageDataRef.current.get(m.id) ?? { result: blankResult(), draft: EMPTY_DRAFT }),
+          },
+    );
+    return {
+      id: activeDraftId,
+      lessonId: lessonIdRef.current ?? undefined,
+      fileName: fileName ?? 'screen.svg',
+      items: built,
+      activePageId,
+      coverPageId,
+      updatedAt: Date.now(),
+    };
+  }, [activeDraftId, activePageId, result, draft, items, fileName, coverPageId]);
+
+  const [publishState, setPublishState] = useState<'idle' | 'saving' | 'publishing'>('idle');
+
+  // Flush the current draft to the server without publishing — the «В черновики»
+  // action. Autosave already does this on a timer; this just makes it immediate
+  // and gives explicit feedback.
+  const saveDraftNow = useCallback(async () => {
+    const entry = buildEntry();
+    if (!entry) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    setPublishState('saving');
+    try {
+      await persistEntry(entry);
+      alert(t('editor.steps.savedDraftAlert'));
+    } catch (e) {
+      alert(`${t('editor.autosaveFailed')} ${(e as Error).message}`);
+    } finally {
+      setPublishState('idle');
+    }
+  }, [buildEntry, persistEntry, t]);
+
+  /**
+   * Assemble the screen-critique EXERCISE from the authoring source and publish.
+   *
+   * The editor only ever autosaves a `screen` block (markup + zones as authoring
+   * data); `blocksToLesson` doesn't turn that into a playable exercise. So on
+   * publish we materialise a `screen-critique` exercise block from the сломанный
+   * frame + zones, upsert it (so re-publishing doesn't stack duplicates), then
+   * flip the lesson's `published` flag — which re-validates the whole lesson.
+   */
+  const publishLesson = useCallback(async () => {
+    const cur = result;
+    if (!cur || publishState !== 'idle') return;
+    const flawed = cur.screen.layers.find((l) => l.props.frameRole === 'flawed');
+    if (!flawed) {
+      alert(t('editor.publish.needFlawed'));
+      return;
+    }
+    const zones = draft.zones.filter((z) => z.layerId);
+    if (!zones.length) {
+      alert(t('editor.publish.needZone'));
+      return;
+    }
+    const box = measureLayerBox(flawed.id);
+    if (!box) {
+      alert(t('editor.publish.needFlawed'));
+      return;
+    }
+
+    // The scene is the cropped сломанный frame, so zone rects — authored in
+    // whole-screen % — must be rebased into that frame's local %.
+    const screen = { width: cur.screen.width, height: cur.screen.height };
+    const exercise = {
+      id: rid('ex'),
+      type: 'screen-critique' as const,
+      prompt: t('editor.publish.defaultPrompt'),
+      scene: 'svg' as const,
+      svg: cropSvgToFrame(cur.svg, box),
+      screenTitle: draft.title || flawed.name,
+      zones: zones.map((z) => ({
+        ...z,
+        rect: rebaseRect(z.rect ?? { x0: 0, y0: 0, x1: 100, y1: 100 }, box, screen),
+      })),
+      explanation: '',
+    };
+
+    const entry = buildEntry();
+    if (!entry) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    setPublishState('publishing');
+    try {
+      const lessonId = await persistEntry(entry);
+
+      // Upsert the exercise block: reuse an existing screen-critique block so a
+      // second publish overwrites rather than appends.
+      const lesson = await fetch(`/api/admin/lessons/${lessonId}`).then((r) => r.json());
+      const existing = (lesson.blocks ?? []).find(
+        (b: { kind: string; payload?: { type?: string } }) =>
+          b.kind === 'exercise' && b.payload?.type === 'screen-critique',
+      );
+      const target = existing
+        ? { url: `/api/admin/lessons/${lessonId}/blocks/${existing.id}`, method: 'PATCH', body: { payload: exercise } }
+        : { url: `/api/admin/lessons/${lessonId}/blocks`, method: 'POST', body: { kind: 'exercise', payload: exercise } };
+      const blockRes = await fetch(target.url, {
+        method: target.method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(target.body),
+      });
+      if (!blockRes.ok) {
+        const msg = await blockRes.json().catch(() => null);
+        throw new Error(msg?.message ?? `block save failed (${blockRes.status})`);
+      }
+
+      const pubRes = await fetch(`/api/admin/lessons/${lessonId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ published: true }),
+      });
+      const pub = await pubRes.json().catch(() => null);
+      if (!pubRes.ok) throw new Error(pub?.message ?? t('editor.publish.incomplete'));
+      alert(t('editor.publish.done'));
+    } catch (e) {
+      alert(`${t('editor.publish.failed')} ${(e as Error).message}`);
+    } finally {
+      setPublishState('idle');
+    }
+  }, [result, draft, publishState, measureLayerBox, buildEntry, persistEntry, t]);
+
   /**
    * Fill the selected zone's prose fields from the vision model. Renders the
    * сломанный frame the zone lives in plus its эталон twin, sends both, then
@@ -3038,8 +3201,9 @@ export function EditorCore() {
             draft={draft}
             zoneCount={draft.zones.length}
             onPatch={patchDraft}
-            onSave={() => alert(t('editor.steps.savedDraftAlert'))}
-            onPublish={() => alert(t('editor.steps.publishAlert'))}
+            onSave={() => void saveDraftNow()}
+            onPublish={() => void publishLesson()}
+            busy={publishState}
           />
         ) : (
           <StageCanvas

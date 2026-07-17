@@ -16,11 +16,20 @@ import {
   Blend,
   Scan,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import type { Layer, ParsedScreen } from '@/lib/editor/types';
 import { useT } from '@/lib/i18n/client';
 
 import { ColorPicker } from './ColorPicker';
+
+/**
+ * How the panel separates its blocks. `divider` (default) draws a hairline under
+ * each block — Figma's own chrome; `card` wraps every block in its own rounded
+ * bordered surface with a gap between, so the panel reads as a stack of cards.
+ * Threaded through context so the seven Section call-sites don't each take a prop.
+ */
+export type SectionChrome = 'divider' | 'card';
+const SectionChromeContext = createContext<SectionChrome>('divider');
 
 /**
  * The Figma-style properties panel — a read-across-then-edit inspector for the
@@ -50,6 +59,7 @@ export function PropertiesPanel({
   onResize,
   onToggleClip,
   footer,
+  chrome = 'divider',
 }: {
   layer: Layer;
   screen?: ParsedScreen | null;
@@ -69,6 +79,8 @@ export function PropertiesPanel({
   onResize?: (w: number, h: number) => void;
   onToggleClip?: (on: boolean) => void;
   footer?: React.ReactNode;
+  /** Block separation style — see {@link SectionChrome}. */
+  chrome?: SectionChrome;
 }) {
   const { t } = useT();
   const { props } = layer;
@@ -82,7 +94,8 @@ export function PropertiesPanel({
   const isRealFrame = isFrame && !!props.frame;
 
   return (
-    <div className="flex flex-col">
+    <SectionChromeContext.Provider value={chrome}>
+    <div className={['flex flex-col', chrome === 'card' ? 'gap-2' : ''].join(' ')}>
       {/* Header */}
       <div className="pb-2">
         <p className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.props.properties')}</p>
@@ -175,7 +188,9 @@ export function PropertiesPanel({
           )}
         </div>
         {isRealFrame && onToggleClip && (
-          <ClipToggle checked={!!props.clip} onChange={onToggleClip} />
+          <div className="mt-1.5">
+            <ClipToggle checked={!!props.clip} onChange={onToggleClip} />
+          </div>
         )}
       </Section>
 
@@ -311,6 +326,7 @@ export function PropertiesPanel({
 
       {footer && <div className="pt-3">{footer}</div>}
     </div>
+    </SectionChromeContext.Provider>
   );
 }
 
@@ -484,10 +500,18 @@ export function Section({
   muted?: boolean;
   last?: boolean;
 }) {
-  // No horizontal padding of its own — the rail's px-3 is the single left edge
-  // every section, field and the zone block below align to.
+  const chrome = useContext(SectionChromeContext);
+  // Divider chrome: no horizontal padding of its own — the rail's px-3 is the
+  // single left edge every section, field and the zone block below align to; a
+  // hairline under each block but the last carries the separation.
+  // Card chrome: each block is its own rounded bordered surface, so it takes its
+  // own inset padding and never draws a divider (the gap + border do the work).
+  const shell =
+    chrome === 'card'
+      ? 'rounded-lg border border-border-strong bg-surface px-2.5 py-2'
+      : ['py-2', last ? '' : 'border-b border-border-strong'].join(' ');
   return (
-    <div className={['py-2', last ? '' : 'border-b border-border'].join(' ')}>
+    <div className={shell}>
       <div className="mb-1.5 flex items-center justify-between">
         <p className={['min-w-0 truncate text-caption font-medium', muted ? 'text-tertiary' : 'text-secondary'].join(' ')} title={title}>
           {title}
@@ -602,7 +626,7 @@ export function ClipToggle({ checked, onChange }: { checked: boolean; onChange: 
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="mt-1.5 flex w-full items-center gap-1.5 rounded-sm px-1 py-0.5 text-left text-footnote text-secondary transition-fast hover:text-primary"
+      className="flex w-full items-center gap-1.5 rounded-sm px-1 py-0.5 text-left text-footnote text-secondary transition-fast hover:text-primary"
     >
       <span
         className={[

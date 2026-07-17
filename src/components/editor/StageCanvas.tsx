@@ -84,18 +84,32 @@ function bboxLeafIdAt(root: Element | null, clientX: number, clientY: number): s
   return hit;
 }
 
+/** Screen-space area of an element's bounding box. */
+function boxArea(el: Element): number {
+  const r = el.getBoundingClientRect();
+  return r.width * r.height;
+}
+
 /** The layer id under a hit target — deepest leaf, or the outermost group. */
 function layerIdAt(target: EventTarget | null, deep: boolean, root?: Element | null, clientX?: number, clientY?: number): string | null {
   let el = target instanceof Element ? target.closest('[data-layer-id]') : null;
-  // A box hit on a leaf beats whatever painted under it (see bboxLeafIdAt), but
-  // never beats a leaf the browser resolved directly — that one is a real hit
-  // on the geometry and is at least as specific.
-  if (root != null && clientX != null && clientY != null && (!el || el.querySelector('[data-layer-id]'))) {
+  // Native SVG hit-testing only fires on painted ink, so clicking a gap between
+  // outlined-text glyphs (or a glyph's counter) falls through to whatever paints
+  // there — usually the full-bleed background rect. bboxLeafIdAt recovers the
+  // intended target by box, but we must decide when it beats the browser's hit.
+  if (root != null && clientX != null && clientY != null) {
     const boxId = bboxLeafIdAt(root, clientX, clientY);
     const boxEl = boxId ? root.querySelector(`[data-layer-id="${boxId}"]`) : null;
-    // Only trust it when it sits inside the DOM hit — otherwise a leaf whose box
-    // overhangs a neighbouring frame would steal that frame's clicks.
-    if (boxEl && (!el || el.contains(boxEl))) el = boxEl;
+    if (boxEl && boxEl !== el) {
+      // Take the box hit when the browser resolved nothing, when it's the gap
+      // inside a frame/group we landed on (containment), or when it's a smaller
+      // leaf painted ABOVE whatever we hit — the outlined-text case: the glyph
+      // gap lands on the background, but the text object's box covers the gap and
+      // sits on top, so it wins. The size guard stops a large backdrop from
+      // stealing clicks off the small elements drawn over it.
+      const above = el ? (el.compareDocumentPosition(boxEl) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 : true;
+      if (!el || el.contains(boxEl) || (above && boxArea(boxEl) <= boxArea(el))) el = boxEl;
+    }
   }
   if (!el) return null;
   if (deep) return el.getAttribute('data-layer-id');
@@ -123,6 +137,50 @@ function clipRectOf(el: Element): Element | null {
   if (!doc) return null;
   const id = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(m[1]) : m[1];
   return doc.querySelector(`clipPath[id="${id}"] > rect`);
+}
+
+/** SVG tags that actually render ink (so their bounds mean something visible). */
+const PAINT_TAGS = new Set([
+  'text', 'path', 'rect', 'circle', 'ellipse', 'line', 'polygon', 'polyline', 'image', 'use',
+]);
+
+/** Whether an element paints anything — a fill or a stroke that's actually visible. */
+function paints(el: Element): boolean {
+  const tag = el.tagName.toLowerCase();
+  if (!PAINT_TAGS.has(tag)) return false;
+  if (tag === 'image' || tag === 'use') return true;
+  const cs = getComputedStyle(el);
+  if (cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity === 0) return false;
+  const blank = (v: string) => v === 'none' || v === 'transparent' || v === 'rgba(0, 0, 0, 0)';
+  const hasFill = !blank(cs.fill) && +cs.fillOpacity !== 0;
+  const hasStroke = !blank(cs.stroke) && parseFloat(cs.strokeWidth) > 0 && +cs.strokeOpacity !== 0;
+  return hasFill || hasStroke;
+}
+
+/**
+ * Screen-space bounds of only the *visible ink* under a node. Figma exports a
+ * text (or outlined-text) layer as a `<g>` holding the glyphs plus a transparent
+ * frame rect that marks the design-time text box — and `getBoundingClientRect`
+ * on the group unions that invisible rect, so the selection box trails far past
+ * the glyphs. Unioning only painted descendants hugs what you actually see.
+ *
+ * Leaves paint on their own, so they take the plain rect (fast path); only groups
+ * pay for the descendant sweep. Returns null when nothing paints, so the caller
+ * falls back to the node's own rect.
+ */
+function inkClientRect(node: Element): DOMRect | null {
+  if (PAINT_TAGS.has(node.tagName.toLowerCase())) return node.getBoundingClientRect();
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity, found = false;
+  for (const el of Array.from(node.querySelectorAll('*'))) {
+    if (!paints(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) continue;
+    left = Math.min(left, r.left); top = Math.min(top, r.top);
+    right = Math.max(right, r.right); bottom = Math.max(bottom, r.bottom);
+    found = true;
+  }
+  if (!found) return null;
+  return new DOMRect(left, top, right - left, bottom - top);
 }
 
 /** A layer's content-space bounds plus its centre, for alignment snapping. */
@@ -443,7 +501,10 @@ export function StageCanvas({
       // shrinking the border below the content makes the selection snap back to
       // the children's extent. Plain layers measure their own bbox as before.
       const bounds = node.querySelector<SVGGraphicsElement>(':scope > rect[data-frame-bg]');
-      const r = (bounds ?? node).getBoundingClientRect();
+      // Non-frames measure their visible ink, not the raw node box — a text/vector
+      // layer wrapped with a transparent Figma frame rect would otherwise select
+      // far past the glyphs (see inkClientRect).
+      const r = bounds ? bounds.getBoundingClientRect() : inkClientRect(node) ?? node.getBoundingClientRect();
       return {
         left: (r.left - cr.left) / v.scale,
         top: (r.top - cr.top) / v.scale,
@@ -1537,8 +1598,8 @@ function TransformHandles({
       })}
       <div
         ref={dimLabelRef}
-        className="pointer-events-none absolute whitespace-nowrap rounded"
-        style={{ left: midX, top: bottom + 7 / scale, transform: 'translateX(-50%)', background: accent, color: '#fff', fontSize: 11 / scale, lineHeight: 1.35, padding: `${1 / scale}px ${5 / scale}px` }}
+        className="pointer-events-none absolute whitespace-nowrap"
+        style={{ left: midX, top: bottom + 7 / scale, transform: 'translateX(-50%)', background: accent, color: '#fff', fontSize: 11 / scale, lineHeight: 1.35, padding: `${1.5 / scale}px ${6 / scale}px`, borderRadius: `${5 / scale}px` }}
       >
         {Math.round(box.width)} × {Math.round(box.height)}
       </div>

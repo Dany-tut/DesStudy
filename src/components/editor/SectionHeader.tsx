@@ -34,7 +34,7 @@ export function SectionHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="flex h-7 items-center justify-between gap-2">
+    <div className="mb-2.5 flex h-7 items-center justify-between gap-2">
       <p
         className={[
           'truncate text-footnote font-semibold',

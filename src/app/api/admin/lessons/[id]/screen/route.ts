@@ -36,7 +36,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     body = await readBody(req);
   } catch {
     return NextResponse.json(
-      { error: 'invalid_json', message: 'Тело запроса не разобрано (возможно, экран слишком большой)' },
+      { error: 'invalid_json', message: 'Тело запроса не разобрано — не удалось распаковать или прочитать JSON' },
       { status: 400 },
     );
   }

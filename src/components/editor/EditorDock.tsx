@@ -24,10 +24,6 @@ import {
   MessageSquareText,
   Ruler,
   Component,
-  Spline,
-  MousePointerClick,
-  Boxes,
-  Code2,
   ChevronDown,
   Check,
   SquarePen,
@@ -145,15 +141,6 @@ const TOOLS: ToolDef[] = [
 
 /** First placeholder tool — a divider is drawn just before it. */
 const FIRST_SOON = TOOLS.findIndex((t) => t.soon);
-
-/** Right-hand mode segment — matches the screenshot's grouped pill. Cosmetic for
- *  now (dev-mode / code hand-off arrive with the platform work). */
-const MODE_SEGMENT: { id: string; labelKey: string; icon: LucideIcon }[] = [
-  { id: 'draw', labelKey: 'editor.dock.modes.draw', icon: Spline },
-  { id: 'design', labelKey: 'editor.dock.modes.design', icon: MousePointerClick },
-  { id: 'dev', labelKey: 'editor.dock.modes.dev', icon: Boxes },
-  { id: 'code', labelKey: 'editor.dock.modes.code', icon: Code2 },
-];
 
 export type ViewMode = 'editor' | 'share';
 
@@ -331,28 +318,6 @@ export function EditorDock({
                     );
                   })}
 
-                  {/* Mode segment — grouped pill, visually separated. Cosmetic
-                      for now, so the whole group is dimmed and tagged «скоро». */}
-                  <span className="mx-1 h-6 w-px shrink-0 bg-border" />
-                  <div className="flex items-center gap-0.5 rounded-xl bg-hover/60 p-0.5 opacity-45">
-                    {MODE_SEGMENT.map((m) => {
-                      const active = m.id === 'design'; // design mode = this editor
-                      const Icon = m.icon;
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          title={`${tr(m.labelKey)} · ${tr('editor.dock.soon')}`}
-                          className={[
-                            'flex h-8 w-8 items-center justify-center rounded-lg transition-fast',
-                            active ? 'bg-brand text-on-brand' : 'text-tertiary hover:text-primary',
-                          ].join(' ')}
-                        >
-                          <Icon size={16} />
-                        </button>
-                      );
-                    })}
-                  </div>
             </div>
         </div>
 

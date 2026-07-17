@@ -54,5 +54,11 @@ function redirectToSignin(req: NextRequest, next: string) {
 export const config = {
   // Run on all pages except Next internals and static assets (anything with a
   // file extension), so `x-pathname` is set for every rendered route.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)'],
+  //
+  // `api` is excluded on purpose: API routes render no chrome (they don't need
+  // `x-pathname`) and do their own `requireAdmin`/auth, so middleware has no job
+  // there. Crucially, any route middleware touches is capped at Next's default
+  // 10MB request-body limit and silently TRUNCATED past it — which corrupted the
+  // gzipped screen autosave (`/api/admin/lessons/[id]/screen`) on large files.
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)'],
 };
