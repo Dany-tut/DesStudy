@@ -210,6 +210,14 @@ export const editor = {
       brokenPlaceholder: 'сломано',
       addDiff: 'Добавить отличие',
     },
+    diff: {
+      button: 'Отличия',
+      title: 'Отличия от эталона',
+      empty: 'Дефектов пока нет — сломай слой внутри «сломанного» фрейма, и отличия появятся здесь.',
+      criterion: 'критерий',
+      criterionOn: 'Отмечено как критерий оценки',
+      criterionOff: 'Отметить критерием оценки',
+    },
     access: {
       lessonTitle: 'Название урока',
       lessonTitlePlaceholder: 'Напр. «Премиум-карта: иерархия»',
@@ -430,6 +438,14 @@ export const editor = {
       referencePlaceholder: 'reference',
       brokenPlaceholder: 'broken',
       addDiff: 'Add difference',
+    },
+    diff: {
+      button: 'Differences',
+      title: 'Differences from reference',
+      empty: 'No defects yet — break a layer inside the «flawed» frame and the differences will show up here.',
+      criterion: 'criterion',
+      criterionOn: 'Marked as a grading criterion',
+      criterionOff: 'Mark as a grading criterion',
     },
     access: {
       lessonTitle: 'Lesson title',

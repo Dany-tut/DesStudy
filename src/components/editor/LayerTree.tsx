@@ -530,16 +530,27 @@ function LayerRow({
           const r = el.getBoundingClientRect();
           const y = e.clientY - r.top;
           // A group/frame accepts a middle "nest inside" band; a leaf is reorder-only.
+          // For an OPEN frame the "after" band is dropped: inserting after the frame
+          // lands the node below all its (visible) children, but the header-level
+          // "after" line would draw right under the header — a ~N-row mismatch. So an
+          // open frame only offers before / inside (its children carry their own
+          // reorder bands, and dropping before the next row places a sibling after
+          // the frame). A collapsed frame keeps all three bands.
+          const openFrame = layer.type === 'frame' && hasChildren && open;
           const pos: DropPos =
-            layer.type === 'frame'
-              ? y < r.height * 0.28
+            openFrame
+              ? y < r.height * 0.35
                 ? 'before'
-                : y > r.height * 0.72
-                  ? 'after'
-                  : 'inside'
-              : y < r.height / 2
-                ? 'before'
-                : 'after';
+                : 'inside'
+              : layer.type === 'frame'
+                ? y < r.height * 0.28
+                  ? 'before'
+                  : y > r.height * 0.72
+                    ? 'after'
+                    : 'inside'
+                : y < r.height / 2
+                  ? 'before'
+                  : 'after';
           onHoverDrop?.(layer.id, pos);
         }}
         onDrop={(e) => {

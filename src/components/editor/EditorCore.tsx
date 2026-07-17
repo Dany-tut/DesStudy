@@ -18,6 +18,7 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { FrameSizePanel, CanvasBackgroundPanel } from './FramePresetPanel';
 import { type EditorStep } from './StepBar';
 import { ExerciseSetupPanel, ZoneEditor, Step4Access, type EditorDraft } from './EditorSteps';
+import { DiffPanel } from './DiffPanel';
 
 /** Flatten the tree once so selection lookups don't re-walk on every render. */
 function indexLayers(layers: Layer[], map: Map<string, Layer> = new Map()): Map<string, Layer> {
@@ -29,6 +30,22 @@ function indexLayers(layers: Layer[], map: Map<string, Layer> = new Map()): Map<
 }
 
 const rid = (p: string) => `${p}-${Math.random().toString(36).slice(2, 8)}`;
+
+/**
+ * Resolve a keydown to its physical-key code (e.g. 'KeyV'), layout-independent.
+ * `e.code` already is the physical key on most browsers, but as a belt-and-braces
+ * fallback we also map the Cyrillic character `e.key` produces on a Russian
+ * (ЙЦУКЕН) layout — so pressing the V key (which types 'м') still resolves to
+ * 'KeyV'. Returns '' for keys we don't care about.
+ */
+const CYRILLIC_TO_CODE: Record<string, string> = {
+  м: 'KeyV', ь: 'KeyM', а: 'KeyF', к: 'KeyR', е: 'KeyT', з: 'KeyP',
+  с: 'KeyC', л: 'KeyK', я: 'KeyZ', п: 'KeyG', ф: 'KeyA', в: 'KeyD',
+};
+function physCode(e: KeyboardEvent): string {
+  if (/^(Key[A-Z]|Digit\d)$/.test(e.code)) return e.code;
+  return CYRILLIC_TO_CODE[e.key.toLowerCase()] ?? e.code;
+}
 
 /** Rename one layer in the tree, preserving structure and identity elsewhere. */
 function renameInTree(layers: Layer[], id: string, name: string): Layer[] {
@@ -343,6 +360,53 @@ function diffLayerProps(ref: Layer, bad: Layer): DefectDelta[] {
   return out.filter((d): d is DefectDelta => d != null);
 }
 
+/** One layer inside a «сломанный» frame that differs from its эталон twin —
+ *  the row model behind the «Отличия» panel. */
+export interface DefectEntry {
+  frameId: string;
+  frameName: string;
+  layerId: string;
+  layerName: string;
+  deltas: DefectDelta[];
+}
+
+/**
+ * Scan every «сломанный» top-level frame and pair each of its descendant layers
+ * to the эталон twin — by the explicit `twinId` link first (robust to
+ * reordering), falling back to the mirrored index path against the first
+ * reference frame for hand-built pairs. Returns only the layers that actually
+ * differ, with their per-property deltas. This is the whole-frame counterpart to
+ * `autoDeltas` (which diffs a single selected layer).
+ */
+function collectDefects(tops: Layer[]): DefectEntry[] {
+  const refFrames = tops.filter((t) => t.props.frameRole === 'reference');
+  if (!refFrames.length) return [];
+  const out: DefectEntry[] = [];
+  const walk = (frame: Layer, node: Layer) => {
+    if (node !== frame) {
+      let twin: Layer | null = null;
+      if (node.props.twinId) {
+        for (const rf of refFrames) {
+          twin = findLayer(rf.children, node.props.twinId);
+          if (twin) break;
+        }
+      }
+      if (!twin) {
+        const path = pathTo(frame, node.id);
+        if (path) twin = atPath(refFrames[0], path);
+      }
+      if (twin) {
+        const deltas = diffLayerProps(twin, node);
+        if (deltas.length)
+          out.push({ frameId: frame.id, frameName: frame.name, layerId: node.id, layerName: node.name, deltas });
+      }
+    }
+    for (const c of node.children) walk(frame, c);
+  };
+  for (const f of tops) if (f.props.frameRole === 'flawed') walk(f, f);
+  return out;
+}
+
 const EMPTY_DRAFT: EditorDraft = {
   title: '',
   kind: 'critique',
@@ -589,7 +653,7 @@ export function EditorCore() {
   // Cmd/Ctrl+Z undo, Cmd/Ctrl+Shift+Z redo — but let native undo win inside inputs.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.code !== 'KeyZ') return;
+      if (!(e.metaKey || e.ctrlKey) || physCode(e) !== 'KeyZ') return;
       const ae = document.activeElement;
       if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
       e.preventDefault();
@@ -648,6 +712,22 @@ export function EditorCore() {
     if (!twin) return [];
     return diffLayerProps(twin, selected);
   }, [selected, result]);
+
+  // Every layer across all «сломанный» frames that differs from its эталон twin —
+  // the data behind the bottom «Отличия» panel.
+  const defects = useMemo<DefectEntry[]>(
+    () => (result ? collectDefects(result.screen.layers) : []),
+    [result],
+  );
+  // A reference↔flawed pair exists at all — so the panel is worth showing even
+  // before any layer is broken (it prompts «сломай слой»).
+  const hasFramePair = useMemo(
+    () =>
+      !!result &&
+      result.screen.layers.some((l) => l.props.frameRole === 'reference') &&
+      result.screen.layers.some((l) => l.props.frameRole === 'flawed'),
+    [result],
+  );
 
   const ingest = useCallback(async (file: File) => {
     const text = await file.text();
@@ -1762,7 +1842,7 @@ export function EditorCore() {
       if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
       // Keyed on `e.code` (physical key), so it works on any layout — on a
       // Cyrillic layout `e.key` for the C key is 'с', which would never match.
-      const code = e.code;
+      const code = physCode(e);
       if (code !== 'KeyC' && code !== 'KeyV' && code !== 'KeyD') return;
       const ae = document.activeElement;
       if (ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae as HTMLElement).isContentEditable)) return;
@@ -1788,7 +1868,7 @@ export function EditorCore() {
   // Shift makes a plain group. Skip while typing in a field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.code !== 'KeyG') return;
+      if (!(e.metaKey || e.ctrlKey) || physCode(e) !== 'KeyG') return;
       const ae = document.activeElement;
       if (ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae as HTMLElement).isContentEditable)) return;
       if (!selectedIds.length) return;
@@ -2023,13 +2103,14 @@ export function EditorCore() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const ae = document.activeElement;
       if (ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae as HTMLElement).isContentEditable)) return;
+      const code = physCode(e);
       // K → Scale mode (proportional resize); still the move tool underneath.
-      if (e.code === 'KeyK') {
+      if (code === 'KeyK') {
         setTool('move');
         setScaleMode(true);
         return;
       }
-      const t = keyTool[e.code];
+      const t = keyTool[code];
       if (!t) return;
       setTool(t);
       setScaleMode(false);
@@ -2050,10 +2131,11 @@ export function EditorCore() {
     const onKey = (e: KeyboardEvent) => {
       const ae = document.activeElement;
       if (ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae as HTMLElement).isContentEditable)) return;
-      if ((e.metaKey || e.ctrlKey) && e.code === 'KeyA') {
+      const code = physCode(e);
+      if ((e.metaKey || e.ctrlKey) && code === 'KeyA') {
         e.preventDefault();
         selectAll();
-      } else if (e.shiftKey && e.code === 'Digit1') {
+      } else if (e.shiftKey && code === 'Digit1') {
         e.preventDefault();
         fitView();
       }
@@ -2106,7 +2188,10 @@ export function EditorCore() {
   );
 
   const addZone = useCallback(
-    (layer: Layer) => {
+    // `deltas` pre-fills the per-property diffs — used when a zone is created
+    // straight from the «Отличия» panel, so the auto-detected changes land as
+    // grading criteria without the teacher re-entering them.
+    (layer: Layer, deltas?: DefectDelta[]) => {
       pushUndo();
       const rect = measureRect(layer.id);
       setDraft((d) => ({
@@ -2122,6 +2207,7 @@ export function EditorCore() {
             intent: '',
             defect: 'none',
             defectNote: '',
+            deltas: deltas && deltas.length ? deltas : undefined,
             rect: rect ?? { x0: 10, y0: 10, x1: 40, y1: 30 },
           },
         ],
@@ -2136,6 +2222,22 @@ export function EditorCore() {
       setDraft((d) => ({ ...d, zones: d.zones.filter((z) => z.id !== zoneId) }));
     },
     [pushUndo],
+  );
+
+  // «Отличия» panel: toggle a defect entry as a grading criterion. On → create a
+  // critique zone pre-filled with the entry's auto-detected deltas; off → drop
+  // the zone. Keyed by layer, matching how zones bind to layers elsewhere.
+  const toggleCriterion = useCallback(
+    (entry: DefectEntry) => {
+      const existing = zoneByLayer.get(entry.layerId);
+      if (existing) {
+        removeZone(existing.id);
+        return;
+      }
+      const layer = findLayer(result?.screen.layers ?? [], entry.layerId);
+      if (layer) addZone(layer, entry.deltas);
+    },
+    [zoneByLayer, removeZone, addZone, result],
   );
 
   const patchZone = useCallback(
@@ -2388,6 +2490,15 @@ export function EditorCore() {
           viewMode={step === 2 ? 'share' : 'editor'}
           onViewMode={(m) => setStep(m === 'share' ? 2 : 1)}
         />
+        {step === 1 && hasFramePair && (
+          <DiffPanel
+            defects={defects}
+            criterionLayerIds={zoneIds}
+            selectedId={selectedId}
+            onSelect={(id) => select(id)}
+            onToggleCriterion={toggleCriterion}
+          />
+        )}
       </section>
 
       {/* ── Right — unified editor: свойства слоя + зона критики, либо настройка
