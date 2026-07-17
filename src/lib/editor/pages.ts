@@ -58,14 +58,14 @@ export function blankResult(width = 375, height = 812): ParseResult {
       layers: [
         {
           id: 'L0',
-          name: 'Фрейм',
+          name: 'Фрейм 1',
           type: 'frame',
           props: { fill, box: { x: 0, y: 0, w: width, h: height } },
           children: [],
         },
       ],
     },
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect data-layer-id="L0" width="${width}" height="${height}" fill="${fill}"/></svg>`,
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect data-layer-id="L0" data-name="Фрейм 1" width="${width}" height="${height}" fill="${fill}"/></svg>`,
     errors: [],
   };
 }

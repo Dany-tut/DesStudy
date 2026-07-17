@@ -13,12 +13,25 @@ import type { EditorPage, PageItem } from './pages';
 const KEY = 'desstudy.editor.drafts.v1';
 
 /**
+ * JSON → gzipped bytes, for the autosave request body. Screens embed base64
+ * images and full SVG markup, so an uncompressed body overruns the ~10MB
+ * request ceiling and reaches the server truncated.
+ */
+export async function gzipJson(value: unknown): Promise<Blob> {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new CompressionStream('gzip'));
+  return await new Response(stream).blob();
+}
+
+/**
  * One saved file: a set of pages (each its own canvas) plus optional dividers.
  * `coverPageId` marks which page's render is the file's thumbnail. `activePageId`
  * remembers which page was open so re-loading lands where you left off.
  */
 export interface EditorDraftEntry {
   id: string;
+  /** The AuthoredLesson this draft autosaves into, once one has been created. */
+  lessonId?: string;
   fileName: string;
   items: PageItem[];
   activePageId: string;

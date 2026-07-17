@@ -10,7 +10,7 @@
  * Same conventions as mentor.ts: structured JSON output + graceful offline
  * fallback so authoring never hard-blocks when no ANTHROPIC_API_KEY is set.
  */
-import Anthropic from '@anthropic-ai/sdk';
+import { claudeProxyText } from './claudeProxy';
 import type { CritiqueRoleId, CritiqueDefectId } from '@/lib/curriculum/types';
 import { CRITIQUE_ROLES, CRITIQUE_DEFECTS } from '@/lib/curriculum/screenCritique';
 
@@ -170,10 +170,13 @@ function sanitize(reply: AnalyzeReply): AnalyzeReply {
 }
 
 export async function analyzeScreen(input: AnalyzeInput): Promise<AnalyzeReply> {
-  if (!process.env.ANTHROPIC_API_KEY) return fallback(input);
-  const client = new Anthropic();
-
-  const content: Anthropic.ContentBlockParam[] = [imageBlock(input.imageBase64, input.mediaType)];
+  // Image / document / text blocks, in the Messages-API wire shape. Typed
+  // locally rather than via the SDK — see claudeProxy.ts for why the SDK isn't
+  // used here at all.
+  const content: (
+    | ReturnType<typeof imageBlock>
+    | { type: 'text'; text: string }
+  )[] = [imageBlock(input.imageBase64, input.mediaType)];
   if (input.goodBase64 && input.goodMediaType) {
     content.push({ type: 'text', text: 'Это «хороший» вариант того же экрана — используй его как эталон:' });
     content.push(imageBlock(input.goodBase64, input.goodMediaType));
@@ -186,19 +189,17 @@ export async function analyzeScreen(input: AnalyzeInput): Promise<AnalyzeReply> 
     ].join('\n'),
   });
 
+  const text = await claudeProxyText({
+    model: 'claude-opus-4-8',
+    max_tokens: 4096,
+    system: SYSTEM,
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
+    messages: [{ role: 'user', content }],
+  });
+  if (!text) return fallback(input);
+
   try {
-    const response = await client.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 4096,
-      system: SYSTEM,
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
-      messages: [{ role: 'user', content }],
-    });
-    const text = response.content.find((b) => b.type === 'text');
-    if (text && text.type === 'text') {
-      return sanitize(JSON.parse(text.text) as AnalyzeReply);
-    }
-    return fallback(input);
+    return sanitize(JSON.parse(text) as AnalyzeReply);
   } catch {
     return fallback(input);
   }

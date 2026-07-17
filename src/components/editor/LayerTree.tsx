@@ -18,12 +18,13 @@ import {
   BoxSelect,
   SquareDashed,
   Maximize,
+  FilePlus2,
   BadgeCheck,
   Bug,
 } from 'lucide-react';
 import type { Layer, LayerType } from '@/lib/editor/types';
-import { playHover } from '@/lib/sound';
 import { useT } from '@/lib/i18n/client';
+import { RENAME_FIELD } from './renameField';
 
 const TYPE_ICON: Record<LayerType, typeof Square> = {
   frame: Frame,
@@ -59,6 +60,89 @@ function iconFor(layer: Layer): typeof Square {
 /** Whether `id` is anywhere in this layer's subtree (excluding the layer itself). */
 function subtreeContains(layer: Layer, id: string): boolean {
   return layer.children.some((c) => c.id === id || subtreeContains(c, id));
+}
+
+/** ms between the start of one row's type-out and the next — the whole point of
+ *  the stagger is that the list reads as being worked through, one row at a time. */
+const REVEAL_STAGGER = 130;
+/** ms per character. Fast enough not to be a wait, slow enough to read as typing. */
+const REVEAL_CHAR = 26;
+
+/**
+ * A layer's name cell. Normally it's just text — the animation only exists for
+ * the AI naming pass:
+ *
+ *   thinking → a shimmering skeleton bar (the model is reading the page)
+ *   answer   → the new name types in, staggered so rows land one after another
+ *
+ * Both the pre-pass name and the row's place in the order are captured when
+ * thinking *starts*, because by the time we animate, `naming` has cleared and
+ * those props are already gone. A pass that changed nothing (a failure, or a
+ * name the model chose to keep) types nothing — no theatre for a no-op.
+ */
+function LayerName({ name, naming, order }: { name: string; naming: boolean; order: number }) {
+  // null = show the real name; a string = mid-type-out.
+  const [typed, setTyped] = useState<string | null>(null);
+  const wasNaming = useRef(naming);
+  const nameAtStart = useRef(name);
+  const orderAtStart = useRef(order);
+
+  if (naming && !wasNaming.current) {
+    // Capture during render, not in an effect: `naming` and `order` can both be
+    // gone by the time an effect for the *end* of the pass runs.
+    nameAtStart.current = name;
+    orderAtStart.current = order;
+  }
+
+  useEffect(() => {
+    const ended = wasNaming.current && !naming;
+    wasNaming.current = naming;
+    if (!ended || name === nameAtStart.current) return;
+
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;
+
+    let i = 0;
+    let tick: ReturnType<typeof setInterval> | null = null;
+    setTyped('');
+    const start = setTimeout(() => {
+      tick = setInterval(() => {
+        i += 1;
+        // Reveal by code point, so a name with an emoji or a surrogate pair
+        // never types out half a character.
+        setTyped([...name].slice(0, i).join(''));
+        if (i >= [...name].length) {
+          if (tick) clearInterval(tick);
+          setTyped(null);
+        }
+      }, REVEAL_CHAR);
+    }, orderAtStart.current * REVEAL_STAGGER);
+
+    return () => {
+      clearTimeout(start);
+      if (tick) clearInterval(tick);
+      setTyped(null);
+    };
+  }, [naming, name]);
+
+  if (naming) {
+    return (
+      <span className="min-w-0 flex-1">
+        <span className="lt-skeleton block h-3 w-2/3" />
+      </span>
+    );
+  }
+  if (typed !== null) {
+    return (
+      <span className="flex min-w-0 flex-1 items-center text-brand">
+        <span className="truncate">{typed}</span>
+        <span aria-hidden className="lt-caret" />
+      </span>
+    );
+  }
+  return <span className="min-w-0 flex-1 truncate">{name}</span>;
 }
 
 /** Drop position of a layer-panel drag — kept in sync with EditorCore's LayerDropPos. */
@@ -102,6 +186,7 @@ export function LayerTree({
   referenceIds,
   flawedIds,
   collapseSignal,
+  namingIds,
 }: {
   layers: Layer[];
   /** Selected layer ids; the last is the "primary" (drives centering). */
@@ -132,6 +217,10 @@ export function LayerTree({
   flawedIds?: Set<string>;
   /** Bump this counter to collapse every group in the tree. */
   collapseSignal?: number;
+  /** Ids the AI naming pass is currently thinking about — those rows show a
+   *  shimmering skeleton, then type their new name in when the answer lands.
+   *  Clear the set to end the pass; each row animates off that transition. */
+  namingIds?: Set<string>;
 }) {
   const primaryId = selectedIds.length ? selectedIds[selectedIds.length - 1] : null;
   const noop = () => {};
@@ -154,8 +243,12 @@ export function LayerTree({
     setDrop(null);
     forbidden.current = new Set();
   };
-  const hoverDrop = (id: string, pos: DropPos) => {
-    if (!dragId || forbidden.current.has(id)) {
+  const hoverDrop = (id: string, pos: DropPos, copy: boolean) => {
+    // A copy may land right before/after the dragged row itself — Alt-dropping a
+    // layer onto itself duplicates it in place. It still may never land *inside*
+    // its own subtree, copy or not.
+    const selfEdge = copy && id === dragId && pos !== 'inside';
+    if (!dragId || (forbidden.current.has(id) && !selfEdge)) {
       setDrop((d) => (d ? null : d));
       return;
     }
@@ -166,10 +259,50 @@ export function LayerTree({
     endDrag();
   };
 
+  // The empty space under the last row is a drop target of its own, landing the
+  // node at the end of the root list. Without it that whole area is dead: the
+  // rows own every drop band, so releasing below them hits nothing and the drag
+  // silently does nothing — which reads as "the indicator shows but no copy
+  // appears" whenever the dragged row is the last one.
+  const lastRootId = layers.length ? layers[layers.length - 1].id : null;
+  // Rows handle their own drops and stop propagation; these fire only for the
+  // container's own empty area, never for a bubbling row event.
+  const onTailDragOver = (e: React.DragEvent) => {
+    if (!dragId || !lastRootId || e.target !== e.currentTarget) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
+    hoverDrop(lastRootId, 'after', e.altKey);
+  };
+  const onTailDrop = (e: React.DragEvent) => {
+    if (!dragId || e.target !== e.currentTarget) return;
+    e.preventDefault();
+    commitDrop(e.altKey);
+  };
+
+  // Stagger order for the naming type-out: each renamed row's place in the tree,
+  // read top to bottom the way it's displayed, counting only renamed rows — a
+  // row that keeps its name must not leave a gap in the cascade.
+  const namingOrder = new Map<string, number>();
+  if (namingIds?.size) {
+    let n = 0;
+    const walk = (list: Layer[]) => {
+      for (const l of list) {
+        if (namingIds.has(l.id)) namingOrder.set(l.id, n++);
+        if (l.children.length) walk(l.children);
+      }
+    };
+    walk(layers);
+  }
+
   return (
-    <div onMouseLeave={() => onHover(null)} className="flex flex-col">
+    <div
+      onMouseLeave={() => onHover(null)}
+      onDragOver={onTailDragOver}
+      onDrop={onTailDrop}
+      className="flex min-h-full flex-col"
+    >
       {layers.map((l, i) => (
-        <LayerRow key={l.id} layer={l} depth={0} selectedIds={selectedIds} primaryId={primaryId} runTop={!runNeighbourHi(layers, i - 1, selectedIds, false)} runBottom={!runNeighbourHi(layers, i + 1, selectedIds, false)} onSelect={onSelect} onHover={onHover} onRename={onRename} onDelete={onDelete} onContextMenu={onContextMenu ?? noop} renameId={renameId ?? null} onRenameHandled={onRenameHandled ?? noop} zoneIds={zoneIds} isReference={!!referenceIds?.has(l.id)} inReference={!!referenceIds?.has(l.id)} isFlawed={!!flawedIds?.has(l.id)} inFlawed={!!flawedIds?.has(l.id)} draggable={!!onReparent} dragId={dragId} drop={drop} onBeginDrag={beginDrag} onHoverDrop={hoverDrop} onCommitDrop={commitDrop} onEndDrag={endDrag} collapseSignal={collapseSignal} />
+        <LayerRow key={l.id} layer={l} depth={0} selectedIds={selectedIds} primaryId={primaryId} runTop={!runNeighbourHi(layers, i - 1, selectedIds, false)} runBottom={!runNeighbourHi(layers, i + 1, selectedIds, false)} onSelect={onSelect} onHover={onHover} onRename={onRename} onDelete={onDelete} onContextMenu={onContextMenu ?? noop} renameId={renameId ?? null} onRenameHandled={onRenameHandled ?? noop} zoneIds={zoneIds} isReference={!!referenceIds?.has(l.id)} inReference={!!referenceIds?.has(l.id)} isFlawed={!!flawedIds?.has(l.id)} inFlawed={!!flawedIds?.has(l.id)} draggable={!!onReparent} dragId={dragId} drop={drop} onBeginDrag={beginDrag} onHoverDrop={hoverDrop} onCommitDrop={commitDrop} onEndDrag={endDrag} collapseSignal={collapseSignal} namingIds={namingIds} namingOrder={namingOrder} />
       ))}
     </div>
   );
@@ -341,6 +474,7 @@ export function CanvasContextMenu({
   onSelectAll,
   onClearSelection,
   onFitView,
+  onAddFile,
 }: {
   x: number;
   y: number;
@@ -350,10 +484,21 @@ export function CanvasContextMenu({
   onSelectAll: () => void;
   onClearSelection: () => void;
   onFitView: () => void;
+  /** Import an SVG into the open page. Omitted where import isn't available. */
+  onAddFile?: () => void;
 }) {
   const { t } = useT();
   return (
     <ContextMenuShell x={x} y={y} onClose={onClose}>
+      {onAddFile && (
+        <>
+          <button type="button" className={MENU_ITEM} onClick={() => { onAddFile(); onClose(); }}>
+            <FilePlus2 size={14} className="text-tertiary" />
+            {t('editor.file.addFile')}
+          </button>
+          <div className="my-1 h-px bg-border" />
+        </>
+      )}
       <button type="button" className={MENU_ITEM} disabled={!hasLayers} onClick={() => { onSelectAll(); onClose(); }}>
         <BoxSelect size={14} className="text-tertiary" />
         {t('editor.menu.selectAll')}
@@ -401,6 +546,8 @@ function LayerRow({
   onCommitDrop,
   onEndDrag,
   collapseSignal,
+  namingIds,
+  namingOrder,
 }: {
   layer: Layer;
   depth: number;
@@ -437,11 +584,16 @@ function LayerRow({
   /** The active drop target + position, or null. */
   drop?: { id: string; pos: DropPos } | null;
   onBeginDrag?: (id: string) => void;
-  onHoverDrop?: (id: string, pos: DropPos) => void;
+  onHoverDrop?: (id: string, pos: DropPos, copy: boolean) => void;
   onCommitDrop?: (copy: boolean) => void;
   onEndDrag?: () => void;
   /** Bump this counter to collapse this row (and, recursively, all groups). */
   collapseSignal?: number;
+  /** Ids the AI naming pass is thinking about — those rows show the skeleton,
+   *  then type their new name in. Passed down whole so nested rows animate too. */
+  namingIds?: Set<string>;
+  /** Each renamed row's place in the cascade, for the type-out stagger. */
+  namingOrder?: Map<string, number>;
 }) {
   const { t } = useT();
   const [open, setOpen] = useState(true);
@@ -511,7 +663,6 @@ function LayerRow({
         onContextMenu={(e) => onContextMenu(e, layer.id)}
         onMouseEnter={() => {
           onHover(layer.id);
-          playHover();
         }}
         draggable={draggable && !editing}
         onDragStart={(e) => {
@@ -521,7 +672,10 @@ function LayerRow({
           onBeginDrag?.(layer.id);
         }}
         onDragOver={(e) => {
-          if (!dragId || dragId === layer.id) return;
+          if (!dragId) return;
+          // Hovering the dragged row itself is a no-op for a move, but Alt-dropping
+          // onto itself is a valid duplicate — so only bail out when not copying.
+          if (dragId === layer.id && !e.altKey) return;
           e.preventDefault();
           // Alt/Option → show the copy badge; a plain drag shows the move cursor.
           e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
@@ -551,7 +705,7 @@ function LayerRow({
                 : y < r.height / 2
                   ? 'before'
                   : 'after';
-          onHoverDrop?.(layer.id, pos);
+          onHoverDrop?.(layer.id, pos, e.altKey);
         }}
         onDrop={(e) => {
           if (!dragId) return;
@@ -656,10 +810,10 @@ function LayerRow({
             }}
             // Frame drawn with `outline` (not `border`) so it adds nothing to
             // the box — the row height stays identical to its non-editing state.
-            className="-mx-0.5 min-w-0 flex-1 rounded-[4px] bg-surface px-1 py-0 text-footnote leading-[inherit] text-primary outline outline-[1.5px] -outline-offset-1 outline-brand focus:outline-brand focus-visible:outline-brand"
+            className={`${RENAME_FIELD} -mx-0.5 min-w-0 flex-1 px-1 py-0 text-footnote leading-[inherit]`}
           />
         ) : (
-          <span className="min-w-0 flex-1 truncate">{layer.name}</span>
+          <LayerName name={layer.name} naming={!!namingIds?.has(layer.id)} order={namingOrder?.get(layer.id) ?? 0} />
         )}
         {!editing && isReference && (
           <BadgeCheck size={12} className="ml-auto shrink-0 text-[var(--ref-green)]" aria-label={t('editor.tree.reference')} />
@@ -700,7 +854,7 @@ function LayerRow({
                 ? ctxHi || selectedIds.includes(layer.children[i + 1].id)
                 : false;
             return (
-              <LayerRow key={c.id} layer={c} depth={depth + 1} selectedIds={selectedIds} primaryId={primaryId} inSelectedGroup={ctxHi} runTop={!hiPrev} runBottom={!hiNext} onSelect={onSelect} onHover={onHover} onRename={onRename} onDelete={onDelete} onContextMenu={onContextMenu} renameId={renameId} onRenameHandled={onRenameHandled} zoneIds={zoneIds} inReference={inReference} inFlawed={inFlawed} draggable={draggable} dragId={dragId} drop={drop} onBeginDrag={onBeginDrag} onHoverDrop={onHoverDrop} onCommitDrop={onCommitDrop} onEndDrag={onEndDrag} collapseSignal={collapseSignal} />
+              <LayerRow key={c.id} layer={c} depth={depth + 1} selectedIds={selectedIds} primaryId={primaryId} inSelectedGroup={ctxHi} runTop={!hiPrev} runBottom={!hiNext} onSelect={onSelect} onHover={onHover} onRename={onRename} onDelete={onDelete} onContextMenu={onContextMenu} renameId={renameId} onRenameHandled={onRenameHandled} zoneIds={zoneIds} inReference={inReference} inFlawed={inFlawed} draggable={draggable} dragId={dragId} drop={drop} onBeginDrag={onBeginDrag} onHoverDrop={onHoverDrop} onCommitDrop={onCommitDrop} onEndDrag={onEndDrag} collapseSignal={collapseSignal} namingIds={namingIds} namingOrder={namingOrder} />
             );
           })}
         </>

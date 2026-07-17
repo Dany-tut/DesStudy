@@ -227,6 +227,29 @@ export function parseTheoryText(data: Record<string, unknown>): string {
   return typeof data.text === 'string' ? data.text : '';
 }
 
+/**
+ * The screen editor's own draft, stored verbatim as a `screen` block. Unlike the
+ * learner-facing kinds this payload isn't read by `blocksToLesson` — it's the
+ * authoring source the editor reloads, so validation only checks the structure
+ * the editor needs to hydrate (pages carry opaque `result`/`draft` blobs).
+ */
+export function parseScreen(data: Record<string, unknown>): Record<string, unknown> {
+  const items = arr(data.items, 'items').map((raw, i) => {
+    const it = raw as Record<string, unknown>;
+    const kind = str(it.kind, `items[${i}].kind`);
+    if (kind !== 'page' && kind !== 'divider') {
+      throw new ValidationError(`items[${i}].kind: ожидается page или divider`);
+    }
+    return { ...it, id: str(it.id, `items[${i}].id`), kind, name: text(it.name) };
+  });
+  return {
+    fileName: text(data.fileName),
+    items,
+    activePageId: optionalStr(data.activePageId) ?? null,
+    coverPageId: optionalStr(data.coverPageId) ?? null,
+  };
+}
+
 const DIFFICULTIES = ['intro', 'easy', 'medium', 'hard'];
 
 export interface LessonMetaInput {

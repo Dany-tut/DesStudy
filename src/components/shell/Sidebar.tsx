@@ -62,10 +62,6 @@ export function Sidebar({ user }: { user?: UserMenuUser }) {
             ))}
           </nav>
           <div className="mt-auto flex flex-col gap-1 border-t border-border/60 pt-2">
-            <SidebarLink
-              item={{ href: '/settings', labelKey: 'nav.settings', icon: Settings }}
-              active={isActive('/settings')}
-            />
             {user && (
               <div className="px-1 pt-1">
                 <UserMenu user={user} align="start" openUp full />

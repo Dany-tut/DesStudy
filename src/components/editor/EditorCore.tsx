@@ -3,15 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useT } from '@/lib/i18n/client';
-import { UploadCloud, AlertCircle, RotateCcw, Plus, X, GraduationCap, Link2, Image as ImageIcon, ChevronDown, ChevronsDownUp } from 'lucide-react';
+import { UploadCloud, AlertCircle, X, GraduationCap, Link2, Image as ImageIcon, ChevronDown, ChevronsDownUp, Sparkles, Loader2, Shapes } from 'lucide-react';
 import { parseSvgToLayers } from '@/lib/editor/parseSvg';
 import type { Layer, ParseResult, EditorTool } from '@/lib/editor/types';
-import { listDrafts, saveDraft, deleteDraft, coverPageOf, type EditorDraftEntry } from '@/lib/editor/drafts';
+// Digest only — importing @/lib/ai/nameFrames here would pull the Anthropic SDK
+// into the client bundle. The naming itself runs server-side, behind the route.
+import { digestFrame } from '@/lib/editor/frameDigest';
+import { rasterizeFrame } from '@/lib/editor/rasterizeFrame';
+import { listDrafts, saveDraft, deleteDraft, coverPageOf, gzipJson, type EditorDraftEntry } from '@/lib/editor/drafts';
 import { blankResult, type PageItem, type PageMeta } from '@/lib/editor/pages';
 import { emptyDraft, draftToPayload } from '@/lib/admin/exerciseDraft';
 import type { CritiqueZone, DefectDelta } from '@/lib/curriculum/types';
 import { LayerTree, LayerContextMenu, CanvasContextMenu } from './LayerTree';
 import { PagesPanel } from './PagesPanel';
+import { FileHeader } from './FileHeader';
+import { TypePill } from './TypePill';
 import { StageCanvas } from './StageCanvas';
 import { EditorDock } from './EditorDock';
 import { PropertiesPanel } from './PropertiesPanel';
@@ -191,6 +197,55 @@ function setBoxInTree(layers: Layer[], id: string, box: NonNullable<Layer['props
   );
 }
 
+/** Auto-generated frame names: the parser's numbered fallback («Фрейм 41») and the
+ *  bare «Фрейм» that older builds stamped on drawn frames. Only these are renumbered
+ *  on create/duplicate — a name the teacher typed («Карта») is theirs to repeat, so
+ *  it's left alone. */
+const AUTO_FRAME_NAME = /^Фрейм(?:\s+(\d+))?$/;
+
+/** Highest «Фрейм N» number in use anywhere in the tree (0 when there are none).
+ *  A bare «Фрейм» carries no number and so doesn't raise the ceiling. */
+function maxFrameNumber(layers: Layer[]): number {
+  let max = 0;
+  const walk = (ls: Layer[]) => {
+    for (const l of ls) {
+      const m = AUTO_FRAME_NAME.exec(l.name);
+      if (m?.[1]) max = Math.max(max, Number(m[1]));
+      if (l.children.length) walk(l.children);
+    }
+  };
+  walk(layers);
+  return max;
+}
+
+/** Next free «Фрейм N» name. The parser numbers its fallback names, so a frame drawn
+ *  on the canvas (or copied) should too — otherwise the tree fills up with identical
+ *  rows that can't be told apart. Numbers are never reused, so deleting a frame can't
+ *  make the next one collide with a leftover twin elsewhere in the tree. */
+function nextFrameName(layers: Layer[]): string {
+  return `Фрейм ${maxFrameNumber(layers) + 1}`;
+}
+
+/**
+ * The frame's own geometry rects: its bg rect plus the rect backing its
+ * `clip-path="url(#id)"`. The clip is resolved through the URL reference because
+ * <clipPath> lives inline for frames we author but in <defs> for imported ones
+ * (see parseSvg) — a `:scope > clipPath > rect` selector misses the latter,
+ * freezing the clip at its old bounds so the frame crops as it grows.
+ */
+function frameGeomRects(el: Element): Element[] {
+  const out: Element[] = [];
+  const bg = el.querySelector(':scope > rect[data-frame-bg]');
+  if (bg) out.push(bg);
+  const m = /url\(#(.+?)\)/.exec(el.getAttribute('clip-path') || '');
+  if (m) {
+    const id = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(m[1]) : m[1];
+    const clip = el.ownerDocument?.querySelector(`clipPath[id="${id}"] > rect`);
+    if (clip) out.push(clip);
+  }
+  return out;
+}
+
 /** Rewrite one layer's corner radius in the tree (structural copy along the path).
  *  Keeps the properties panel in sync when a resize re-clamps the radius. */
 function setRadiusInTree(layers: Layer[], id: string, radius: number): Layer[] {
@@ -291,6 +346,25 @@ function copyName(name: string): string {
   const m = name.match(/^(.*?) копия(?: (\d+))?$/);
   if (m) return `${m[1]} копия ${m[2] ? parseInt(m[2], 10) + 1 : 2}`;
   return `${name} копия`;
+}
+
+/** Name for a copy of `name` that nothing in `layers` is already using. Auto-named
+ *  frames take the next free number (two «Фрейм 1» rows are indistinguishable);
+ *  anything else walks «… копия» → «… копия 2» → … until the name is free, so
+ *  copying the same layer twice never leaves two identical rows in the tree. */
+function copyNameIn(name: string, layers: Layer[]): string {
+  if (AUTO_FRAME_NAME.test(name)) return `Фрейм ${maxFrameNumber(layers) + 1}`;
+  const taken = new Set<string>();
+  const walk = (ls: Layer[]) => {
+    for (const l of ls) {
+      taken.add(l.name);
+      if (l.children.length) walk(l.children);
+    }
+  };
+  walk(layers);
+  let next = copyName(name);
+  while (taken.has(next)) next = copyName(next);
+  return next;
 }
 
 /** Immutably insert `layer` right after the sibling `afterId`, at whatever depth
@@ -508,8 +582,10 @@ export function EditorCore() {
   const [canvasBg, setCanvasBg] = useState<string | null>(null);
   // Bumped to ask the canvas to refit the scene to the viewport.
   const [fitSignal, setFitSignal] = useState(0);
+  /** Set when an in-editor "Добавить файл" import fails to parse — shown as a
+   *  banner over the canvas, since a bad file leaves the open page untouched. */
+  const [importError, setImportError] = useState<string | null>(null);
   const [draft, setDraft] = useState<EditorDraft>(EMPTY_DRAFT);
-  const replaceRef = useRef<HTMLInputElement>(null);
   const svgHostRef = useRef<HTMLDivElement>(null);
 
   // ── Local drafts (localStorage) ────────────────────────────────────────────
@@ -599,6 +675,73 @@ export function EditorCore() {
     },
     [router, t],
   );
+
+  // ── Autosave into Уроки ────────────────────────────────────────────────────
+  // The payload carries whole parsed screens (markup + embedded base64 images),
+  // which blows past the ~10MB request-body ceiling — the body arrives truncated
+  // and JSON.parse dies. Gzip before sending: SVG markup compresses ~8x, so a
+  // real screen stays far under the limit. The route decodes it symmetrically.
+  // Every edit lands in the lessons list as an unpublished draft: the first save
+  // of a file creates its AuthoredLesson (published defaults to false), later
+  // ones upsert the screen block. Debounced, and serialised through
+  // `savingRef` so a burst of edits can't race two lesson-creates.
+  const lessonIdRef = useRef<string | null>(null);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savingRef = useRef<Promise<void>>(Promise.resolve());
+  const [autosaveError, setAutosaveError] = useState<string | null>(null);
+  const [lessonSaved, setLessonSaved] = useState(false);
+
+  const autosaveToLesson = useCallback((entry: EditorDraftEntry) => {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => {
+      savingRef.current = savingRef.current.then(async () => {
+        try {
+          if (!lessonIdRef.current) {
+            const res = await fetch('/api/admin/lessons', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: entry.fileName.replace(/\.svg$/i, '') || 'Новый экран',
+                slug: `ekran-${Math.random().toString(36).slice(2, 8)}`,
+                pathTitle: 'От преподавателя',
+                skill: 'custom',
+                difficulty: 'easy',
+                estimatedMinutes: 10,
+                objectives: [],
+                prerequisites: [],
+              }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message ?? `create failed (${res.status})`);
+            lessonIdRef.current = data.id as string;
+            setDrafts(saveDraft({ ...entry, lessonId: data.id as string }));
+          }
+          const res = await fetch(`/api/admin/lessons/${lessonIdRef.current}/screen`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/octet-stream', 'X-Payload-Encoding': 'gzip' },
+            body: await gzipJson({
+              payload: {
+                fileName: entry.fileName,
+                items: entry.items,
+                activePageId: entry.activePageId,
+                coverPageId: entry.coverPageId,
+              },
+            }),
+          });
+          if (!res.ok) {
+            const msg = await res.json().catch(() => null);
+            throw new Error(msg?.message ?? `save failed (${res.status})`);
+          }
+          setAutosaveError(null);
+          setLessonSaved(true);
+        } catch (e) {
+          // Show the real reason — a bare "не удалось" hides whether it's auth,
+          // validation or size, which is exactly what you need to act on.
+          setAutosaveError(`${t('editor.autosaveFailed')} ${(e as Error).message}`);
+        }
+      });
+    }, 1500);
+  }, [t]);
 
   // ── Undo / redo ──────────────────────────────────────────────────────────
   // Snapshots capture the two mutable pieces of authoring state (the SVG markup
@@ -755,6 +898,8 @@ export function EditorCore() {
     // Open a fresh draft seeded with one page holding the imported screen.
     const draftId = rid('draft');
     const pageId = rid('page');
+    lessonIdRef.current = null; // fresh file → its own lesson draft
+    setLessonSaved(false);
     pageDataRef.current = new Map([[pageId, { result: parsed, draft: EMPTY_DRAFT }]]);
     setItems([{ id: pageId, kind: 'page', name: 'Страница 1' }]);
     setActivePageId(pageId);
@@ -786,9 +931,19 @@ export function EditorCore() {
             ...(pageDataRef.current.get(m.id) ?? { result: blankResult(), draft: EMPTY_DRAFT }),
           },
     );
-    setDrafts(saveDraft({ id: activeDraftId, fileName: fileName ?? 'screen.svg', items: built, activePageId, coverPageId, updatedAt: Date.now() }));
+    const entry: EditorDraftEntry = {
+      id: activeDraftId,
+      lessonId: lessonIdRef.current ?? undefined,
+      fileName: fileName ?? 'screen.svg',
+      items: built,
+      activePageId,
+      coverPageId,
+      updatedAt: Date.now(),
+    };
+    setDrafts(saveDraft(entry));
+    autosaveToLesson(entry);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, draft, items, activePageId, coverPageId, activeDraftId]);
+  }, [result, draft, items, activePageId, coverPageId, activeDraftId, fileName]);
 
   /** Open a saved draft: hydrate the page map, then load its active page live. */
   const loadDraft = useCallback((entry: EditorDraftEntry) => {
@@ -804,9 +959,63 @@ export function EditorCore() {
     setActivePageId(active);
     setCoverPageId(entry.coverPageId);
     setActiveDraftId(entry.id);
+    lessonIdRef.current = entry.lessonId ?? null;
+    setLessonSaved(!!entry.lessonId);
     setFileName(entry.fileName);
     setResult(data?.result ?? null);
     setDraft(data?.draft ?? EMPTY_DRAFT);
+    setSelectedIds([]);
+    setHoveredId(null);
+    setStep(1);
+    undoStack.current = [];
+    redoStack.current = [];
+  }, []);
+
+  /** Import an SVG into the page that's ALREADY open — the «make» flow, where the
+   *  editor opens blank and the file arrives after. Unlike `ingest` (which starts
+   *  a whole new draft from the file), this keeps the current draft and page, so
+   *  adding a file doesn't leave the blank draft stranded beside it. */
+  const importIntoPage = useCallback(
+    async (file: File) => {
+      const text = await file.text();
+      const parsed = parseSvgToLayers(text);
+      // A broken file must not clobber the open page — report and keep the canvas.
+      if (parsed.errors.length > 0 || parsed.screen.layers.length === 0) {
+        setImportError(t('editor.file.importFailed'));
+        return;
+      }
+      pushUndo();
+      setImportError(null);
+      setFileName(file.name);
+      setResult(parsed);
+      setSelectedIds([]);
+      setHoveredId(null);
+      setFitSignal((n) => n + 1);
+    },
+    [pushUndo, t],
+  );
+
+  /** Open the OS file picker for the header / canvas-menu "Добавить файл" entries. */
+  const addFileRef = useRef<HTMLInputElement>(null);
+  const openFilePicker = useCallback(() => addFileRef.current?.click(), []);
+
+  /** The «make» pill: open the screen editor straight away on a blank page —
+   *  no file needed up front. The SVG gets imported from inside the editor
+   *  ("Добавить файл" in the header / canvas right-click menu). */
+  const newBlankDraft = useCallback(() => {
+    const draftId = rid('draft');
+    const pageId = rid('page');
+    const res = blankResult();
+    lessonIdRef.current = null; // fresh file → its own lesson draft
+    setLessonSaved(false);
+    pageDataRef.current = new Map([[pageId, { result: res, draft: EMPTY_DRAFT }]]);
+    setItems([{ id: pageId, kind: 'page', name: 'Страница 1' }]);
+    setActivePageId(pageId);
+    setCoverPageId(pageId);
+    setActiveDraftId(draftId);
+    setFileName('screen.svg');
+    setResult(res);
+    setDraft(EMPTY_DRAFT);
     setSelectedIds([]);
     setHoveredId(null);
     setStep(1);
@@ -972,7 +1181,7 @@ export function EditorCore() {
   // to the new local box and refresh its tree box. Children are left as-is (the
   // canvas already resized the rects live) — only their clipping changes.
   const resizeFrameBox = useCallback(
-    (id: string, box: { x: number; y: number; w: number; h: number }) => {
+    (id: string, box: { x: number; y: number; w: number; h: number }, radius?: number) => {
       if (!(box.w > 0 && box.h > 0)) return;
       pushUndo();
       setResult((r) => {
@@ -980,16 +1189,29 @@ export function EditorCore() {
         const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
         const el = doc.querySelector(`[data-layer-id="${id}"]`);
         if (!el) return r;
-        for (const rect of el.querySelectorAll(':scope > rect[data-frame-bg], :scope > clipPath > rect')) {
+        for (const rect of frameGeomRects(el)) {
           rect.setAttribute('x', String(box.x));
           rect.setAttribute('y', String(box.y));
           rect.setAttribute('width', String(box.w));
           rect.setAttribute('height', String(box.h));
+          // These edges are the user's now. Drop the "auto" marker parseSvg set on
+          // a derived bounds rect, so the canvas stops re-measuring this frame
+          // against its content and can't pull the border back (see parseSvg).
+          if (rect.getAttribute('data-frame-bg') === 'auto') rect.setAttribute('data-frame-bg', '1');
+          // Same radius on bg and clip so the background can't outgrow its clip.
+          if (radius != null) {
+            rect.setAttribute('rx', String(radius));
+            rect.setAttribute('ry', String(radius));
+          }
         }
+        const boxed = setBoxInTree(r.screen.layers, id, box);
         return {
           ...r,
           svg: new XMLSerializer().serializeToString(doc.documentElement),
-          screen: { ...r.screen, layers: setBoxInTree(r.screen.layers, id, box) },
+          screen: {
+            ...r.screen,
+            layers: radius != null ? setRadiusInTree(boxed, id, radius) : boxed,
+          },
         };
       });
     },
@@ -1107,7 +1329,11 @@ export function EditorCore() {
           /* un-rendered node — bail */
         }
       }
-      if (!bbox || bbox.w <= 0 || bbox.h <= 0) return;
+      console.log('[DBG framify] id=', id, 'liveNodeFound?', !!live, 'bbox=', bbox);
+      if (!bbox || bbox.w <= 0 || bbox.h <= 0) {
+        console.log('[DBG framify] BAIL: bbox unmeasurable/degenerate');
+        return;
+      }
       pushUndo();
       setResult((r) => {
         if (!r) return r;
@@ -1218,9 +1444,7 @@ export function EditorCore() {
         if (!el) return r;
         // A plain rect rounds itself; a frame <g> has no radius of its own, so round
         // its bg rect (visible corner) and clip rect (so children clip to the round).
-        const targets = el.tagName.toLowerCase() === 'rect'
-          ? [el]
-          : Array.from(el.querySelectorAll(':scope > rect[data-frame-bg], :scope > clipPath > rect'));
+        const targets = el.tagName.toLowerCase() === 'rect' ? [el] : frameGeomRects(el);
         if (!targets.length) return r;
         for (const t of targets) {
           t.setAttribute('rx', String(v));
@@ -1455,6 +1679,105 @@ export function EditorCore() {
     [pushUndo],
   );
 
+  // «Переименовать по смыслу»: give the model a PICTURE of each frame plus every
+  // layer's box, and let it name what it actually sees — the frame AND everything
+  // inside it. A text-only digest was blind here: these exports outline their
+  // text, so the tree holds no readable string and the model called a full card
+  // screen «Пустой фрейм», which was it obeying "don't invent" on empty input.
+  //
+  // One request per frame (each carries its own image), a few at a time. Each
+  // frame's rows clear as its answer lands, so the tree fills in progressively
+  // instead of freezing until the slowest frame returns.
+  const [namingIds, setNamingIds] = useState<Set<string>>(new Set());
+  const renamingFrames = namingIds.size > 0;
+
+  /** Commit one frame's names into both the markup and the tree, and release its
+   *  rows from the skeleton. Committing and releasing in one batch is what makes
+   *  the type-out possible — a row animates off the naming→named transition, so
+   *  it has to see the new name and the cleared flag at the same time. */
+  const commitNames = useCallback((named: { id: string; name: string }[], ids: string[]) => {
+    if (named.length) {
+      pushUndo();
+      setResult((r) => {
+        if (!r) return r;
+        const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
+        let layers = r.screen.layers;
+        let touched = false;
+        for (const { id, name } of named) {
+          const trimmed = name.trim();
+          if (!trimmed) continue;
+          const el = doc.querySelector(`[data-layer-id="${id}"]`);
+          if (el) {
+            el.setAttribute('data-name', trimmed);
+            touched = true;
+          }
+          layers = renameInTree(layers, id, trimmed);
+        }
+        return {
+          ...r,
+          svg: touched ? new XMLSerializer().serializeToString(doc.documentElement) : r.svg,
+          screen: { ...r.screen, layers },
+        };
+      });
+    }
+    setNamingIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.delete(id);
+      return next;
+    });
+  }, [pushUndo]);
+
+  const renameFramesWithAI = useCallback(async () => {
+    const cur = latest.current;
+    if (!cur || namingIds.size) return;
+    const frames = cur.layers.filter((l) => l.type === 'frame');
+    if (!frames.length) return;
+
+    // Build every frame's request up front, off the tree as it is right now:
+    // rasterizing and measuring both read the live DOM, and awaiting between
+    // frames would let a stray edit shift what we measured.
+    const jobs = frames
+      .map((frame) => {
+        const box = measureLayerBox(frame.id);
+        if (!box) return null;
+        const digest = digestFrame(frame, box, measureLayerBox);
+        return { frame, box, digest, ids: [frame.id, ...digest.layers.map((l) => l.id)] };
+      })
+      .filter((j): j is NonNullable<typeof j> => j != null);
+    if (!jobs.length) return;
+
+    setNamingIds(new Set(jobs.flatMap((j) => j.ids)));
+
+    const svg = cur.svg;
+    const runOne = async (job: (typeof jobs)[number]) => {
+      try {
+        const imageBase64 = await rasterizeFrame(svg, job.box);
+        const res = await fetch('/api/admin/name-frames', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ ...job.digest, imageBase64 }),
+        });
+        const reply = res.ok
+          ? ((await res.json()) as { layers?: { id: string; name: string }[] })
+          : null;
+        commitNames(reply?.layers ?? [], job.ids);
+      } catch {
+        // This frame keeps its names; its rows drop the skeleton and, since
+        // nothing changed, type nothing. Other frames are unaffected.
+        commitNames([], job.ids);
+      }
+    };
+
+    // Three at a time: enough to overlap the ~35s vision calls, few enough not
+    // to fire a dozen multi-megabyte requests at once from a big page.
+    const queue = [...jobs];
+    await Promise.all(
+      Array.from({ length: Math.min(3, queue.length) }, async () => {
+        for (let job = queue.shift(); job; job = queue.shift()) await runOne(job);
+      }),
+    );
+  }, [namingIds, commitNames, measureLayerBox]);
+
   // Cycle a top-level frame's critique role (обычный → эталон → косячный). Role
   // is pure metadata (no SVG mutation), so this only touches the layer tree.
   const cycleFrameRole = useCallback(
@@ -1469,41 +1792,64 @@ export function EditorCore() {
 
   // Delete a layer (and its subtree) from both the markup and the tree, drop any
   // critique zones that pointed at removed layers, and clear a stale selection.
-  const deleteLayer = useCallback(
-    (id: string) => {
-      const found = latest.current ? findLayer(latest.current.layers, id) : null;
-      if (!found) return;
+  // Removes the whole batch in a single undo step, so Delete on a multi-selection
+  // is one action to undo rather than one per layer. Ids that nest inside another
+  // deleted layer are harmless — the subtree is already gone by the time we get
+  // to them, and removeFromTree simply finds nothing.
+  const deleteLayers = useCallback(
+    (ids: string[]) => {
+      const cur = latest.current;
+      if (!cur || !ids.length) return;
       const removed = new Set<string>();
-      collectIds(found, removed);
+      for (const id of ids) {
+        const found = findLayer(cur.layers, id);
+        if (found) collectIds(found, removed);
+      }
+      if (!removed.size) return;
       pushUndo();
       setResult((r) => {
         if (!r) return r;
         const doc = new DOMParser().parseFromString(r.svg, 'image/svg+xml');
-        const el = doc.querySelector(`[data-layer-id="${id}"]`);
-        el?.remove();
+        let layers = r.screen.layers;
+        let touched = false;
+        for (const id of ids) {
+          const el = doc.querySelector(`[data-layer-id="${id}"]`);
+          if (el) {
+            el.remove();
+            touched = true;
+          }
+          layers = removeFromTree(layers, id);
+        }
         return {
           ...r,
-          svg: el ? new XMLSerializer().serializeToString(doc.documentElement) : r.svg,
-          screen: { ...r.screen, layers: removeFromTree(r.screen.layers, id) },
+          svg: touched ? new XMLSerializer().serializeToString(doc.documentElement) : r.svg,
+          screen: { ...r.screen, layers },
         };
       });
       setDraft((d) => ({ ...d, zones: d.zones.filter((z) => !z.layerId || !removed.has(z.layerId)) }));
-      setSelectedIds((cur) => cur.filter((x) => !removed.has(x)));
+      setSelectedIds((c) => c.filter((x) => !removed.has(x)));
     },
     [pushUndo],
   );
+
+  /** Delete a single layer — the row trash button and the context menu. */
+  const deleteLayer = useCallback((id: string) => deleteLayers([id]), [deleteLayers]);
 
   // Wrap the selected layers into a new frame ("auto-layout" flow) or plain
   // group. Mirrors the change in both the source markup (a new <g> that adopts
   // the selected nodes) and the layer tree, then selects the new frame. Only
   // works when the selection is a set of siblings — otherwise it no-ops.
   const groupLayers = useCallback(
-    (ids: string[], layout: 'row' | 'column' | 'none'): string | null => {
+    (ids: string[], layout: 'row' | 'column' | 'none', nameOverride?: string): string | null => {
       const cur = latest.current;
-      if (!cur || ids.length < 1) return null;
+      console.log('[DBG groupLayers] ids=', ids, 'layout=', layout, 'cur?', !!cur);
+      if (!cur || ids.length < 1) {
+        console.log('[DBG groupLayers] BAIL: no snapshot or empty ids');
+        return null;
+      }
       const idSet = new Set(ids);
       const gid = rid('L');
-      const name = layout === 'none' ? 'Группа' : 'Авто-макет';
+      const name = nameOverride ?? (layout === 'none' ? 'Группа' : 'Авто-макет');
       const grouped = groupSiblings(cur.layers, idSet, (hits) => ({
         id: gid,
         name,
@@ -1513,7 +1859,10 @@ export function EditorCore() {
         props: layout === 'none' ? {} : { layout, frame: true },
         children: hits,
       }));
-      if (!grouped) return null; // selection spans different parents — can't group
+      if (!grouped) {
+        console.log('[DBG groupLayers] BAIL: groupSiblings=null (selection not siblings under one parent)');
+        return null; // selection spans different parents — can't group
+      }
 
       pushUndo();
       setResult((r) => {
@@ -1522,7 +1871,11 @@ export function EditorCore() {
         const els = ids
           .map((id) => doc.querySelector(`[data-layer-id="${id}"]`))
           .filter((e): e is Element => !!e);
-        if (!els.length) return r;
+        console.log('[DBG groupLayers] markup nodes found:', els.length, 'of', ids.length);
+        if (!els.length) {
+          console.log('[DBG groupLayers] BAIL: no data-layer-id nodes in markup');
+          return r;
+        }
         // Order the nodes as they sit in the document so the wrapped markup keeps
         // its paint order (earlier = behind), matching the tree order.
         els.sort((a, b) =>
@@ -1550,13 +1903,14 @@ export function EditorCore() {
   );
 
   // Wrap a selection into a real frame in one step (right-click → "Преобразовать
-  // во фрейм"). Groups the layers, then framifies the new group once it's in the
-  // DOM (framify measures the live bbox). Falls back to a straight framify when
-  // the target is already a plain group.
+  // во фрейм"). Always wraps in a NEW frame — including around a group or a frame
+  // that's already framed, since frame-in-frame nesting is expected. Groups the
+  // layers, then framifies the new group once it's in the DOM (framify measures
+  // the live bbox).
   const pendingFramifyRef = useRef<string | null>(null);
   const frameSelection = useCallback(
     (ids: string[]) => {
-      const gid = groupLayers(ids, 'none');
+      const gid = groupLayers(ids, 'none', 'Фрейм');
       if (gid) pendingFramifyRef.current = gid;
     },
     [groupLayers],
@@ -1618,6 +1972,9 @@ export function EditorCore() {
         if (!src) return;
         const idMap = new Map<string, string>();
         const clone = cloneSubtree(src, idMap);
+        // Without this the copy inherits the original's name verbatim, leaving two
+        // identical rows in the tree — the canvas duplicate renames too.
+        clone.name = copyNameIn(src.name, cur.layers);
         const layers = insertRelative(cur.layers, targetId, clone, pos);
         if (!layers) return;
         pushUndo();
@@ -1634,6 +1991,7 @@ export function EditorCore() {
             for (const child of Array.from(node.children)) relabel(child);
           };
           relabel(el);
+          el.setAttribute('data-name', clone.name);
           if (pos === 'inside') {
             targetEl.appendChild(el);
           } else {
@@ -1647,6 +2005,11 @@ export function EditorCore() {
         anchorRef.current = clone.id;
         return;
       }
+
+      // Dropping a layer onto itself is only meaningful as a copy (handled above);
+      // as a move it's a no-op, and letting it through would splice the node out
+      // and look for its own vanished target.
+      if (dragId === targetId) return;
 
       const moved = moveLayerInTree(cur.layers, dragId, targetId, pos);
       if (!moved) return;
@@ -1739,11 +2102,19 @@ export function EditorCore() {
       // Plan the clones off the current tree so we know the fresh ids up front
       // (setResult runs deferred — we need the ids now to update the selection).
       const plans: { srcId: string; clone: Layer; idMap: Map<string, string> }[] = [];
+      // Auto-named frames get the next free number instead of inheriting the
+      // original's — two «Фрейм 1» rows are indistinguishable in the tree. Counted
+      // up across this batch so duplicating a multi-frame selection stays unique.
+      let frameN = maxFrameNumber(cur.layers);
       for (const id of ids) {
         const layer = findLayer(cur.layers, id);
         if (!layer) continue;
         const idMap = new Map<string, string>();
-        plans.push({ srcId: id, clone: cloneSubtree(layer, idMap), idMap });
+        const clone = cloneSubtree(layer, idMap);
+        if (clone.type === 'frame' && AUTO_FRAME_NAME.test(clone.name)) {
+          clone.name = `Фрейм ${++frameN}`;
+        }
+        plans.push({ srcId: id, clone, idMap });
       }
       if (!plans.length) return [];
       pushUndo();
@@ -1761,6 +2132,11 @@ export function EditorCore() {
             for (const child of Array.from(node.children)) relabel(child);
           };
           relabel(el);
+          // Mirror a renumbered frame name into the markup too — the tree name alone
+          // would be lost the next time this SVG is re-parsed.
+          if (clone.name !== findLayer(r.screen.layers, srcId)?.name) {
+            el.setAttribute('data-name', clone.name);
+          }
           if (dx || dy) {
             const prev = el.getAttribute('transform') ?? '';
             el.setAttribute('transform', `translate(${dx.toFixed(2)},${dy.toFixed(2)}) ${prev}`.trim());
@@ -2014,9 +2390,10 @@ export function EditorCore() {
         const lx = +(b.x - ox).toFixed(1);
         const ly = +(b.y - oy).toFixed(1);
 
+        const name = nextFrameName(r.screen.layers);
         const g = doc.createElementNS(SVG_NS, 'g');
         g.setAttribute('data-layer-id', gid);
-        g.setAttribute('data-name', 'Фрейм');
+        g.setAttribute('data-name', name);
         g.setAttribute('data-frame', '1');
         const clipId = `fc-${gid}`;
         g.setAttribute('clip-path', `url(#${clipId})`);
@@ -2043,7 +2420,7 @@ export function EditorCore() {
         g.appendChild(bg);
         host.appendChild(g);
 
-        const layer: Layer = { id: gid, name: 'Фрейм', type: 'frame', props: { fill, box: b, layout: 'none', clip: true }, children: [] };
+        const layer: Layer = { id: gid, name, type: 'frame', props: { fill, box: b, layout: 'none', clip: true }, children: [] };
         return {
           ...r,
           svg: new XMLSerializer().serializeToString(doc.documentElement),
@@ -2166,20 +2543,20 @@ export function EditorCore() {
     return () => window.removeEventListener('keydown', onKey);
   }, [selectAll, fitView]);
 
-  // Delete / Backspace removes the selected layer — but never while typing in a
+  // Delete / Backspace removes the whole selection — but never while typing in a
   // field (e.g. the inline rename input or a properties input).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
       const ae = document.activeElement;
       if (ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || (ae as HTMLElement).isContentEditable)) return;
-      if (!selectedId) return;
+      if (!selectedIds.length) return;
       e.preventDefault();
-      deleteLayer(selectedId);
+      deleteLayers(selectedIds);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selectedId, deleteLayer]);
+  }, [selectedIds, deleteLayers]);
 
   // Bounding box of a layer as % of the screen — measured live from the DOM so it
   // accounts for the pan/zoom transform and any SVG transforms.
@@ -2285,50 +2662,6 @@ export function EditorCore() {
   // is valid (you draw a header on it), so this no longer gates on layer count.
   const open = activePageId != null && !!result && result.errors.length === 0;
 
-  // Drafts strip — file tabs, Figma-style: one tab per saved file, the active
-  // one highlighted, and the rightmost control a "+" that starts a fresh import.
-  const draftsBar = (
-    <div className="flex shrink-0 items-center gap-1.5 border-b border-border bg-elevated px-3 py-2">
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
-        {drafts.map((d) => {
-          const active = d.id === activeDraftId;
-          return (
-            <div
-              key={d.id}
-              className={`group flex shrink-0 items-center gap-1 rounded-lg border px-2.5 py-1 text-caption transition-fast ${
-                active
-                  ? 'border-brand bg-brand/10 text-brand'
-                  : 'border-border bg-surface text-secondary hover:border-brand/40'
-              }`}
-            >
-              <button type="button" onClick={() => loadDraft(d)} className="max-w-[140px] truncate font-medium">
-                {d.fileName}
-              </button>
-              <button
-                type="button"
-                onClick={() => removeDraft(d.id)}
-                title={t('editor.home.deleteFile')}
-                className="rounded p-0.5 text-tertiary opacity-60 transition-fast hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
-              >
-                <X size={12} />
-              </button>
-            </div>
-          );
-        })}
-      </div>
-      <button
-        type="button"
-        onClick={() => void createLesson(false)}
-        disabled={creating}
-        title={t('editor.home.newLesson')}
-        aria-label={t('editor.home.newLesson')}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand text-white transition-fast hover:bg-brand/90 disabled:opacity-50"
-      >
-        <Plus size={16} />
-      </button>
-    </div>
-  );
-
   if (!open || !result) {
     return (
       <div className="flex h-full flex-col">
@@ -2343,6 +2676,7 @@ export function EditorCore() {
             lessons={lessons}
             creating={creating}
             onNewLesson={createLesson}
+            onNewBlank={newBlankDraft}
             onOpenLesson={(id) => router.push(`/admin/lessons/${id}`)}
             drafts={drafts}
             dragging={dragging}
@@ -2363,11 +2697,20 @@ export function EditorCore() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {draftsBar}
+      {autosaveError && (
+        <div className="shrink-0 bg-warning/10 px-3 py-1.5 text-caption text-warning">{autosaveError}</div>
+      )}
       <div className="flex min-h-0 flex-1">
       {/* ── Left rail: Pages (top) + Layers (flush left, internal scroll) ── */}
       {showLeft && (
         <aside className="flex w-[240px] shrink-0 flex-col border-r border-border bg-elevated">
+          <FileHeader
+            name={(fileName ?? 'screen.svg').replace(/\.svg$/i, '')}
+            onRename={(n) => setFileName(`${n}.svg`)}
+            saved={lessonSaved && !autosaveError}
+            onAddFile={openFilePicker}
+            onBack={newFile}
+          />
           <PagesPanel
             items={items}
             activeId={activePageId}
@@ -2400,31 +2743,25 @@ export function EditorCore() {
             </button>
             <button
               type="button"
+              onClick={() => void renameFramesWithAI()}
+              disabled={renamingFrames}
+              title={t('editor.sidebar.renameFrames')}
+              className="shrink-0 cursor-default text-tertiary transition-fast hover:text-brand disabled:hover:text-tertiary"
+            >
+              {renamingFrames ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Sparkles size={14} />
+              )}
+            </button>
+            <button
+              type="button"
               onClick={() => setCollapseSignal((v) => v + 1)}
               title={t('editor.sidebar.collapseAll')}
               className="shrink-0 text-tertiary transition-fast hover:text-brand"
             >
               <ChevronsDownUp size={14} />
             </button>
-            <button
-              type="button"
-              onClick={() => replaceRef.current?.click()}
-              title={t('editor.sidebar.loadOtherSvg')}
-              className="shrink-0 text-tertiary transition-fast hover:text-brand"
-            >
-              <RotateCcw size={14} />
-            </button>
-            <input
-              ref={replaceRef}
-              type="file"
-              accept=".svg,image/svg+xml"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void ingest(f);
-                e.target.value = '';
-              }}
-            />
           </div>
           {!layersCollapsed && (
             <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -2443,6 +2780,7 @@ export function EditorCore() {
                 referenceIds={referenceIds}
                 flawedIds={flawedIds}
                 collapseSignal={collapseSignal}
+                namingIds={namingIds}
               />
             </div>
           )}
@@ -2496,6 +2834,7 @@ export function EditorCore() {
             svgHostRef={svgHostRef}
             frames={frameChrome}
             onCycleFrameRole={cycleFrameRole}
+            onRename={renameLayer}
           />
         )}
         <EditorDock
@@ -2535,7 +2874,7 @@ export function EditorCore() {
                 layer={selected}
                 screen={result.screen}
                 liveBox={selBox}
-                onRadius={(v) => mutate(selected.id, (el) => (el.setAttribute('rx', String(v)), el.setAttribute('ry', String(v))))}
+                onRadius={(v) => setLayerRadius(selected.id, v)}
                 onFill={(v) =>
                   selected.type === 'frame'
                     ? mutate(selected.id, (el) => setFrameFill(el, v, selected.props.box))
@@ -2583,7 +2922,7 @@ export function EditorCore() {
                 onBroken={(brokenSvg) => patchDraft({ brokenSvg })}
               />
               <CanvasBackgroundPanel
-                value={canvasBg ?? '#f7f8fa'}
+                value={canvasBg ?? ''}
                 onChange={setCanvasBg}
               />
             </>
@@ -2600,27 +2939,16 @@ export function EditorCore() {
             const l = findLayer(result.screen.layers, menu.layerId);
             return !!l && l.type === 'frame' && l.children.length > 0;
           })()}
-          canFramify={(() => {
-            const l = findLayer(result.screen.layers, menu.layerId);
-            if (!l) return false;
-            // A plain group converts in place; any other target (a leaf, or a
-            // multi-selection) gets wrapped into a new frame — Figma's "Frame
-            // selection". A layer that's already a real frame has nothing to do.
-            const isPlainGroup = l.type === 'frame' && l.children.length > 0 && !l.props.frame;
-            const isRealFrame = l.type === 'frame' && !!l.props.frame;
-            return isPlainGroup || !isRealFrame;
-          })()}
+          // Anything can be wrapped — including a frame already inside a frame.
+          canFramify={!!findLayer(result.screen.layers, menu.layerId)}
           onFramify={() => {
-            const l = findLayer(result.screen.layers, menu.layerId!);
-            const isPlainGroup =
-              !!l && l.type === 'frame' && l.children.length > 0 && !l.props.frame;
-            if (isPlainGroup) {
-              framifyGroup(menu.layerId!); // existing group → frame, in place
-            } else {
-              // Frame the current selection (or just the clicked row).
-              const target = menu.layerId!;
-              frameSelection(selectedIds.includes(target) ? selectedIds : [target]);
-            }
+            // Always wrap the selection in a NEW frame (Figma's "Frame
+            // selection"), never convert in place: nesting frame-in-frame is
+            // expected, and an in-place convert leaves the tree looking
+            // unchanged, which reads as "the command did nothing".
+            const target = menu.layerId!;
+            console.log('[DBG onFramify] CLICKED target=', target, 'selectedIds=', selectedIds);
+            frameSelection(selectedIds.includes(target) ? selectedIds : [target]);
             setMenu(null);
           }}
           onGroup={(layout) => {
@@ -2645,7 +2973,10 @@ export function EditorCore() {
             setMenu(null);
           }}
           onDelete={() => {
-            deleteLayer(menu.layerId!);
+            // Right-clicking inside a multi-selection acts on all of it; on a row
+            // outside the selection it acts on that row alone.
+            const id = menu.layerId!;
+            deleteLayers(selectedIds.includes(id) ? selectedIds : [id]);
             setMenu(null);
           }}
         />
@@ -2659,8 +2990,37 @@ export function EditorCore() {
           onSelectAll={selectAll}
           onClearSelection={() => setSelectedIds([])}
           onFitView={fitView}
+          onAddFile={openFilePicker}
         />
       ))}
+
+      {/* Shared file picker for the header / canvas-menu "Добавить файл" entries. */}
+      <input
+        ref={addFileRef}
+        type="file"
+        accept=".svg,image/svg+xml"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void importIntoPage(f);
+          e.target.value = ''; // let the same file be picked again after a failure
+        }}
+      />
+
+      {/* A failed import leaves the page as it was, so say so rather than silently no-op. */}
+      {importError && (
+        <div className="fixed left-1/2 top-4 z-50 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-danger/30 bg-elevated px-3 py-2 text-footnote text-primary shadow-lg">
+          <AlertCircle size={14} className="shrink-0 text-danger" />
+          {importError}
+          <button
+            type="button"
+            onClick={() => setImportError(null)}
+            className="ml-1 shrink-0 text-tertiary transition-fast hover:text-primary"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -2678,15 +3038,17 @@ function relTime(ts: number, t: (key: string, vars?: Record<string, string | num
 }
 
 /**
- * The editor home — lessons-first, Figma-recents-style. Primary cards create a
- * lesson (an empty one for mixed tasks, or one seeded with a Figma-submit task)
- * and open the block constructor; existing lessons list beside them. A secondary
- * section keeps the standalone SVG screen-critique drafts.
+ * The editor home — lessons-first, Figma-recents-style. Three pills in the
+ * heading row create a lesson by type: «Урок» (mixed tasks), «Figma» (seeded
+ * with a Figma-submit task) — both open the block constructor — and «make»,
+ * which opens this SVG screen editor on a blank page. Existing lessons list
+ * below. A secondary section keeps the standalone SVG screen-critique drafts.
  */
 function ProjectGrid({
   lessons,
   creating,
   onNewLesson,
+  onNewBlank,
   onOpenLesson,
   drafts,
   dragging,
@@ -2699,6 +3061,8 @@ function ProjectGrid({
   lessons: { id: string; title: string; slug: string; blockCount: number; updatedAt: string }[];
   creating: boolean;
   onNewLesson: (withFigma: boolean) => void;
+  /** Open the SVG screen editor on a blank page (the «make» pill). */
+  onNewBlank: () => void;
   onOpenLesson: (id: string) => void;
   drafts: EditorDraftEntry[];
   dragging: boolean;
@@ -2709,66 +3073,88 @@ function ProjectGrid({
   onDelete: (id: string) => void;
 }) {
   const { t, tp } = useT();
+  const [lessonsOpen, setLessonsOpen] = useState(true);
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       {/* ── Lessons — the primary surface ── */}
       <section>
-        <h2 className="mb-3 text-callout font-semibold text-primary">{t('editor.home.lessons')}</h2>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
-          {/* New-lesson cards — mixed tasks, or a single Figma submission. */}
+        {/* Heading row — the three create-pills sit here, one per lesson type. */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            disabled={creating}
-            onClick={() => onNewLesson(false)}
-            className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-surface text-center transition-base hover:border-brand/50 hover:bg-brand/5 disabled:opacity-50"
+            onClick={() => setLessonsOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-callout font-semibold text-primary transition-fast hover:text-brand"
           >
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand/10 text-brand">
-              <GraduationCap size={20} />
-            </span>
-            <p className="px-4 text-footnote font-semibold text-primary">{t('editor.home.newLesson')}</p>
-            <p className="px-4 text-caption text-tertiary">{t('editor.home.newLessonMixed')}</p>
+            <ChevronDown
+              size={14}
+              className={`text-tertiary transition-transform duration-base ease-standard ${lessonsOpen ? '' : '-rotate-90'}`}
+            />
+            {t('editor.home.lessons')}
           </button>
-
-          <button
-            type="button"
-            disabled={creating}
-            onClick={() => onNewLesson(true)}
-            className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-surface text-center transition-base hover:border-brand/50 hover:bg-brand/5 disabled:opacity-50"
-          >
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand/10 text-brand">
-              <Link2 size={20} />
-            </span>
-            <p className="px-4 text-footnote font-semibold text-primary">{t('editor.home.newLessonFigma')}</p>
-            <p className="px-4 text-caption text-tertiary">{t('editor.home.newLessonFigmaHint')}</p>
-          </button>
-
-          {lessons.map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              onClick={() => onOpenLesson(l.id)}
-              className="group flex flex-col gap-2 text-left"
-            >
-              <span className="flex aspect-[4/3] items-center justify-center rounded-xl border border-border bg-surface transition-fast group-hover:border-brand/60">
-                <GraduationCap size={30} className="text-tertiary transition-fast group-hover:text-brand" />
-              </span>
-              <span className="min-w-0 px-0.5">
-                <span className="block truncate text-footnote font-medium text-primary">
-                  {l.title || t('editor.home.untitled')}
+          <div className="ml-auto flex items-center gap-1.5">
+            <TypePill
+              icon={GraduationCap}
+              tone="lesson"
+              label={t('editor.home.typeLesson')}
+              title={t('editor.home.newLessonMixed')}
+              disabled={creating}
+              onClick={() => onNewLesson(false)}
+            />
+            <TypePill
+              icon={Link2}
+              tone="figma"
+              label={t('editor.home.typeFigma')}
+              title={t('editor.home.newLessonFigmaHint')}
+              disabled={creating}
+              onClick={() => onNewLesson(true)}
+            />
+            <TypePill
+              icon={Shapes}
+              tone="make"
+              label={t('editor.home.typeMake')}
+              title={t('editor.home.typeMakeHint')}
+              onClick={onNewBlank}
+            />
+          </div>
+        </div>
+        {/* Collapse animates on grid-template-rows (1fr → 0fr): the card grid's
+            height is content-driven, so there's no max-height to tween against. */}
+        <div
+          className={`grid transition-[grid-template-rows] duration-base ease-standard ${
+            lessonsOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+          }`}
+        >
+          <div className="overflow-hidden">
+            <div className="grid grid-cols-5 gap-3">
+            {lessons.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => onOpenLesson(l.id)}
+                className="group flex flex-col gap-1.5 text-left"
+              >
+                <span className="flex aspect-[8/3] flex-col items-center justify-center gap-1 rounded-lg border border-border bg-surface px-3 transition-fast group-hover:border-brand/60">
+                  <GraduationCap size={20} className="text-tertiary transition-fast group-hover:text-brand" />
+                  <span className="line-clamp-1 w-full text-center text-caption font-medium text-primary">
+                    {l.title || t('editor.home.untitled')}
+                  </span>
                 </span>
-                <span className="block text-caption text-tertiary">
-                  {tp('editor.home.blockCount', l.blockCount)} · {t('editor.home.editedAt', { time: relTime(new Date(l.updatedAt).getTime(), t) })}
+                <span className="min-w-0 px-0.5">
+                  <span className="block truncate text-caption text-tertiary">
+                    {tp('editor.home.blockCount', l.blockCount)} · {t('editor.home.editedAt', { time: relTime(new Date(l.updatedAt).getTime(), t) })}
+                  </span>
                 </span>
-              </span>
-            </button>
-          ))}
+              </button>
+            ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ── SVG screen-critique files — the standalone importer ── */}
+      {/* ── Make files — the drafts the «Make» pill and the SVG importer produce ── */}
       <section>
         <h2 className="mb-3 flex items-center gap-2 text-callout font-semibold text-primary">
-          <ImageIcon size={16} className="text-tertiary" /> {t('editor.home.svgCritiques')}
+          <Shapes size={16} className="text-tertiary" /> {t('editor.home.makeFiles')}
         </h2>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
           {/* Import tile — dashed, matches the dropzone affordance. */}

@@ -10,7 +10,7 @@
  * Degrades gracefully to the validator's static explanation when no API key
  * is configured, so the whole flow works offline during development.
  */
-import Anthropic from '@anthropic-ai/sdk';
+import { claudeProxyText } from './claudeProxy';
 import type { Locale } from '@/lib/i18n/config';
 
 export interface MentorInput {
@@ -158,10 +158,6 @@ function observeFallback(input: ObserveInput): ObserveReply {
 }
 
 export async function coachObservation(input: ObserveInput): Promise<ObserveReply> {
-  if (!process.env.ANTHROPIC_API_KEY) return observeFallback(input);
-
-  const client = new Anthropic();
-
   const userPrompt = [
     `Экран: ${input.screenTitle}`,
     `Что замечает сильное наблюдение: ${input.concepts.map((c) => c.label).join('; ')}`,
@@ -171,20 +167,17 @@ export async function coachObservation(input: ObserveInput): Promise<ObserveRepl
     'Отрази, что он уловил, и мягко укажи на 1–2 упущенных момента. Разбор не раскрывай.',
   ].join('\n');
 
-  try {
-    const response = await client.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 1024,
-      system: OBSERVE_SYSTEM,
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: OBSERVE_SCHEMA } },
-      messages: [{ role: 'user', content: userPrompt }],
-    });
+  const text = await claudeProxyText({
+    model: 'claude-opus-4-8',
+    max_tokens: 1024,
+    system: OBSERVE_SYSTEM,
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: OBSERVE_SCHEMA } },
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+  if (!text) return observeFallback(input);
 
-    const text = response.content.find((b) => b.type === 'text');
-    if (text && text.type === 'text') {
-      return { ...(JSON.parse(text.text) as Omit<ObserveReply, 'offline'>) };
-    }
-    return observeFallback(input);
+  try {
+    return { ...(JSON.parse(text) as Omit<ObserveReply, 'offline'>) };
   } catch {
     return observeFallback(input);
   }
@@ -246,10 +239,6 @@ function fixFallback(): FixReply {
 }
 
 export async function coachFix(input: FixInput): Promise<FixReply> {
-  if (!process.env.ANTHROPIC_API_KEY) return fixFallback();
-
-  const client = new Anthropic();
-
   const userPrompt = [
     `Экран: ${input.screenTitle}`,
     `Зона: ${input.region}`,
@@ -260,20 +249,17 @@ export async function coachFix(input: FixInput): Promise<FixReply> {
     'Оцени правку: улучшает / дело вкуса / сломала бы — и коротко объясни.',
   ].join('\n');
 
-  try {
-    const response = await client.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 1024,
-      system: FIX_SYSTEM,
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: FIX_SCHEMA } },
-      messages: [{ role: 'user', content: userPrompt }],
-    });
+  const text = await claudeProxyText({
+    model: 'claude-opus-4-8',
+    max_tokens: 1024,
+    system: FIX_SYSTEM,
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: FIX_SCHEMA } },
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+  if (!text) return fixFallback();
 
-    const text = response.content.find((b) => b.type === 'text');
-    if (text && text.type === 'text') {
-      return { ...(JSON.parse(text.text) as Omit<FixReply, 'offline'>) };
-    }
-    return fixFallback();
+  try {
+    return { ...(JSON.parse(text) as Omit<FixReply, 'offline'>) };
   } catch {
     return fixFallback();
   }
@@ -331,51 +317,17 @@ export async function coachChat(
   history: { role: 'user' | 'assistant'; content: string }[] = [],
   locale: Locale = 'ru',
 ): Promise<{ reply: string; offline?: boolean }> {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return chatFallback(locale);
-
-  // We call the proxy with a plain fetch rather than the SDK, for two reasons:
-  //  1. Auth — the proxy expects `Authorization: Bearer`, not Anthropic's
-  //     `x-api-key` (which returns a wrapped 401).
-  //  2. WAF — the proxy 403s ("request was blocked") on the SDK's telemetry
-  //     headers/User-Agent. A minimal fetch with only the required headers gets
-  //     through cleanly.
-  // Base URL from a dedicated var (default: the proxy) so a global
-  // ANTHROPIC_BASE_URL pointing at api.anthropic.com can't shadow it.
-  const base = process.env.MENTOR_BASE_URL || 'https://api.kie.ai/claude';
-
-  try {
-    const res = await fetch(`${base}/v1/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 512,
-        system: CHAT_SYSTEM,
-        messages: [...history.slice(-6), { role: 'user', content: message }],
-      }),
-    });
-
-    const data = (await res.json()) as {
-      content?: { type: string; text?: string }[];
-    };
-    const text = data.content?.find((b) => b.type === 'text');
-    if (text?.text?.trim()) return { reply: text.text.trim() };
-    return chatFallback();
-  } catch {
-    return chatFallback();
-  }
+  // Haiku, not Opus: the landing chat is a teaser, and its replies are short.
+  const text = await claudeProxyText({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 512,
+    system: CHAT_SYSTEM,
+    messages: [...history.slice(-6), { role: 'user', content: message }],
+  });
+  return text ? { reply: text.trim() } : chatFallback(locale);
 }
 
 export async function coach(input: MentorInput): Promise<MentorReply> {
-  if (!process.env.ANTHROPIC_API_KEY) return fallback(input);
-
-  const client = new Anthropic();
-
   const userPrompt = [
     `Урок: ${input.lessonTitle}`,
     `Задание: ${input.prompt}`,
@@ -391,22 +343,19 @@ export async function coach(input: MentorInput): Promise<MentorReply> {
     .filter(Boolean)
     .join('\n');
 
-  try {
-    const response = await client.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 1024,
-      system: SYSTEM,
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
-      messages: [{ role: 'user', content: userPrompt }],
-    });
+  const text = await claudeProxyText({
+    model: 'claude-opus-4-8',
+    max_tokens: 1024,
+    system: SYSTEM,
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+  if (!text) return fallback(input);
 
-    const text = response.content.find((b) => b.type === 'text');
-    if (text && text.type === 'text') {
-      return { ...(JSON.parse(text.text) as Omit<MentorReply, 'offline'>) };
-    }
-    return fallback(input);
+  try {
+    return { ...(JSON.parse(text) as Omit<MentorReply, 'offline'>) };
   } catch {
-    // Network / auth / parse failure → never block the learner.
+    // Malformed JSON → never block the learner.
     return fallback(input);
   }
 }

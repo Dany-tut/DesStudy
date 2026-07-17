@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, FileText, Minus, Star, Pencil, Trash2 } from 'lucide-react';
 import type { PageMeta } from '@/lib/editor/pages';
 import { useT } from '@/lib/i18n/client';
+import { RENAME_FIELD } from './renameField';
 
 interface PagesPanelProps {
   items: PageMeta[];
@@ -294,7 +295,7 @@ function InlineEdit({
         onCommit(text);
         onDone();
       }}
-      className="min-w-0 flex-1 rounded border border-brand bg-surface px-1 py-0.5 text-footnote text-primary outline-none"
+      className={`${RENAME_FIELD} min-w-0 flex-1 px-1 py-0.5 text-footnote`}
     />
   );
 }

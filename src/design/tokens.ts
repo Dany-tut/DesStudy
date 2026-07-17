@@ -110,6 +110,12 @@ export const palette = {
   gray800: '#20242C',
   gray900: '#14171C',
   gray950: '#0B0D11',
+  // Dark-theme surface ramp. Deeper and bluer than the shared gray ramp, which
+  // light mode also draws on — the dark chrome is tuned on its own.
+  ink700: '#2C323E',
+  ink800: '#191D26',
+  ink900: '#0F1218',
+  ink950: '#070910',
   white: '#FFFFFF',
   black: '#000000',
   // Brand — calm indigo/blue
@@ -147,12 +153,12 @@ export const semanticColors = {
     info: palette.info,
   },
   dark: {
-    'bg-canvas': palette.gray950,
-    'bg-surface': palette.gray900,
-    'bg-elevated': palette.gray800,
-    'bg-muted': palette.gray800,
-    border: palette.gray800,
-    'border-strong': palette.gray700,
+    'bg-canvas': palette.ink950,
+    'bg-surface': palette.ink900,
+    'bg-elevated': palette.ink800,
+    'bg-muted': palette.ink800,
+    border: palette.ink800,
+    'border-strong': palette.ink700,
     'text-primary': palette.gray50,
     'text-secondary': palette.gray300,
     'text-tertiary': palette.gray500,

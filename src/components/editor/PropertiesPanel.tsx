@@ -13,6 +13,8 @@ import {
   MousePointer2,
   Plus,
   Scissors,
+  Blend,
+  Scan,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Layer, ParsedScreen } from '@/lib/editor/types';
@@ -78,7 +80,7 @@ export function PropertiesPanel({
   return (
     <div className="flex flex-col">
       {/* Header */}
-      <div className="px-1 pb-3">
+      <div className="pb-2">
         <p className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.props.properties')}</p>
         <p className="mt-0.5 flex items-center gap-1.5 truncate text-footnote font-semibold text-primary">
           {layer.name}
@@ -90,7 +92,7 @@ export function PropertiesPanel({
 
       {/* ── Position ── */}
       <Section title={t('editor.props.position')}>
-        <div className="mb-2 flex items-center gap-1">
+        <div className="mb-1.5 flex items-center gap-1">
           {(
             [
               [AlignStartVertical, 'left'],
@@ -100,7 +102,9 @@ export function PropertiesPanel({
           ).map(([I, edge], i) => (
             <GhostBtn key={i} Icon={I} onClick={onAlign ? () => onAlign(edge) : undefined} />
           ))}
-          <span className="mx-1 h-4 w-px bg-border-strong" />
+          {/* w-[1px], not w-px: `px` isn't a spacing token and Tailwind's scale is
+              replaced wholesale, so `w-px` generates no class and the rule vanishes. */}
+          <span className="mx-0.5 h-3.5 w-[1px] shrink-0 bg-border-strong" />
           {(
             [
               [AlignStartHorizontal, 'top'],
@@ -111,7 +115,7 @@ export function PropertiesPanel({
             <GhostBtn key={i} Icon={I} onClick={onAlign ? () => onAlign(edge) : undefined} />
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-1">
           {onMove && box ? (
             <>
               <ScrubField label="X" value={Math.round(box.x)} onCommit={(v) => onMove(v, Math.round(box.y))} allowNeg />
@@ -129,7 +133,7 @@ export function PropertiesPanel({
       {/* ── Layout ── */}
       <Section title={t('editor.props.layout')}>
         {isFrame && (
-          <div className="mb-2 flex items-center gap-1">
+          <div className="mb-1.5 flex items-center gap-1">
             <FlowChip
               Icon={Columns3}
               label={t('editor.props.row')}
@@ -150,7 +154,7 @@ export function PropertiesPanel({
             />
           </div>
         )}
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-1">
           {onResize && box ? (
             <>
               <ScrubField label={t('editor.props.w')} value={Math.round(box.w)} onCommit={(v) => onResize(v, Math.round(box.h))} min={1} />
@@ -170,10 +174,11 @@ export function PropertiesPanel({
 
       {/* ── Appearance ── */}
       <Section title={t('editor.props.appearance')}>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-1">
           {onOpacity ? (
             <ScrubField
               label={t('editor.props.opacity')}
+              Icon={Blend}
               value={props.opacity != null ? Math.round(props.opacity * 100) : 100}
               onCommit={(pct) => onOpacity(pct / 100)}
               min={0}
@@ -181,12 +186,12 @@ export function PropertiesPanel({
               suffix="%"
             />
           ) : (
-            <Field label={t('editor.props.opacity')} value={props.opacity != null ? `${Math.round(props.opacity * 100)}%` : '100%'} />
+            <Field label={t('editor.props.opacity')} Icon={Blend} value={props.opacity != null ? `${Math.round(props.opacity * 100)}%` : '100%'} />
           )}
           {layer.type === 'block' && onRadius ? (
-            <ScrubField label={t('editor.props.radius')} value={props.radius ?? 0} onCommit={onRadius} min={0} />
+            <ScrubField label={t('editor.props.radius')} Icon={Scan} value={props.radius ?? 0} onCommit={onRadius} min={0} />
           ) : (
-            <Field label={t('editor.props.radius')} value={props.radius != null ? String(props.radius) : '—'} />
+            <Field label={t('editor.props.radius')} Icon={Scan} value={props.radius != null ? String(props.radius) : '—'} />
           )}
         </div>
       </Section>
@@ -204,7 +209,7 @@ export function PropertiesPanel({
             onOpacity={onOpacity}
           />
         ) : (
-          <p className="px-1 text-caption text-tertiary">{t('editor.props.noFill')}</p>
+          <p className="text-caption text-tertiary">{t('editor.props.noFill')}</p>
         )}
       </Section>
 
@@ -219,10 +224,10 @@ export function PropertiesPanel({
               className="w-full resize-none rounded-lg border border-border bg-canvas px-2 py-1.5 text-caption text-primary"
             />
           ) : (
-            <p className="line-clamp-3 px-1 text-caption text-secondary">«{props.text}»</p>
+            <p className="line-clamp-3 text-caption text-secondary">«{props.text}»</p>
           )}
           {(props.fontSize != null || props.fontWeight) && (
-            <p className="mt-1.5 px-1 text-caption tabular-nums text-tertiary">
+            <p className="mt-1.5 text-caption tabular-nums text-tertiary">
               {props.fontSize != null ? `${props.fontSize}px` : ''}
               {props.fontWeight ? ` · ${props.fontWeight}` : ''}
             </p>
@@ -249,7 +254,7 @@ export function PropertiesPanel({
               <>
                 <ColorRow value={props.stroke as string} onChange={onStroke ? (v) => onStroke(v) : undefined} />
                 {onStrokeWidth && (
-                  <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                  <div className="mt-1 grid grid-cols-2 gap-1">
                     <ScrubField
                       label={t('editor.props.strokeWidth')}
                       value={Math.round(props.strokeWidth ?? 1)}
@@ -267,7 +272,7 @@ export function PropertiesPanel({
                 )}
               </>
             ) : onStroke ? null : (
-              <p className="px-1 text-caption text-tertiary">{t('editor.props.noStroke')}</p>
+              <p className="text-caption text-tertiary">{t('editor.props.noStroke')}</p>
             )}
           </Section>
         );
@@ -309,11 +314,22 @@ const round = (n: number) => String(Math.round(n));
  * so the ring never doubles up). `FIELD_STATIC` is the read-only variant.
  */
 const FIELD_BASE =
-  'flex items-center gap-1.5 rounded-md border bg-surface px-2 py-1.5 transition-fast';
-const FIELD_STATIC = `${FIELD_BASE} border-border`;
-const FIELD_INTERACTIVE =
+  'flex items-center gap-2 rounded-sm border bg-surface px-2 py-1 transition-fast';
+export const FIELD_STATIC = `${FIELD_BASE} border-border`;
+export const FIELD_INTERACTIVE =
   `group ${FIELD_BASE} border-border hover:border-border-strong ` +
   'focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/25';
+
+/**
+ * Shared icon-button styling (the section «+», the align glyphs). Rest is a bare
+ * glyph; hover/focus lay the translucent `bg-hover` wash under it and firm the
+ * glyph to `text-primary`; press deepens to `bg-pressed`. Never a solid fill —
+ * an opaque swatch here reads as a hole punched in the panel.
+ */
+export const ICON_BTN =
+  'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-tertiary transition-fast ' +
+  'hover:bg-hover hover:text-primary active:bg-pressed ' +
+  'focus-visible:!outline-none focus-visible:bg-hover focus-visible:text-primary';
 
 /** Seed color when adding a stroke from scratch — a neutral dark border. */
 const DEFAULT_STROKE = '#1A1A1A';
@@ -326,8 +342,9 @@ const DEFAULT_STROKE = '#1A1A1A';
  * (so the canvas previews) and once when a typed value settles. An optional
  * `suffix` renders a trailing unit (e.g. «%»).
  */
-function ScrubField({
+export function ScrubField({
   label,
+  Icon,
   value,
   onCommit,
   min,
@@ -335,7 +352,12 @@ function ScrubField({
   allowNeg,
   suffix,
 }: {
+  /** Always required, even alongside `Icon`: it stays the field's accessible name
+   *  and its tooltip, since a glyph on its own names nothing. */
   label: string;
+  /** Draws the handle as a glyph instead of text — a word like «Прозрачность»
+   *  costs more width than the value it labels. */
+  Icon?: typeof MousePointer2;
   value: number;
   onCommit: (v: number) => void;
   min?: number;
@@ -396,14 +418,16 @@ function ScrubField({
   return (
     <label className={FIELD_INTERACTIVE}>
       <span
+        title={label}
         onPointerDown={startScrub}
-        className="cursor-ew-resize select-none text-caption text-tertiary transition-fast group-hover:text-secondary"
+        className="flex shrink-0 cursor-ew-resize select-none items-center text-caption text-tertiary transition-fast group-hover:text-secondary"
       >
-        {label}
+        {Icon ? <Icon size={12} strokeWidth={2} aria-hidden /> : label}
       </span>
       <input
         type="text"
         inputMode="numeric"
+        aria-label={label}
         value={text}
         onFocus={() => setEditing(true)}
         onChange={(e) => {
@@ -419,7 +443,7 @@ function ScrubField({
   );
 }
 
-function Section({
+export function Section({
   title,
   action,
   children,
@@ -432,9 +456,11 @@ function Section({
   muted?: boolean;
   last?: boolean;
 }) {
+  // No horizontal padding of its own — the rail's px-3 is the single left edge
+  // every section, field and the zone block below align to.
   return (
-    <div className={['py-3', last ? '' : 'border-b border-border'].join(' ')}>
-      <div className="mb-2 flex items-center justify-between px-1">
+    <div className={['py-2', last ? '' : 'border-b border-border'].join(' ')}>
+      <div className="mb-1.5 flex items-center justify-between">
         <p className={['text-caption font-medium', muted ? 'text-tertiary' : 'text-secondary'].join(' ')}>{title}</p>
         {action}
       </div>
@@ -443,17 +469,20 @@ function Section({
   );
 }
 
-/** Read-only value field — Figma's boxed metric cell. */
-function Field({ label, value }: { label: string; value: string }) {
+/** Read-only value field — Figma's boxed metric cell. Mirrors ScrubField's glyph
+ *  handling so a section reads identically whether or not it's editable here. */
+export function Field({ label, Icon, value }: { label: string; Icon?: typeof MousePointer2; value: string }) {
   return (
-    <div className={FIELD_STATIC}>
-      <span className="text-caption text-tertiary">{label}</span>
+    <div className={FIELD_STATIC} title={Icon ? label : undefined}>
+      <span className="flex shrink-0 items-center text-caption text-tertiary">
+        {Icon ? <Icon size={12} strokeWidth={2} aria-hidden /> : label}
+      </span>
       <span className="truncate text-caption tabular-nums text-primary">{value}</span>
     </div>
   );
 }
 
-function ColorRow({
+export function ColorRow({
   value,
   onChange,
   opacity,
@@ -483,26 +512,22 @@ function ColorRow({
   );
 }
 
-function GhostBtn({ Icon, onClick }: { Icon: typeof MousePointer2; onClick?: () => void }) {
+export function GhostBtn({ Icon, onClick }: { Icon: typeof MousePointer2; onClick?: () => void }) {
   if (!onClick) {
     return (
-      <span className="flex h-6 w-6 items-center justify-center rounded-md text-tertiary">
+      <span className="flex h-5 w-5 items-center justify-center rounded-sm text-tertiary">
         <Icon size={13} />
       </span>
     );
   }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex h-6 w-6 items-center justify-center rounded-md text-tertiary transition-fast hover:bg-hover hover:text-primary focus-visible:!outline-none focus-visible:bg-hover focus-visible:text-primary"
-    >
+    <button type="button" onClick={onClick} className={ICON_BTN}>
       <Icon size={13} />
     </button>
   );
 }
 
-function FlowChip({
+export function FlowChip({
   Icon,
   label,
   active,
@@ -513,12 +538,17 @@ function FlowChip({
   active?: boolean;
   onClick?: () => void;
 }) {
+  // An active chip stays interactive — clicking it turns the layout off — so it
+  // gets its own hover/press instead of going inert once selected.
   const cls = [
-    'flex h-7 flex-1 items-center justify-center rounded-md border transition-fast focus-visible:!outline-none',
+    'flex h-6 flex-1 items-center justify-center rounded-sm border transition-fast focus-visible:!outline-none',
     active
       ? 'border-brand bg-brand/12 text-brand'
       : 'border-border bg-surface text-tertiary',
-    onClick && !active ? 'hover:border-border-strong hover:text-secondary' : '',
+    onClick && !active
+      ? 'hover:border-border-strong hover:bg-hover hover:text-secondary active:bg-pressed focus-visible:border-border-strong focus-visible:text-secondary'
+      : '',
+    onClick && active ? 'hover:bg-brand/20 active:bg-brand/25' : '',
   ].join(' ');
   if (!onClick) {
     return (
@@ -536,13 +566,13 @@ function FlowChip({
 
 /** Figma-style "Обрезать содержимое" row: a label + a switch that clips the
  *  frame's children to its bounds. */
-function ClipToggle({ checked, onChange }: { checked: boolean; onChange: (on: boolean) => void }) {
+export function ClipToggle({ checked, onChange }: { checked: boolean; onChange: (on: boolean) => void }) {
   const { t } = useT();
   return (
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="mt-2 flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-footnote text-secondary transition-fast hover:text-primary"
+      className="mt-1.5 flex w-full items-center gap-1.5 rounded-sm px-1 py-0.5 text-left text-footnote text-secondary transition-fast hover:text-primary"
     >
       <Scissors size={13} className="text-tertiary" />
       <span className="flex-1">{t('editor.props.clipContent')}</span>
@@ -563,21 +593,16 @@ function ClipToggle({ checked, onChange }: { checked: boolean; onChange: (on: bo
   );
 }
 
-function PlusBtn({ onClick, title }: { onClick?: () => void; title?: string } = {}) {
+export function PlusBtn({ onClick, title }: { onClick?: () => void; title?: string } = {}) {
   if (!onClick) {
     return (
-      <span className="flex h-4 w-4 items-center justify-center text-tertiary">
+      <span className="flex h-5 w-5 items-center justify-center text-tertiary">
         <Plus size={13} />
       </span>
     );
   }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className="flex h-4 w-4 items-center justify-center rounded text-tertiary transition-colors hover:bg-canvas hover:text-primary"
-    >
+    <button type="button" onClick={onClick} title={title} className={ICON_BTN}>
       <Plus size={13} />
     </button>
   );

@@ -37,7 +37,9 @@ export function ColorPicker({
   const pct = Math.round((opacity ?? 1) * 100);
 
   return (
-    <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-2 py-1.5 transition-fast hover:border-border-strong focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/25">
+    // Mirrors FIELD_BASE in PropertiesPanel — the fill row sits in the same column
+    // as the scrub fields, so it has to keep their height and corner exactly.
+    <div className="flex items-center gap-2 rounded-sm border border-border bg-surface px-2 py-1 transition-fast hover:border-border-strong focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/25">
       <button
         ref={swatchRef}
         type="button"
@@ -121,6 +123,7 @@ function Popover({
   onOpacityChange?: (v: number) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [mode, setMode] = useState<'hex' | 'rgb'>('hex');
@@ -191,8 +194,24 @@ function Popover({
     <div
       ref={ref}
       style={pos ? { top: pos.top, left: pos.left } : { visibility: 'hidden' }}
-      className="fixed z-[60] w-[232px] rounded-xl border border-border bg-elevated p-3 shadow-lg"
+      className="fixed z-[60] w-[232px] rounded-lg border border-border-strong bg-elevated p-3 shadow-[0_12px_32px_-4px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]"
     >
+      <div className="mb-2 flex items-center justify-end">
+        <button
+          type="button"
+          aria-label={t('editor.color.close')}
+          onClick={() => {
+            onClose();
+            onChangeEnd?.();
+          }}
+          className="flex h-6 w-6 items-center justify-center rounded-md text-tertiary transition-fast hover:bg-hover hover:text-primary active:bg-pressed"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
       {/* Saturation / value square */}
       <SvSquare hsv={hsv} onChange={emit} onChangeEnd={onChangeEnd} />
 
@@ -217,7 +236,7 @@ function Popover({
       <div className="mt-3 flex items-center gap-1.5">
         <ModeToggle mode={mode} onChange={setMode} />
         {mode === 'hex' ? (
-          <div className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1 focus-within:border-brand">
+          <div className="flex h-7 min-w-0 flex-1 items-center rounded-md border border-border-strong bg-surface px-2 focus-within:border-brand">
             <HexInput hex={hex} onChange={onChange} onChangeEnd={onChangeEnd} />
           </div>
         ) : (
@@ -271,7 +290,7 @@ function SvSquare({
     <div
       ref={ref}
       onPointerDown={drag}
-      className="relative h-40 w-full cursor-crosshair overflow-hidden rounded-lg"
+      className="relative h-40 w-full cursor-crosshair overflow-hidden rounded-md"
       style={{
         background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, ${hueHex})`,
       }}
@@ -327,14 +346,14 @@ function ModeToggle({
   onChange: (m: 'hex' | 'rgb') => void;
 }) {
   return (
-    <div className="flex shrink-0 rounded-md border border-border-strong p-0.5">
+    <div className="flex h-7 shrink-0 items-center rounded-md border border-border-strong p-0.5">
       {(['hex', 'rgb'] as const).map((m) => (
         <button
           key={m}
           type="button"
           onClick={() => onChange(m)}
           className={[
-            'rounded px-1.5 py-0.5 text-[10px] font-medium uppercase transition-colors',
+            'flex h-full items-center rounded-[4px] px-2 text-[10px] font-medium uppercase leading-none transition-colors',
             mode === m ? 'bg-brand text-white' : 'text-tertiary hover:text-primary',
           ].join(' ')}
         >
@@ -404,7 +423,7 @@ function EyeDropperButton({ onPick }: { onPick: (hex: string) => void }) {
           /* user cancelled */
         }
       }}
-      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-border-strong text-secondary transition-colors hover:border-brand hover:text-primary"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border-strong text-secondary transition-colors hover:border-brand hover:text-primary"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="m2 22 1-1h3l9-9" />
@@ -432,11 +451,11 @@ function RgbField({
     if (!focused.current) setText(String(Math.round(value)));
   }, [value]);
   return (
-    <label className="flex items-center gap-1 rounded-md border border-border-strong bg-surface px-1.5 py-1 focus-within:border-brand">
-      <span className="text-[10px] text-tertiary">{label}</span>
+    <label className="flex h-7 min-w-0 items-center rounded-md border border-border-strong bg-surface px-1.5 focus-within:border-brand">
       <input
         value={text}
         inputMode="numeric"
+        aria-label={label}
         onFocus={() => (focused.current = true)}
         onChange={(e) => {
           const raw = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
@@ -448,7 +467,7 @@ function RgbField({
           setText(String(Math.round(value)));
           onChangeEnd?.();
         }}
-        className="w-full min-w-0 bg-transparent text-caption tabular-nums text-primary !outline-none focus-visible:!outline-none"
+        className="w-full min-w-0 bg-transparent text-center text-caption tabular-nums text-primary !outline-none focus-visible:!outline-none"
       />
     </label>
   );
