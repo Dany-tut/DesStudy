@@ -123,32 +123,6 @@ export function startParticleStream(): () => void {
 }
 
 /**
- * A short UI "hover" tick, played from a shipped wav asset (public/sounds/hover.wav).
- * A single shared, muted-by-default Audio element is reused and rewound on each
- * play so rapid row-to-row hovers don't spawn a pile of elements. Rate-limited so
- * a fast sweep across the list doesn't machine-gun the sound. No-ops server-side
- * or before the first user gesture unlocks audio.
- */
-let hoverEl: HTMLAudioElement | null = null;
-let lastHover = 0;
-export function playHover() {
-  if (typeof window === 'undefined') return;
-  const now = performance.now();
-  if (now - lastHover < 110) return; // debounce a fast sweep across rows
-  lastHover = now;
-  try {
-    if (!hoverEl) {
-      hoverEl = new Audio('/sounds/hover.wav');
-      hoverEl.volume = 0.12;
-    }
-    hoverEl.currentTime = 0;
-    void hoverEl.play().catch(() => {});
-  } catch {
-    /* audio unavailable — ignore */
-  }
-}
-
-/**
  * A tiny, dry "tick" for a checkmark drawing in — a short soft blip that reads
  * as a pen stroke landing. Pitched a little higher each call would feel busy, so
  * it stays fixed and gentle; fire one per row as a validation list fills in.
@@ -172,6 +146,35 @@ export function playTick() {
   osc.connect(lp).connect(g).connect(ac.destination);
   osc.start(t0);
   osc.stop(t0 + 0.15);
+}
+
+/**
+ * A near-subliminal "brush" for hovering a nav row — one very quiet, very short
+ * low blip. Quieter and duller than playTick (that one announces an event; this
+ * one just acknowledges the pointer). Debounced hard: a pointer swept down a
+ * list fires onMouseEnter per row, and without this it machine-guns.
+ */
+let lastHover = 0;
+export function playHover() {
+  const ac = audio();
+  if (!ac) return;
+  const t0 = ac.currentTime;
+  if (t0 - lastHover < 0.06) return;
+  lastHover = t0;
+  const osc = ac.createOscillator();
+  const g = ac.createGain();
+  const lp = ac.createBiquadFilter();
+  osc.type = 'sine';
+  // flat and low — a pitch glide would read as a "confirm", not a graze
+  osc.frequency.setValueAtTime(420, t0);
+  lp.type = 'lowpass';
+  lp.frequency.value = 1200;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.018, t0 + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.05);
+  osc.connect(lp).connect(g).connect(ac.destination);
+  osc.start(t0);
+  osc.stop(t0 + 0.07);
 }
 
 /**

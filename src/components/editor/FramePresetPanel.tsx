@@ -2,6 +2,7 @@
 
 import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import { THEME_CANVAS, useEditorTheme } from '@/lib/editor/theme';
 import { useT } from '@/lib/i18n/client';
 
 import { ColorPicker } from './ColorPicker';
@@ -63,7 +64,7 @@ export function FrameSizePanel({ onPick }: { onPick: (w: number, h: number) => v
   const { t } = useT();
   return (
     <div className="flex flex-col">
-      <div className="px-1 pb-3">
+      <div className="pb-3">
         <p className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.frame.title')}</p>
         <p className="mt-0.5 text-footnote text-secondary">{t('editor.frame.hint')}</p>
       </div>
@@ -82,7 +83,7 @@ function PresetGroup({ group, onPick }: { group: Group; onPick: (w: number, h: n
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-1.5 px-1 py-1 text-left text-footnote font-semibold text-primary transition-fast hover:text-brand"
+        className="flex w-full items-center gap-1.5 py-1 text-left text-footnote font-semibold text-primary transition-fast hover:text-brand"
       >
         <ChevronRight size={13} className={['text-tertiary transition-fast', open ? 'rotate-90' : ''].join(' ')} />
         {t(group.titleKey)}
@@ -112,6 +113,9 @@ function PresetGroup({ group, onPick }: { group: Group; onPick: (w: number, h: n
  * Canvas background swatch — Figma surfaces the page background colour when
  * nothing is selected. Sits under the exercise-setup panel in the deselected
  * state and repaints the dotted canvas behind the frames.
+ *
+ * The preset row picks the editor theme (chrome + canvas together); the swatch
+ * above it overrides just the canvas for the current session.
  */
 export function CanvasBackgroundPanel({
   value,
@@ -121,11 +125,44 @@ export function CanvasBackgroundPanel({
   onChange: (v: string) => void;
 }) {
   const { t } = useT();
-  const hex = /^#[0-9a-f]{6}$/i.test(value) ? value : '#f7f8fa';
+  const [theme, setTheme] = useEditorTheme();
+  const hex = /^#[0-9a-f]{6}$/i.test(value) ? value : THEME_CANVAS[theme];
   return (
     <div className="border-t border-border pt-3">
-      <p className="mb-2 px-1 text-caption font-medium text-secondary">{t('editor.frame.canvasBackground')}</p>
+      <p className="mb-2 text-caption font-medium text-secondary">{t('editor.frame.canvasBackground')}</p>
       <ColorPicker value={hex} onChange={onChange} />
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
+        {THEME_PRESETS.map((p) => {
+          const active = theme === p.theme;
+          return (
+            <button
+              key={p.theme}
+              type="button"
+              onClick={() => {
+                setTheme(p.theme);
+                onChange(THEME_CANVAS[p.theme]);
+              }}
+              className={`flex min-w-0 items-center gap-1.5 rounded-md border px-1.5 py-1.5 text-caption outline-none transition-colors focus-visible:border-brand ${
+                active
+                  ? 'border-brand text-primary'
+                  : 'border-transparent bg-surface text-secondary hover:text-primary'
+              }`}
+            >
+              <span
+                className="size-3 shrink-0 rounded-full border border-border-strong"
+                style={{ background: THEME_CANVAS[p.theme] }}
+              />
+              <span className="truncate">{t(p.key)}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
+
+const THEME_PRESETS = [
+  { theme: 'dark' as const, key: 'editor.frame.canvasPresetBlue' },
+  { theme: 'graphite' as const, key: 'editor.frame.canvasPresetGray' },
+  { theme: 'light' as const, key: 'editor.frame.canvasPresetLight' },
+];

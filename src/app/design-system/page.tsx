@@ -20,6 +20,7 @@ import { RadiusDragTune } from '@/components/exercises/RadiusDragTune';
 import { FigmaLinkSubmit } from '@/components/exercises/FigmaLinkSubmit';
 import { FileUploadZone } from '@/components/exercises/FileUploadZone';
 import { VideoEmbed } from '@/components/lesson/VideoEmbed';
+import { MakeBlock } from './MakeBlock';
 import { BarBuilder } from '@/components/exercises/drafts/BarBuilder';
 import { ContrastTuner } from '@/components/exercises/drafts/ContrastTuner';
 import { AlignSnap } from '@/components/exercises/drafts/AlignSnap';
@@ -130,6 +131,10 @@ export default function DesignSystemPage() {
           {dark ? <Sun size={18} /> : <Moon size={18} />}
         </button>
       </header>
+
+      <Section title="Make — редактор экрана, по элементам">
+        <MakeBlock />
+      </Section>
 
       <Section title="Typography — SF Pro modular scale">
         <div className="space-y-3">

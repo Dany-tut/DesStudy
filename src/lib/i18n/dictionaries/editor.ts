@@ -18,7 +18,7 @@ export const editor = {
       expand: 'Развернуть',
       collapse: 'Свернуть',
       collapseAll: 'Свернуть все группы',
-      loadOtherSvg: 'Загрузить другой SVG',
+      renameFrames: 'Переименовать фреймы по смыслу (ИИ)',
       layerCount: {
         one: '{count} слой',
         few: '{count} слоя',
@@ -87,6 +87,7 @@ export const editor = {
       pick: 'Выбрать цвет',
       eyedropper: 'Пипетка',
       eyedropperHint: 'Пипетка — взять цвет с экрана',
+      close: 'Закрыть',
     },
     frame: {
       title: 'Фрейм',
@@ -95,6 +96,9 @@ export const editor = {
       groupTablet: 'Планшет',
       groupDesktop: 'Десктоп',
       canvasBackground: 'Фон холста',
+      canvasPresetBlue: 'Синяя',
+      canvasPresetGray: 'Серая',
+      canvasPresetLight: 'Светлая',
     },
     dock: {
       soon: 'скоро',
@@ -141,6 +145,16 @@ export const editor = {
     hint: {
       canvas: '⌘/Ctrl+колесо — зум · перетаскивание — выделение рамкой · пробел/СКМ — рука · K — scale',
     },
+    autosaveFailed: 'Не удалось сохранить черновик в уроки — правки пока только в браузере.',
+    file: {
+      renameHint: 'Двойной клик — переименовать',
+      draft: 'Черновик',
+      savedToLessons: 'Сохранён в уроки',
+      localOnly: 'Только в браузере',
+      addFile: 'Добавить файл',
+      importFailed: 'Не удалось разобрать SVG — файл повреждён или пустой',
+      back: 'К урокам',
+    },
     stepbar: {
       editorLabel: 'Редактор',
       editorHint: 'Слои, роли, зоны',
@@ -159,8 +173,13 @@ export const editor = {
       newLessonMixed: 'Разные задания',
       newLessonFigma: 'Урок · сдача в Figma',
       newLessonFigmaHint: 'Одно задание со ссылкой',
+      // Create-pills in the «Уроки» heading row — one per lesson type.
+      typeLesson: 'Урок',
+      typeFigma: 'Figma',
+      typeMake: 'Make',
+      typeMakeHint: 'Редактор экрана · загрузка SVG',
       untitled: 'Без названия',
-      svgCritiques: 'SVG-разборы экрана',
+      makeFiles: 'Make',
       dropSvg: 'Перетащи SVG или выбери файл',
       deleteFile: 'Удалить файл',
       createFailed: 'Не удалось создать урок',
@@ -249,7 +268,7 @@ export const editor = {
       expand: 'Expand',
       collapse: 'Collapse',
       collapseAll: 'Collapse all groups',
-      loadOtherSvg: 'Load a different SVG',
+      renameFrames: 'Rename frames by meaning (AI)',
       layerCount: {
         one: '{count} layer',
         other: '{count} layers',
@@ -317,6 +336,7 @@ export const editor = {
       pick: 'Pick a color',
       eyedropper: 'Eyedropper',
       eyedropperHint: 'Eyedropper — pick a color from the screen',
+      close: 'Close',
     },
     frame: {
       title: 'Frame',
@@ -325,6 +345,9 @@ export const editor = {
       groupTablet: 'Tablet',
       groupDesktop: 'Desktop',
       canvasBackground: 'Canvas background',
+      canvasPresetBlue: 'Blue',
+      canvasPresetGray: 'Gray',
+      canvasPresetLight: 'Light',
     },
     dock: {
       soon: 'soon',
@@ -371,6 +394,16 @@ export const editor = {
     hint: {
       canvas: '⌘/Ctrl+wheel — zoom · drag — marquee select · space/MMB — pan · K — scale',
     },
+    autosaveFailed: 'Could not save the draft to lessons — changes are in this browser only for now.',
+    file: {
+      renameHint: 'Double-click to rename',
+      draft: 'Draft',
+      savedToLessons: 'Saved to lessons',
+      localOnly: 'This browser only',
+      addFile: 'Add file',
+      importFailed: 'Could not parse the SVG — the file is broken or empty',
+      back: 'Back to lessons',
+    },
     stepbar: {
       editorLabel: 'Editor',
       editorHint: 'Layers, roles, zones',
@@ -389,8 +422,13 @@ export const editor = {
       newLessonMixed: 'Mixed tasks',
       newLessonFigma: 'Lesson · Figma submission',
       newLessonFigmaHint: 'A single task with a link',
+      // Create-pills in the "Lessons" heading row — one per lesson type.
+      typeLesson: 'Lesson',
+      typeFigma: 'Figma',
+      typeMake: 'Make',
+      typeMakeHint: 'Screen editor · SVG import',
       untitled: 'Untitled',
-      svgCritiques: 'SVG screen breakdowns',
+      makeFiles: 'Make',
       dropSvg: 'Drop an SVG or choose a file',
       deleteFile: 'Delete file',
       createFailed: 'Could not create the lesson',

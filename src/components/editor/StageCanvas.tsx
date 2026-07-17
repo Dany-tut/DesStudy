@@ -4,6 +4,7 @@ import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, u
 import { Frame as FrameIcon, BadgeCheck, Bug } from 'lucide-react';
 import type { EditorTool } from '@/lib/editor/types';
 import { useT } from '@/lib/i18n/client';
+import { RENAME_RADIUS_PX } from './renameField';
 
 /** A top-level frame the canvas draws chrome for: a name label above the frame
  *  and a role icon (frame / эталон / косячный) that cycles on click. */
@@ -71,6 +72,24 @@ function layerIdAt(target: EventTarget | null, deep: boolean): string | null {
   return top.getAttribute('data-layer-id');
 }
 
+/**
+ * The rect backing an element's `clip-path="url(#id)"`, wherever the <clipPath>
+ * lives. Frames come in two shapes: ones we author inline (<clipPath> is a child
+ * of the frame's <g>), and imported ones, whose <clipPath> Figma parks in <defs>
+ * (see parseSvg). Resolving through the URL reference covers both — a `:scope >
+ * clipPath > rect` selector silently misses the imported case, which leaves the
+ * clip frozen at its old bounds and crops the frame as it grows.
+ */
+function clipRectOf(el: Element): Element | null {
+  const cp = el.getAttribute('clip-path') || '';
+  const m = /url\(#(.+?)\)/.exec(cp);
+  if (!m) return null;
+  const doc = el.ownerDocument;
+  if (!doc) return null;
+  const id = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(m[1]) : m[1];
+  return doc.querySelector(`clipPath[id="${id}"] > rect`);
+}
+
 /** A layer's content-space bounds plus its centre, for alignment snapping. */
 type SnapBox = { left: number; top: number; right: number; bottom: number; cx: number; cy: number };
 
@@ -114,6 +133,7 @@ export function StageCanvas({
   svgHostRef,
   frames,
   onCycleFrameRole,
+  onRename,
 }: {
   svg: string;
   /** viewBox size in user units — one unit renders as one content-space px. */
@@ -141,10 +161,14 @@ export function StageCanvas({
   onTransformLayers?: (ids: string[], matrix: string) => void;
   /** Commit a frame-border resize: set the frame's bg/clip rect to the new local
    *  box, leaving its children untouched (Figma frame semantics). */
-  onResizeFrame?: (id: string, box: { x: number; y: number; w: number; h: number }) => void;
+  /** Commit a frame-border resize. `radius` (when given) is the re-clamped corner
+   *  radius applied to the frame's bg + clip rects, keeping rx == ry. */
+  onResizeFrame?: (id: string, box: { x: number; y: number; w: number; h: number }, radius?: number) => void;
   /** Commit a plain-rect resize: set the rect's x/y/width/height to the new box,
    *  leaving rx/ry untouched so the corner radius doesn't stretch. */
-  onResizeRect?: (id: string, box: { x: number; y: number; w: number; h: number }) => void;
+  /** Commit a plain-rect resize. `radius` (when given) is the re-clamped corner
+   *  radius that keeps rx == ry, so a shrunk rect never reads as an ellipse. */
+  onResizeRect?: (id: string, box: { x: number; y: number; w: number; h: number }, radius?: number) => void;
   /** Commit a corner-radius drag on a single rect layer. */
   onSetRadius?: (id: string, r: number) => void;
   /** Right-click — opens the shared context menu. `layerId` is null on empty grid. */
@@ -177,6 +201,9 @@ export function StageCanvas({
   frames?: FrameChrome[];
   /** Cycle a frame's role (обычный → эталон → косячный → обычный). */
   onCycleFrameRole?: (id: string) => void;
+  /** Rename a layer — drives the frame name label's double-click editing, the
+   *  same gesture (and the same commit) as renaming a row in the layers panel. */
+  onRename?: (id: string, name: string) => void;
 }) {
   const { t } = useT();
   const hostRef = useRef<HTMLDivElement>(null);
@@ -235,12 +262,18 @@ export function StageCanvas({
         frameRects?: { el: Element; x0: number; y0: number; w0: number; h0: number }[] | null;
         frameId?: string | null;
         lastFrameBox?: { x: number; y: number; w: number; h: number } | null;
-        // Plain-rect resize: when the sole selected node is a bare <rect>, we resize
-        // by mutating its x/y/width/height (leaving rx/ry untouched) instead of baking
-        // a matrix scale — otherwise the scale stretches the rounded corners into
-        // ellipses. Reuses the frameRects live-mutation path; commits via onResizeRect.
+        // Plain-rect resize (V only): when the sole selected node is a bare <rect>, we
+        // resize by mutating its x/y/width/height instead of baking a matrix scale —
+        // otherwise the scale stretches the rounded corners into ellipses. The radius
+        // is held absolute at `rectR0` but re-clamped to min(w,h)/2 with rx == ry each
+        // frame (`lastRectRadius`), so corners stay circular. Reuses the frameRects
+        // live-mutation path; commits via onResizeRect.
         rectResize?: boolean;
         rectId?: string | null;
+        /** Corner radius at drag start — the absolute value to hold. */
+        rectR0?: number;
+        /** Latest re-clamped radius written to the rect; committed on drop. */
+        lastRectRadius?: number | null;
         // Frame-chrome strips (name + role icon) of the resized frames, captured at
         // drag start so `flush` can ride them along live — otherwise the label/icon
         // lag behind the frame's edges until the resize commits. `off` is the fixed
@@ -317,6 +350,50 @@ export function StageCanvas({
     if (fitSignal > 0) fitToScreen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitSignal]);
+
+  // Give every parse-derived frame rect its real geometry, now that the SVG is
+  // live. parseSvg runs off-DOM: it can only union the children that carry
+  // explicit x/y/width/height, so a frame full of <path>/<text> ends up boxed
+  // around a subset of what it draws. Here getBBox() reports what's actually
+  // rendered. Only "auto" rects are touched — a drawn/framified/resized frame's
+  // rect is authoritative and must keep its own edges, even inside the content.
+  useLayoutEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+    for (const bg of Array.from(content.querySelectorAll('rect[data-frame-bg="auto"]'))) {
+      const g = bg.parentNode as SVGGraphicsElement | null;
+      if (!g) continue;
+      // A rect-based clip already states the frame's bounds exactly — content
+      // deliberately overflows it, so measuring the children would over-inflate.
+      const clip = clipRectOf(g);
+      let box: { x: number; y: number; w: number; h: number } | null = null;
+      if (clip) {
+        box = {
+          x: +(clip.getAttribute('x') ?? 0),
+          y: +(clip.getAttribute('y') ?? 0),
+          w: +(clip.getAttribute('width') ?? 0),
+          h: +(clip.getAttribute('height') ?? 0),
+        };
+      } else {
+        // Measure the children alone: the bg rect sits in the same user space and
+        // would otherwise pin the union to the stale box we're replacing.
+        const anchor = bg.nextSibling;
+        g.removeChild(bg);
+        try {
+          const b = g.getBBox();
+          if (b.width > 0 && b.height > 0) box = { x: b.x, y: b.y, w: b.width, h: b.height };
+        } catch {
+          // No rendered geometry — leave the parse-time box alone.
+        }
+        g.insertBefore(bg, anchor);
+      }
+      if (!box || !(box.w > 0) || !(box.h > 0)) continue;
+      bg.setAttribute('x', String(box.x));
+      bg.setAttribute('y', String(box.y));
+      bg.setAttribute('width', String(box.w));
+      bg.setAttribute('height', String(box.h));
+    }
+  }, [svg]);
 
   const measure = useCallback(
     (id: string | null): Box | null => {
@@ -536,6 +613,17 @@ export function StageCanvas({
               r.el.setAttribute('width', nw.toFixed(1));
               r.el.setAttribute('height', nh.toFixed(1));
               nb = { x: +nx.toFixed(1), y: +ny.toFixed(1), w: +nw.toFixed(1), h: +nh.toFixed(1) };
+              // Hold the corner radius absolute, but keep rx == ry and capped at
+              // min(w,h)/2 so the shape never degrades into an ellipse (see the
+              // rectR0 note in startTransform). Applies to a plain rect (V) and to a
+              // frame's bg/clip rects alike — every rect here gets the same radius,
+              // so the background and its clip can't drift apart.
+              if ((g.rectR0 ?? 0) > 0) {
+                const rr = +Math.min(g.rectR0 ?? 0, Math.min(nw, nh) / 2).toFixed(2);
+                r.el.setAttribute('rx', String(rr));
+                r.el.setAttribute('ry', String(rr));
+                g.lastRectRadius = rr;
+              }
             }
             g.lastFrameBox = nb;
           } else {
@@ -619,10 +707,19 @@ export function StageCanvas({
         let dy = (p.y - g.startY) / g.scale;
         let guideX: number | null = null;
         let guideY: number | null = null;
+        // Shift → constrain the move to one axis (Figma): keep the dominant delta
+        // and zero the other, so the copy stays exactly parallel to the original
+        // horizontally or vertically. The locked axis is also excluded from snapping
+        // below — otherwise a neighbour could pull it back off the straight line.
+        const lockY = p.shift && Math.abs(dx) >= Math.abs(dy); // moving along X, Y pinned
+        const lockX = p.shift && !lockY; // moving along Y, X pinned
+        if (lockY) dy = 0;
+        if (lockX) dx = 0;
         // Snap the dragged box's edges/centre to any neighbour's edges/centre
         // within a small threshold, and remember the matched line for the guide.
-        // On by default (Figma-style); holding Shift bypasses it for free placement.
-        if (!p.shift && g.targets.length) {
+        // On by default (Figma-style), and it keeps working under Shift — but only
+        // on the axis Shift left free.
+        if (g.targets.length) {
           const T = SNAP_PX / g.scale;
           const b = g.baseBox;
           let bestX = T;
@@ -630,16 +727,20 @@ export function StageCanvas({
           for (const t of g.targets) {
             const tXs = [t.left, t.cx, t.right];
             const tYs = [t.top, t.cy, t.bottom];
-            for (const dv of [b.left + dx, b.cx + dx, b.right + dx]) {
-              for (const tv of tXs) {
-                const d = tv - dv;
-                if (Math.abs(d) < bestX) { bestX = Math.abs(d); dx += d; guideX = tv; }
+            if (!lockX) {
+              for (const dv of [b.left + dx, b.cx + dx, b.right + dx]) {
+                for (const tv of tXs) {
+                  const d = tv - dv;
+                  if (Math.abs(d) < bestX) { bestX = Math.abs(d); dx += d; guideX = tv; }
+                }
               }
             }
-            for (const dv of [b.top + dy, b.cy + dy, b.bottom + dy]) {
-              for (const tv of tYs) {
-                const d = tv - dv;
-                if (Math.abs(d) < bestY) { bestY = Math.abs(d); dy += d; guideY = tv; }
+            if (!lockY) {
+              for (const dv of [b.top + dy, b.cy + dy, b.bottom + dy]) {
+                for (const tv of tYs) {
+                  const d = tv - dv;
+                  if (Math.abs(d) < bestY) { bestY = Math.abs(d); dy += d; guideY = tv; }
+                }
               }
             }
           }
@@ -734,6 +835,16 @@ export function StageCanvas({
           hi.style.removeProperty('--gizmo-inv-x');
           hi.style.removeProperty('--gizmo-inv-y');
         }
+        // Undo the dimension badge's counter-scale (see `flush`). This MUST be
+        // imperative: React renders the badge with the constant style
+        // `transform: translateX(-50%)`, so on the next render it diffs identical
+        // strings, skips the DOM write, and the scale(...) we set during the drag
+        // would stick — leaving the label permanently stretched.
+        const lab = dimLabelRef.current;
+        if (lab) {
+          lab.style.transform = 'translateX(-50%)';
+          lab.style.removeProperty('transform-origin');
+        }
         // Restore each chrome to its pre-drag position. A committed resize then
         // re-renders it to the new box (React's style prop wins on the next paint);
         // a no-op drag just leaves it where it was. Restoring (vs clearing) matters
@@ -749,9 +860,9 @@ export function StageCanvas({
         if (g.sub === 'radius') {
           if (g.lastRadius != null && g.layerId) onSetRadius?.(g.layerId, Math.round(g.lastRadius));
         } else if (g.frameId && g.lastFrameBox) {
-          onResizeFrame?.(g.frameId, g.lastFrameBox);
+          onResizeFrame?.(g.frameId, g.lastFrameBox, g.lastRectRadius ?? undefined);
         } else if (g.rectResize && g.rectId && g.lastFrameBox) {
-          onResizeRect?.(g.rectId, g.lastFrameBox);
+          onResizeRect?.(g.rectId, g.lastFrameBox, g.lastRectRadius ?? undefined);
         } else if (g.lastMatrix) {
           onTransformLayers?.(g.ids, g.lastMatrix);
         }
@@ -885,8 +996,14 @@ export function StageCanvas({
     // Resolve the layer under the cursor. A plain press inside any already-
     // selected layer grabs the whole selection (Figma: drag within selection
     // moves it) — even if the hit resolves to a child or a different group.
-    let id = layerIdAt(e.target, deep);
-    if (!additive && (!deep || dup) && selectedIds.length) {
+    // Pressing a frame's name chrome grabs that frame — Figma moves a frame by its
+    // label, and Alt-dragging it duplicates. The chrome is HTML living outside the
+    // SVG, so it carries no data-layer-id; resolve the frame from the chrome
+    // wrapper instead. (The role-icon button stops pointerdown itself, so it never
+    // reaches here and still just cycles the role.)
+    const chromeEl = e.target instanceof Element ? e.target.closest('[data-frame-chrome-id]') : null;
+    let id = chromeEl ? chromeEl.getAttribute('data-frame-chrome-id') : layerIdAt(e.target, deep);
+    if (!chromeEl && !additive && (!deep || dup) && selectedIds.length) {
       const hitEl = e.target instanceof Element ? e.target : null;
       for (const sid of selectedIds) {
         const selNode = content?.querySelector<Element>(`[data-layer-id="${sid}"]`);
@@ -971,6 +1088,7 @@ export function StageCanvas({
     // usual matrix scale runs instead.
     let frameRects: { el: Element; x0: number; y0: number; w0: number; h0: number }[] | null = null;
     let frameId: string | null = null;
+    let frameR0 = 0;
     if (sub === 'resize' && ids.length === 1) {
       const node = nodes[0].node;
       // Any frame carrying its own bounds — a bg rect (drawn frame) and/or a clip
@@ -979,7 +1097,7 @@ export function StageCanvas({
       // edges. (Rotation would misplace the anchor, but that's a rare edge.)
       const rects = [
         node.querySelector(':scope > rect[data-frame-bg]'),
-        node.querySelector(':scope > clipPath > rect'),
+        clipRectOf(node),
       ].filter(Boolean) as Element[];
       if (rects.length) {
         frameRects = rects.map((el) => ({
@@ -990,19 +1108,30 @@ export function StageCanvas({
           h0: +(el.getAttribute('height') ?? 0),
         }));
         frameId = ids[0];
+        // A frame's corner radius lives on its bg/clip rects and needs the same
+        // circular re-clamp as a plain rect (see rectR0 below) — without it the
+        // independent rx/ry clamp turns a small frame into an ellipse.
+        frameR0 = Math.max(
+          +(rects[0].getAttribute('rx') ?? 0) || 0,
+          +(rects[0].getAttribute('ry') ?? 0) || 0,
+        );
       }
     }
 
-    // Plain-rect resize: the sole selected node is a <rect> whose transform carries
-    // NO rotation or skew (translate and/or scale are fine). Resize it via its
-    // x/y/width/height (rx/ry stay fixed) instead of a matrix scale, so the corner
-    // radius doesn't stretch. With b==c==0 the local→content map is `content = a·x+e`
-    // per axis, so the sx/sy ratios and the local anchor math (x0+w0-nw etc.) still
-    // hold — the constant scale factors a/d just ride along. Only a baked rotate/skew
-    // breaks that assumption, so those alone fall through to the matrix path.
+    // Plain-rect resize (V / move only): the sole selected node is a <rect> whose
+    // transform carries NO rotation or skew (translate and/or scale are fine).
+    // Resize it via its x/y/width/height so the corner radius stays ABSOLUTE
+    // instead of being stretched by a matrix scale. With b==c==0 the local→content
+    // map is `content = a·x+e` per axis, so the sx/sy ratios and the local anchor
+    // math (x0+w0-nw etc.) still hold — the constant scale factors a/d ride along.
+    // A baked rotate/skew breaks that, so those fall through to the matrix path.
+    //
+    // K (scaleMode) deliberately skips this: there the radius must scale WITH the
+    // shape (proportional), which is exactly what the uniform matrix scale gives.
     let rectResize = false;
     let rectId: string | null = null;
-    if (!frameRects && sub === 'resize' && ids.length === 1) {
+    let rectR0 = 0;
+    if (!frameRects && !scaleMode && sub === 'resize' && ids.length === 1) {
       const node = nodes[0].node;
       const m = node.transform?.baseVal?.consolidate()?.matrix;
       const noRotate = !m || (Math.abs(m.b) < 1e-6 && Math.abs(m.c) < 1e-6);
@@ -1016,6 +1145,15 @@ export function StageCanvas({
         }];
         rectResize = true;
         rectId = ids[0];
+        // The radius to hold constant. SVG clamps rx to w/2 and ry to h/2
+        // INDEPENDENTLY, which turns a small non-square rect into an ellipse — the
+        // "broken" corners. We re-clamp both to the same min(w,h)/2 each frame, so
+        // corners stay circular: a rounded rect degrades to a stadium, then a
+        // circle, never an ellipse.
+        rectR0 = Math.max(
+          +(node.getAttribute('rx') ?? 0) || 0,
+          +(node.getAttribute('ry') ?? 0) || 0,
+        );
       }
     }
 
@@ -1058,7 +1196,7 @@ export function StageCanvas({
 
     drag.current = {
       kind: 'transform', sub, ids, nodes, scale: view.scale, crLeft: cr.left, crTop: cr.top, box,
-      frameRects, frameId, rectResize, rectId, lastFrameBox: null, chromes, targets,
+      frameRects, frameId, rectResize, rectId, rectR0: rectR0 || frameR0, lastFrameBox: null, lastRectRadius: null, chromes, targets,
       movesE, movesW, movesN, movesS,
       anchorX: movesE ? box.left : movesW ? right : cx,
       anchorY: movesS ? box.top : movesN ? bottom : cy,
@@ -1172,6 +1310,7 @@ export function StageCanvas({
               selected={selectedIds.includes(f.id)}
               onSelect={(additive) => onSelect(f.id, additive)}
               onCycleRole={onCycleFrameRole ? () => onCycleFrameRole(f.id) : undefined}
+              onRename={onRename ? (name) => onRename(f.id, name) : undefined}
             />
           ))}
           {hovBox && <Highlight box={hovBox} kind="hover" scale={view.scale} />}
@@ -1226,9 +1365,6 @@ export function StageCanvas({
           )}
         </div>
       )}
-      <div className="pointer-events-none absolute right-3 top-3 rounded-md bg-elevated/80 px-2 py-1 text-caption text-tertiary backdrop-blur">
-        {t('editor.hint.canvas')}
-      </div>
     </div>
   );
 }
@@ -1292,7 +1428,11 @@ function TransformHandles({
     // centre so it keeps its true square size while riding to the new edge.
     transform: 'scale(var(--gizmo-inv-x, 1), var(--gizmo-inv-y, 1))',
   });
-  const rInset = Math.max(Math.min(radius, Math.min(box.width, box.height) / 2), 14 / scale);
+  // The 14px floor keeps the handle grabbable on an unrounded corner, but it must
+  // never push past the box centre — on a short box that flings the handles out
+  // past the opposite edge.
+  const rHalf = Math.min(box.width, box.height) / 2;
+  const rInset = Math.min(Math.max(Math.min(radius, rHalf), 14 / scale), rHalf);
   return (
     <>
       <div
@@ -1349,7 +1489,14 @@ function TransformHandles({
             onPointerDown={(e) => onStart(e, 'radius', c.k)}
             className="pointer-events-auto absolute rounded-full"
             title={t('editor.canvas.radiusTitle')}
-            style={{ left: c.x + sx * rInset - s / 2, top: c.y + sy * rInset - s / 2, width: s, height: s, border: `${border}px solid ${accent}`, background: '#fff', cursor: c.cur, transform: 'scale(var(--gizmo-inv-x, 1), var(--gizmo-inv-y, 1))' }}
+            // The inset rides the parent's resize matrix, so a stretched axis would
+            // drag the handle further from its corner than the other one. Scale the
+            // inset by the same inverse vars that keep the dot itself square, so all
+            // four stay the true radius distance from their corners mid-drag.
+            style={{
+              left: `calc(${c.x - s / 2}px + ${sx * rInset}px * var(--gizmo-inv-x, 1))`,
+              top: `calc(${c.y - s / 2}px + ${sy * rInset}px * var(--gizmo-inv-y, 1))`,
+              width: s, height: s, border: `${border}px solid ${accent}`, background: '#fff', cursor: c.cur, transform: 'scale(var(--gizmo-inv-x, 1), var(--gizmo-inv-y, 1))' }}
           />
         );
       })}
@@ -1416,14 +1563,18 @@ function FrameChromeLabel({
   selected,
   onSelect,
   onCycleRole,
+  onRename,
 }: {
   frame: FrameChrome & { box: Box };
   scale: number;
   selected: boolean;
   onSelect: (additive: boolean) => void;
   onCycleRole?: () => void;
+  /** Commit a rename typed into the label after a double-click. */
+  onRename?: (name: string) => void;
 }) {
   const { t } = useT();
+  const [editing, setEditing] = useState(false);
   const { box } = frame;
   const meta = ROLE_META[frame.role ?? 'frame'];
   const { Icon } = meta;
@@ -1436,29 +1587,81 @@ function FrameChromeLabel({
       className="absolute flex items-center justify-between will-change-transform"
       style={{ left: box.left, top: box.top - font * 1.35 - gap, width: box.width, height: font * 1.35 }}
     >
-      <button
-        type="button"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelect(e.shiftKey || e.metaKey);
-        }}
-        // `frame-name-label` drives the cursor via CSS: default arrow normally
-        // (the <button>'s pointer/hand reads as a link, but selecting a frame is a
-        // canvas gesture), flipping to `copy` while Alt is held — Alt-drag
-        // duplicates the frame, same as the shapes on the canvas.
-        className="frame-name-label pointer-events-auto min-w-0 truncate text-left leading-none"
-        style={{
-          fontSize: font,
-          // A role-tagged frame keeps its role colour (red flawed / green
-          // reference) even while selected; plain frames go brand-blue on select.
-          color: frame.role ? meta.color : selected ? 'var(--brand)' : 'var(--text-secondary)',
-          fontWeight: selected ? 600 : 500,
-          paddingRight: gap,
-        }}
-      >
-        {frame.name}
-      </button>
+      {editing && onRename ? (
+        // Rename in place — the same gesture and commit as double-clicking a row
+        // in the layers panel. Pointer events stop here so typing/caret-dragging
+        // inside the field can't reach the stage and start a canvas gesture.
+        <input
+          autoFocus
+          defaultValue={frame.name}
+          onFocus={(e) => e.currentTarget.select()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            // The stage's shortcuts listen on window, so every key typed here
+            // (V, F, Delete…) would otherwise also fire a tool switch.
+            e.stopPropagation();
+            if (e.key === 'Enter') {
+              onRename(e.currentTarget.value);
+              setEditing(false);
+            } else if (e.key === 'Escape') {
+              setEditing(false);
+            }
+          }}
+          onBlur={(e) => {
+            onRename(e.currentTarget.value);
+            setEditing(false);
+          }}
+          className="pointer-events-auto min-w-0 flex-1 bg-elevated leading-none text-primary"
+          // Everything here is divided by `scale` because the chrome lives inside
+          // the zoomed content layer — a CSS radius/outline would grow with the
+          // matrix. Dividing keeps the field the same on screen at any zoom, and
+          // matching the panels' rounded-sm (6px) is why the radius is a constant.
+          style={{
+            fontSize: font,
+            fontWeight: selected ? 600 : 500,
+            borderRadius: `${RENAME_RADIUS_PX / scale}px`,
+            outline: `${1.5 / scale}px solid var(--brand)`,
+            outlineOffset: `${-1 / scale}px`,
+            padding: `${1 / scale}px ${2 / scale}px`,
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          // Pointerdown deliberately bubbles to the stage: it selects the frame and
+          // arms the move/Alt-duplicate drag (the stage resolves the frame from this
+          // chrome's data-frame-chrome-id). onClick then only has to cover the
+          // keyboard/no-drag case, so it must not re-select on a plain mouse click.
+          onClick={(e) => {
+            e.stopPropagation();
+            if (e.detail === 0) onSelect(e.shiftKey || e.metaKey);
+          }}
+          // Double-click opens the rename field. The press that precedes it still
+          // selects + arms a move on the stage, but a double-click never travels
+          // far enough to commit one, so the two gestures don't collide.
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            if (onRename) setEditing(true);
+          }}
+          // `frame-name-label` drives the cursor via CSS: default arrow normally
+          // (the <button>'s pointer/hand reads as a link, but selecting a frame is a
+          // canvas gesture), flipping to `copy` while Alt is held — Alt-drag
+          // duplicates the frame, same as the shapes on the canvas.
+          className="frame-name-label pointer-events-auto min-w-0 truncate text-left leading-none"
+          style={{
+            fontSize: font,
+            // A role-tagged frame keeps its role colour (red flawed / green
+            // reference) even while selected; plain frames go brand-blue on select.
+            color: frame.role ? meta.color : selected ? 'var(--brand)' : 'var(--text-secondary)',
+            fontWeight: selected ? 600 : 500,
+            paddingRight: gap,
+          }}
+        >
+          {frame.name}
+        </button>
+      )}
       {onCycleRole && (
         <button
           type="button"

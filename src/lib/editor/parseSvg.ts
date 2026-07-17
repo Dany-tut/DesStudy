@@ -265,7 +265,12 @@ function walkChildren(el: Element, counter: { n: number }): Layer[] {
           bg.setAttribute('width', String(w));
           bg.setAttribute('height', String(h));
           bg.setAttribute('fill', 'none');
-          bg.setAttribute('data-frame-bg', '1');
+          // "auto" = geometry derived here, off-DOM, from only those children that
+          // carry explicit x/y/width/height (<rect>/<image>) — paths and text
+          // contribute nothing, so this box can sit well inside the real content.
+          // The canvas re-measures every "auto" rect against the live DOM once the
+          // SVG mounts; a manual frame resize drops the marker and pins it.
+          bg.setAttribute('data-frame-bg', 'auto');
           child.insertBefore(bg, child.firstChild);
         }
       }

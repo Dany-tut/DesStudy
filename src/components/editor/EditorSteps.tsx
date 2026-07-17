@@ -49,7 +49,7 @@ export function ExerciseSetupPanel({
   const fileRef = useRef<HTMLInputElement>(null);
   const needsBroken = draft.kind !== 'critique';
   return (
-    <div className="flex flex-col gap-3 px-1">
+    <div className="flex flex-col gap-3">
       <p className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.steps.taskType')}</p>
       <div className="flex flex-col gap-1.5">
         {KINDS.map((k) => {
@@ -143,7 +143,7 @@ export function ZoneEditor({
 }) {
   const { t } = useT();
   return (
-    <div className="flex flex-col gap-4 px-1">
+    <div className="flex flex-col gap-4">
       <div>
         <p className="text-caption font-medium uppercase tracking-wide text-tertiary">{t('editor.zone.title')}</p>
         <p className="mt-0.5 truncate text-footnote font-semibold text-primary">{layer.name}</p>
