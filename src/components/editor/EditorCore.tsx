@@ -191,6 +191,18 @@ function setBoxInTree(layers: Layer[], id: string, box: NonNullable<Layer['props
   );
 }
 
+/** Rewrite one layer's corner radius in the tree (structural copy along the path).
+ *  Keeps the properties panel in sync when a resize re-clamps the radius. */
+function setRadiusInTree(layers: Layer[], id: string, radius: number): Layer[] {
+  return layers.map((l) =>
+    l.id === id
+      ? { ...l, props: { ...l.props, radius } }
+      : l.children.length
+        ? { ...l, children: setRadiusInTree(l.children, id, radius) }
+        : l,
+  );
+}
+
 /** Paint a frame's background. A `<g>` frame has no fill of its own — its
  *  background is a full-bounds rect child (the parser adopts that rect's fill as
  *  the frame fill). To keep the panel and the canvas in sync we write the colour
@@ -985,11 +997,13 @@ export function EditorCore() {
   );
 
   // Commit a plain-rect resize from the canvas: write the new box onto the rect's
-  // x/y/width/height and refresh its tree box. rx/ry are left untouched, so the
-  // corner radius stays constant instead of being stretched by a matrix scale
-  // (Figma's rect-resize behaviour). The canvas already resized the rect live.
+  // x/y/width/height and refresh its tree box. The corner radius stays ABSOLUTE
+  // rather than being stretched by a matrix scale (Figma's rect-resize behaviour);
+  // `radius` re-clamps it so rx == ry (min(w,h)/2 cap), keeping corners circular —
+  // a shrunk rect reads as a stadium/circle, never an ellipse. The canvas already
+  // resized the rect live; this mirrors it into the committed markup + tree.
   const resizeRect = useCallback(
-    (id: string, box: { x: number; y: number; w: number; h: number }) => {
+    (id: string, box: { x: number; y: number; w: number; h: number }, radius?: number) => {
       if (!(box.w > 0 && box.h > 0)) return;
       pushUndo();
       setResult((r) => {
@@ -1001,10 +1015,18 @@ export function EditorCore() {
         el.setAttribute('y', String(box.y));
         el.setAttribute('width', String(box.w));
         el.setAttribute('height', String(box.h));
+        if (radius != null) {
+          el.setAttribute('rx', String(radius));
+          el.setAttribute('ry', String(radius));
+        }
+        const boxed = setBoxInTree(r.screen.layers, id, box);
         return {
           ...r,
           svg: new XMLSerializer().serializeToString(doc.documentElement),
-          screen: { ...r.screen, layers: setBoxInTree(r.screen.layers, id, box) },
+          screen: {
+            ...r.screen,
+            layers: radius != null ? setRadiusInTree(boxed, id, radius) : boxed,
+          },
         };
       });
     },

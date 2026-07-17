@@ -144,7 +144,9 @@ export function StageCanvas({
   onResizeFrame?: (id: string, box: { x: number; y: number; w: number; h: number }) => void;
   /** Commit a plain-rect resize: set the rect's x/y/width/height to the new box,
    *  leaving rx/ry untouched so the corner radius doesn't stretch. */
-  onResizeRect?: (id: string, box: { x: number; y: number; w: number; h: number }) => void;
+  /** Commit a plain-rect resize. `radius` (when given) is the re-clamped corner
+   *  radius that keeps rx == ry, so a shrunk rect never reads as an ellipse. */
+  onResizeRect?: (id: string, box: { x: number; y: number; w: number; h: number }, radius?: number) => void;
   /** Commit a corner-radius drag on a single rect layer. */
   onSetRadius?: (id: string, r: number) => void;
   /** Right-click — opens the shared context menu. `layerId` is null on empty grid. */
@@ -235,12 +237,18 @@ export function StageCanvas({
         frameRects?: { el: Element; x0: number; y0: number; w0: number; h0: number }[] | null;
         frameId?: string | null;
         lastFrameBox?: { x: number; y: number; w: number; h: number } | null;
-        // Plain-rect resize: when the sole selected node is a bare <rect>, we resize
-        // by mutating its x/y/width/height (leaving rx/ry untouched) instead of baking
-        // a matrix scale — otherwise the scale stretches the rounded corners into
-        // ellipses. Reuses the frameRects live-mutation path; commits via onResizeRect.
+        // Plain-rect resize (V only): when the sole selected node is a bare <rect>, we
+        // resize by mutating its x/y/width/height instead of baking a matrix scale —
+        // otherwise the scale stretches the rounded corners into ellipses. The radius
+        // is held absolute at `rectR0` but re-clamped to min(w,h)/2 with rx == ry each
+        // frame (`lastRectRadius`), so corners stay circular. Reuses the frameRects
+        // live-mutation path; commits via onResizeRect.
         rectResize?: boolean;
         rectId?: string | null;
+        /** Corner radius at drag start — the absolute value to hold. */
+        rectR0?: number;
+        /** Latest re-clamped radius written to the rect; committed on drop. */
+        lastRectRadius?: number | null;
         // Frame-chrome strips (name + role icon) of the resized frames, captured at
         // drag start so `flush` can ride them along live — otherwise the label/icon
         // lag behind the frame's edges until the resize commits. `off` is the fixed
@@ -536,6 +544,15 @@ export function StageCanvas({
               r.el.setAttribute('width', nw.toFixed(1));
               r.el.setAttribute('height', nh.toFixed(1));
               nb = { x: +nx.toFixed(1), y: +ny.toFixed(1), w: +nw.toFixed(1), h: +nh.toFixed(1) };
+              // Hold the corner radius absolute, but keep rx == ry and capped at
+              // min(w,h)/2 so the shape never degrades into an ellipse (see the
+              // rectR0 note in startTransform). Only for a plain-rect (V) resize.
+              if (g.rectResize && (g.rectR0 ?? 0) > 0) {
+                const rr = +Math.min(g.rectR0 ?? 0, Math.min(nw, nh) / 2).toFixed(2);
+                r.el.setAttribute('rx', String(rr));
+                r.el.setAttribute('ry', String(rr));
+                g.lastRectRadius = rr;
+              }
             }
             g.lastFrameBox = nb;
           } else {
@@ -751,7 +768,7 @@ export function StageCanvas({
         } else if (g.frameId && g.lastFrameBox) {
           onResizeFrame?.(g.frameId, g.lastFrameBox);
         } else if (g.rectResize && g.rectId && g.lastFrameBox) {
-          onResizeRect?.(g.rectId, g.lastFrameBox);
+          onResizeRect?.(g.rectId, g.lastFrameBox, g.lastRectRadius ?? undefined);
         } else if (g.lastMatrix) {
           onTransformLayers?.(g.ids, g.lastMatrix);
         }
@@ -993,16 +1010,20 @@ export function StageCanvas({
       }
     }
 
-    // Plain-rect resize: the sole selected node is a <rect> whose transform carries
-    // NO rotation or skew (translate and/or scale are fine). Resize it via its
-    // x/y/width/height (rx/ry stay fixed) instead of a matrix scale, so the corner
-    // radius doesn't stretch. With b==c==0 the local→content map is `content = a·x+e`
-    // per axis, so the sx/sy ratios and the local anchor math (x0+w0-nw etc.) still
-    // hold — the constant scale factors a/d just ride along. Only a baked rotate/skew
-    // breaks that assumption, so those alone fall through to the matrix path.
+    // Plain-rect resize (V / move only): the sole selected node is a <rect> whose
+    // transform carries NO rotation or skew (translate and/or scale are fine).
+    // Resize it via its x/y/width/height so the corner radius stays ABSOLUTE
+    // instead of being stretched by a matrix scale. With b==c==0 the local→content
+    // map is `content = a·x+e` per axis, so the sx/sy ratios and the local anchor
+    // math (x0+w0-nw etc.) still hold — the constant scale factors a/d ride along.
+    // A baked rotate/skew breaks that, so those fall through to the matrix path.
+    //
+    // K (scaleMode) deliberately skips this: there the radius must scale WITH the
+    // shape (proportional), which is exactly what the uniform matrix scale gives.
     let rectResize = false;
     let rectId: string | null = null;
-    if (!frameRects && sub === 'resize' && ids.length === 1) {
+    let rectR0 = 0;
+    if (!frameRects && !scaleMode && sub === 'resize' && ids.length === 1) {
       const node = nodes[0].node;
       const m = node.transform?.baseVal?.consolidate()?.matrix;
       const noRotate = !m || (Math.abs(m.b) < 1e-6 && Math.abs(m.c) < 1e-6);
@@ -1016,6 +1037,15 @@ export function StageCanvas({
         }];
         rectResize = true;
         rectId = ids[0];
+        // The radius to hold constant. SVG clamps rx to w/2 and ry to h/2
+        // INDEPENDENTLY, which turns a small non-square rect into an ellipse — the
+        // "broken" corners. We re-clamp both to the same min(w,h)/2 each frame, so
+        // corners stay circular: a rounded rect degrades to a stadium, then a
+        // circle, never an ellipse.
+        rectR0 = Math.max(
+          +(node.getAttribute('rx') ?? 0) || 0,
+          +(node.getAttribute('ry') ?? 0) || 0,
+        );
       }
     }
 
@@ -1058,7 +1088,7 @@ export function StageCanvas({
 
     drag.current = {
       kind: 'transform', sub, ids, nodes, scale: view.scale, crLeft: cr.left, crTop: cr.top, box,
-      frameRects, frameId, rectResize, rectId, lastFrameBox: null, chromes, targets,
+      frameRects, frameId, rectResize, rectId, rectR0, lastFrameBox: null, lastRectRadius: null, chromes, targets,
       movesE, movesW, movesN, movesS,
       anchorX: movesE ? box.left : movesW ? right : cx,
       anchorY: movesS ? box.top : movesN ? bottom : cy,
